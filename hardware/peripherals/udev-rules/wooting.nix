@@ -14,4 +14,6 @@
 		'';
 		destination = "/etc/udev/rules.d/70-wooting.rules";
 	});
+
+	# hardware.wooting.enable = true; # This requires unfree license
 }
