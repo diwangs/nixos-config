@@ -35,6 +35,7 @@
 		# mbelib						# sdrangel: decode AMBe (e.g., C4FM, D-STAR, DMR)
 		wsjtx									# FT8 and WSPR
 		flrig									# Radio remote control (part of fldigi)
+		trezor-suite					# Trezor wallet (since no WebUSB in Firefox)
 	] ++ [
 		pkgs-stable.codeql 		# Pin CodeQL. Also prevents download from vscode plugin
 	];
