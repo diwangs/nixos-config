@@ -81,12 +81,8 @@
 				ms-toolsai.jupyter-keymap
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
-
-				# Code intelligence
-				github.copilot								# Unfree		
+			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 				github.copilot-chat						# Unfree
-				# anthropic.claude-code					# Unfree
-			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace; [
 				github.vscode-codeql					# Unfree
 			]);
 			userSettings = {
@@ -105,7 +101,8 @@
 
 				# Copilot
 				"chat.commandCenter.enabled" = false;
-				"chat.extensionUnification.enabled" = false;
+				"window.commandCenter" = false;
+				# "chat.extensionUnification.enabled" = false;
 				"editor.inlineSuggest.enabled" = false; # Trigger with Alt + \
 				# Modify with `editor.inlineSuggest.trigger`
 				"github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes

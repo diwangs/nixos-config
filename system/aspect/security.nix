@@ -16,7 +16,7 @@
 	# Replace stdenv with Clang/LLVM and compile with NixOS' hardening
 	# This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
 	# TODO: modularize kernel overrides
-	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_default (old: {
+	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_6_12 (old: {
 		stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] (import ./lib/bintools.nix args).llvm;
 		# stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] pkgs.llvmPackages.stdenv;
 
