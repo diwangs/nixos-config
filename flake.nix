@@ -44,14 +44,18 @@
 				# Self-defined args to pass allowed unfree packages
 				allowedUnfree = [
 					"codeql"
-					"claude-code"
 					"github-copilot-cli"
+
+					# VSCode and some unfree extensions
 					"vscode"
 					"vscode-extension-github-copilot"
 					"vscode-extension-github-copilot-chat"
-					"vscode-extension-anthropic-claude-code"
 					"vscode-extension-MS-python-vscode-pylance"
 					"vscode-extension-ms-vscode-remote-remote-ssh"
+
+					# AppImages
+					"trezor-suite"
+					"wootility"
 				];
 
 				# Secrets from TOML

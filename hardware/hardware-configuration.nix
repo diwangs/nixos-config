@@ -9,8 +9,8 @@
 
 		# Peripherals
 		./peripherals/printer.nix
-		./peripherals/udev-rules/hackrf-one.nix
-		./peripherals/udev-rules/wooting.nix
+		# ./peripherals/udev-rules/hackrf-one.nix
+		# ./peripherals/udev-rules/wooting.nix
 		# ./peripherals/egpu.nix # My setup changes, so we don't need egpu anymore
 	];
 
@@ -54,4 +54,8 @@
 
 	networking.hostId = secrets.paladin-iii.host-id;
 	networking.hostName = "paladin-iii";
+
+	# Peripherals
+  hardware.hackrf.enable = true;
+	hardware.wooting.enable = true; # This requires unfree license
 }

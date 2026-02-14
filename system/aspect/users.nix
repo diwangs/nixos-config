@@ -12,6 +12,7 @@
 			"networkmanager"
 			"dialout"		# Serial connection
 			"adbusers"	# Android debugging
+			"plugdev"		# HackRF
 		]; 
 		initialHashedPassword = secrets.diwangs.hashed-password;		# Enable for GDM to detect it?
 		# NOTE: The same password is used for Gnome keyring, but is not synced
