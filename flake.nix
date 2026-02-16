@@ -59,7 +59,7 @@
 				];
 
 				# Secrets from TOML
-				secrets = builtins.fromTOML (builtins.readFile ./secrets.toml);
+				secrets = builtins.fromTOML (builtins.readFile ./secret.toml);
 
 				# Modify `allowUnfreePredicate` of `pkgs-stable`
 				# We don't similarly modify `pkgs` here to retain the ability of 

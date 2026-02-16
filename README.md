@@ -35,7 +35,7 @@ that I manage to do in my laptop with Nix.
 - `system` - How the OS (and 'system-layer') is managed
     - `aspect` - Configurations of the various aspects of the system
 - `package` - Define packages to install
-- Secrets are separated in a `secrets.toml` file (not commited)
+- Secrets are separated in a `secret.toml` file (not commited)
 
 ### Hardware
 These are Nix files that is not-portable across machines.
