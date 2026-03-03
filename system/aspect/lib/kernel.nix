@@ -25,7 +25,7 @@
         hardened = prev.linuxKernel.kernelPatches.hardened // {
           "6.18" = {
             version = "6.18.13";
-            extra = "-hardened1";
+            extra = "";	# nbouchinet's 6.18 patch doesn't set EXTRAVERSION=-hardened1; this keeps `uname` the same
             sha256 = "0zv8qml075jpk2i58cxp61hm3yb74mpkbkjg15n87riqzmakqb7d";		# Hash of the pre-patch kernel
             name = "linux-hardened-6.18.13-hardened1";
             patch = final.fetchurl {
