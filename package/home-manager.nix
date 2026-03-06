@@ -81,8 +81,10 @@
 				ms-toolsai.jupyter-keymap
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
-			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
+				
+				# Agent
 				github.copilot-chat						# Unfree
+			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 				github.vscode-codeql					# Unfree
 			]);
 			userSettings = {
