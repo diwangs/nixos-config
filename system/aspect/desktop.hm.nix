@@ -11,7 +11,7 @@
 			# Find the name with `dconf watch /` and dragging and dropping
 			favorite-apps = [
 				"org.gnome.Nautilus.desktop"	# Files
-				"org.gnome.Console.desktop"
+				"com.mitchellh.ghostty.desktop"
 				"code.desktop"
 				"md.obsidian.Obsidian.desktop"
 				"app.zen_browser.zen.desktop"
@@ -29,7 +29,7 @@
 	# Shell
 	programs.zsh = {
 		enable = true;	# required by home-manager `gpg-agent` to expose SSH keys
-		historySubstringSearch.enable = true;
+		historySubstringSearch.enable = true; # The only feature I need from OMZ
 	};
 	programs.starship = {		# Prompt theming
 		enable = true;

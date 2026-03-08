@@ -54,9 +54,18 @@
 			key = secrets.diwangs.gpg-git-sign-fingerprint; # S subkey fingerprint
 		};
 	};
-	# programs.claude-code.enable = true;
 
-	# IDE
+	# Terminal app: Ghostty
+	programs.ghostty = {
+		enable = true;
+		systemd.enable = false;
+		settings = {
+			window-height = 27; # BUG 260307: additional 3 for title bar
+			window-width = 107;	# Closest approx. to side monitor width
+		};
+	};
+
+	# IDE: VSCode official
 	programs.vscode = {
 		enable = true;
 		mutableExtensionsDir = false;
@@ -82,7 +91,7 @@
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
 				
-				# Agent
+				# IDE-based agent
 				github.copilot-chat						# Unfree
 			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 				github.vscode-codeql					# Unfree
@@ -104,13 +113,18 @@
 				# Copilot
 				"chat.commandCenter.enabled" = false;
 				"window.commandCenter" = false;
-				# "chat.extensionUnification.enabled" = false;
 				"editor.inlineSuggest.enabled" = false; # Trigger with Alt + \
 				# Modify with `editor.inlineSuggest.trigger`
 				"github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
-
-				# "sonarlint.pathToNodeExecutable" = "/etc/profiles/per-user/diwangs/bin/node";
 			};
+		};
+	};
+
+	# Terminal-based agent: OpenCode
+	programs.opencode = {
+		enable = true;
+		settings = {
+			autoupdate = "notify";
 		};
 	};
 }
