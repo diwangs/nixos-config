@@ -70,10 +70,9 @@
 
 	services.clatd.enable = true;
 
-	# tayga > 0.9.2 enforces Well-Known Prefix (wkpf) compliance 
-	# according to RFC6052 (wkpf + private IPv4 addr = no bueno), which breaks 
-	# CLAT as we know it. We need to change this behavior on the tayga that is 
-	# used by clatd. Tried solutions:
+	# Relaxes strict RFC6052 requirement of not allowing well-known prefix with
+	# private IPv4 addresses, since my home network is not that big and the PLAT
+	# is located within. Tried solutions:
 	# - clatd's script-up -> doesn't work somehow (error code 1 on `clatd`)
 	# - clatd's cmd-tayga + wrapper script -> works, but has longer code
 	# - (this) Patch tayga source code -> simplest, might be fragile to updates
