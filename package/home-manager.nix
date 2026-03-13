@@ -82,7 +82,8 @@
 				redhat.ansible
 				redhat.vscode-yaml
 				ms-python.python
-				ms-python.vscode-pylance			# Unfree
+				# ms-python.vscode-pylance			# Unfree
+				ms-pyright.pyright
 
 				# Jupyter
 				ms-toolsai.jupyter
