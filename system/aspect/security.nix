@@ -8,7 +8,7 @@
 	# Use hardened stable kernel compiled with Clang/LLVM toolchain
 	# This is sometimes a bit behind the latest stable (up to a month) if there
 	# is new major version (e.g., 6.17 -> 6.18)
-	nixpkgs.overlays = [ (import ./lib/kernel.nix args).linuxKernel_6_18_13_hardenedOverlay ];
+	nixpkgs.overlays = [ (import ./lib/kernel.nix args).linuxKernel_6_18_16_hardenedOverlay ];
 	# NOTE: this is currently not used because it prevents update of the entire nixpkgs
 	# when the old version got deprecated.
 	# Currently using latest LTS instead, so that I could update the rest of the system
