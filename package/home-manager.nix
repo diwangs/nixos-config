@@ -19,7 +19,7 @@
 	home.packages = with pkgs; [
 		# System
 		lm_sensors						# Power and temperature monitoring
-		helvum								# Pipewire multimedia patchbay
+		crosspipe							# Pipewire multimedia patchbay
 		yubioath-flutter			# Yubikey reader
 
 		# Runtime environment (or environment manager)
@@ -93,8 +93,9 @@
 				ms-toolsai.vscode-jupyter-slideshow
 				
 				# IDE-based agent
-				github.copilot-chat						# Unfree
+				# github.copilot-chat						# Unfree
 			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
+				kilocode.kilo-code
 				github.vscode-codeql					# Unfree
 			]);
 			userSettings = {

@@ -18,20 +18,20 @@
 # Last updated: 260310
 { config, pkgs, lib, ... }: {
   
-  # Alpha quality
-  linuxKernel_6_18_13_hardenedOverlay = (final: prev: {
+  # Latest stable from anthraxx
+  linuxKernel_6_19_7_hardenedOverlay = (final: prev: {
     linuxKernel = prev.linuxKernel // {
       kernelPatches = prev.linuxKernel.kernelPatches // {
         hardened = prev.linuxKernel.kernelPatches.hardened // {
-          "6.18" = {
-            version = "6.18.13";
-            extra = "";	# nbouchinet's 6.18 patch doesn't set EXTRAVERSION=-hardened1; this keeps `uname` the same
-            sha256 = "0zv8qml075jpk2i58cxp61hm3yb74mpkbkjg15n87riqzmakqb7d";		# Hash of the pre-patch kernel
-            name = "linux-hardened-6.18.13-hardened1";
+          "6.19" = {
+            version = "6.19.7";
+            extra = "-hardened1";
+            sha256 = "0blmc3gmqyg1fj390gjz3brjznyn7s9m4f6w107ypygmhf5qgh82";		# Hash of the pre-patch kernel
+            name = "linux-hardened-6.19.7-hardened1";
             patch = final.fetchurl {
-              name = "linux-hardened-v6.18.13-hardened1.patch";
-              url = "https://github.com/nbouchinet-anssi/linux-hardened/releases/download/v6.18.13-hardened1/linux-hardened-v6.18.13-hardened1.patch";
-              sha256 = "10k33gf24ayaxk02zfkdn6cyrhgfl5q8iim3fkfkxq7n56zkdw3j";	# Hash of the patch itself
+              name = "linux-hardened-v6.19.7-hardened1.patch";
+              url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.19.7-hardened1/linux-hardened-v6.19.7-hardened1.patch";
+              sha256 = "1k080qxcj9nid54wxb0lcgziq3lalgb1m9j59iv9cbqv4ixkwn37";	# Hash of the patch itself
             };
           };
         };

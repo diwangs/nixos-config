@@ -8,7 +8,7 @@
 	# Use hardened stable kernel compiled with Clang/LLVM toolchain
 	# This is sometimes a bit behind the latest stable (up to a month) if there
 	# is new major version (e.g., 6.17 -> 6.18)
-	nixpkgs.overlays = [ (import ./lib/kernel.nix args).linuxKernel_6_18_16_hardenedOverlay ];
+	nixpkgs.overlays = [ (import ./lib/kernel.nix args).linuxKernel_6_19_7_hardenedOverlay ];
 	# NOTE: this is currently not used because it prevents update of the entire nixpkgs
 	# when the old version got deprecated.
 	# Currently using latest LTS instead, so that I could update the rest of the system
@@ -16,7 +16,7 @@
 	# Replace stdenv with Clang/LLVM and compile with NixOS' hardening
 	# This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
 	# TODO: modularize kernel overrides
-	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_6_18 (old: {
+	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_6_19 (old: {
 		stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] (import ./lib/bintools.nix args).llvm;
 		# stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] pkgs.llvmPackages.stdenv;
 
