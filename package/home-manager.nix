@@ -93,9 +93,8 @@
 				ms-toolsai.vscode-jupyter-slideshow
 				
 				# IDE-based agent
-				# github.copilot-chat						# Unfree
 			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
-				kilocode.kilo-code
+				github.copilot-chat						# Unfree
 				github.vscode-codeql					# Unfree
 			]);
 			userSettings = {
