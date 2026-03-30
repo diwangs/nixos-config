@@ -50,6 +50,7 @@
 					"vscode"
 					"vscode-extension-github-copilot"
 					"vscode-extension-github-copilot-chat"
+					"vscode-extension-GitHub-copilot-chat"
 					"vscode-extension-MS-python-vscode-pylance"
 					"vscode-extension-ms-vscode-remote-remote-ssh"
 

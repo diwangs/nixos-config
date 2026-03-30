@@ -15,23 +15,23 @@
 # 
 # NOTE: overlay `pkgs.linuxKernel.kernelPatches`, not `pkgs.kernelPatches`
 
-# Last updated: 260310
+# Last updated: 260329
 { config, pkgs, lib, ... }: {
   
   # Latest stable from anthraxx
-  linuxKernel_6_19_7_hardenedOverlay = (final: prev: {
+  linuxKernel_6_19_10_hardenedOverlay = (final: prev: {
     linuxKernel = prev.linuxKernel // {
       kernelPatches = prev.linuxKernel.kernelPatches // {
         hardened = prev.linuxKernel.kernelPatches.hardened // {
           "6.19" = {
-            version = "6.19.7";
+            version = "6.19.10";
             extra = "-hardened1";
-            sha256 = "0blmc3gmqyg1fj390gjz3brjznyn7s9m4f6w107ypygmhf5qgh82";		# Hash of the pre-patch kernel
-            name = "linux-hardened-6.19.7-hardened1";
+            sha256 = "072s76238rnf87yhdy15nbxfyq7x3ch7p2v14dq4pq551qd48va6";		# Hash of the pre-patch kernel
+            name = "linux-hardened-6.19.10-hardened1";
             patch = final.fetchurl {
-              name = "linux-hardened-v6.19.7-hardened1.patch";
-              url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.19.7-hardened1/linux-hardened-v6.19.7-hardened1.patch";
-              sha256 = "1k080qxcj9nid54wxb0lcgziq3lalgb1m9j59iv9cbqv4ixkwn37";	# Hash of the patch itself
+              name = "linux-hardened-v6.19.10-hardened1.patch";
+              url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.19.10-hardened1/linux-hardened-v6.19.10-hardened1.patch";
+              sha256 = "0vnrp93pd0ry9pqr7g8dvn53rxv0yrwp0wzdma40vazp29swazll";	# Hash of the patch itself
             };
           };
         };

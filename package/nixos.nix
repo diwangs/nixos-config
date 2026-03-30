@@ -32,6 +32,8 @@
     fi
   '';
 
+	environment.localBinInPath = true; # Include `~/.local/bin` e.g., for `uv`
+
 	# List packages installed in system profile. To search, run:
 	# $ nix search wget
 	# System packages: packages that is run by the root user sans sudo

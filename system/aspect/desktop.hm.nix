@@ -11,7 +11,8 @@
 			# Find the name with `dconf watch /` and dragging and dropping
 			favorite-apps = [
 				"org.gnome.Nautilus.desktop"	# Files
-				"com.mitchellh.ghostty.desktop"
+				# "com.mitchellh.ghostty.desktop"
+				"org.gnome.Console.desktop"
 				"code.desktop"
 				"md.obsidian.Obsidian.desktop"
 				"app.zen_browser.zen.desktop"

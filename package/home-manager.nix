@@ -15,7 +15,7 @@
 # it is reproducible in the synchronization sense, since the data are 
 # snapshoted 
 
-{ config, pkgs, pkgs-stable, secrets,  ... }: rec {
+{ config, lib, pkgs, pkgs-stable, secrets,  ... }: rec {
 	home.packages = with pkgs; [
 		# System
 		lm_sensors						# Power and temperature monitoring
@@ -23,8 +23,10 @@
 		yubioath-flutter			# Yubikey reader
 
 		# Runtime environment (or environment manager)
+		uv										# Python environment manager
 		fnm										# Node.js version manager 					(eval $(fnm env))
-		conda									# Python distribution	  						(conda-shell)
+		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
+		conda									# Python environment manager	  		(conda-shell)
 		github-copilot-cli 		# Agentic LLM in the CLI
 
 		# Media
@@ -43,7 +45,7 @@
 	# Dev
 	programs.direnv.enable = true; # Add direnv package and sets the shell hook
 	programs.java = { # Aside from installing jdk (latest LTS), this sets JAVA_HOME
-		enable = true;	
+		enable = true;
 		package = pkgs.jdk25;							# Latest LTS
 	};
 	programs.git = {
@@ -61,7 +63,7 @@
 		systemd.enable = false;
 		settings = {
 			window-height = 27; # BUG 260307: additional 3 for title bar
-			window-width = 107;	# Closest approx. to side monitor width
+			window-width = 107;	# Closest approximate to 1080p width
 		};
 	};
 
@@ -84,6 +86,7 @@
 				ms-python.python
 				# ms-python.vscode-pylance			# Unfree
 				ms-pyright.pyright
+				ms-azuretools.vscode-containers
 
 				# Jupyter
 				ms-toolsai.jupyter
@@ -93,10 +96,20 @@
 				ms-toolsai.vscode-jupyter-slideshow
 				
 				# IDE-based agent
-			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
-				github.copilot-chat						# Unfree
-				github.vscode-codeql					# Unfree
-			]);
+		] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
+			github.vscode-codeql					# Unfree
+		]) ++ [
+			# vscode 1.112 needs copilot-chat 0.40.0
+			(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+				mktplcRef = {
+					name = "copilot-chat";
+					publisher = "GitHub";
+					version = "0.40.0";
+					sha256 = "1vk25igr8gzycnqchb83lq1y0gk3vn2qxjbsbr1xcm35bwc4n8gf";
+				};
+				meta.license = lib.licenses.unfree;
+			})
+		];
 			userSettings = {
 				"editor.tabSize" = 2;
 				"editor.minimap.enabled" = false;
@@ -112,10 +125,11 @@
 				"codeQL.runningQueries.memory" = 8192;
 
 				# Copilot
-				"chat.commandCenter.enabled" = false;
 				"window.commandCenter" = false;
 				"editor.inlineSuggest.enabled" = false; # Trigger with Alt + \
 				# Modify with `editor.inlineSuggest.trigger`
+				"chat.commandCenter.enabled" = false;
+				"chat.viewSessions.orientation" = "stacked";
 				"github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
 			};
 		};
