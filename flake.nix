@@ -45,6 +45,7 @@
 				allowedUnfree = [
 					"codeql"
 					"github-copilot-cli"
+					"claude-code"
 
 					# VSCode and some unfree extensions
 					"vscode"
@@ -53,6 +54,7 @@
 					"vscode-extension-GitHub-copilot-chat"
 					"vscode-extension-MS-python-vscode-pylance"
 					"vscode-extension-ms-vscode-remote-remote-ssh"
+					"vscode-extension-anthropic-claude-code"
 
 					# AppImages
 					"trezor-suite"

@@ -96,19 +96,20 @@
 				ms-toolsai.vscode-jupyter-slideshow
 				
 				# IDE-based agent
+				anthropic.claude-code				# Unfree
 		] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 			github.vscode-codeql					# Unfree
 		]) ++ [
 			# vscode 1.112 needs copilot-chat 0.40.0
-			(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-				mktplcRef = {
-					name = "copilot-chat";
-					publisher = "GitHub";
-					version = "0.40.0";
-					sha256 = "1vk25igr8gzycnqchb83lq1y0gk3vn2qxjbsbr1xcm35bwc4n8gf";
-				};
-				meta.license = lib.licenses.unfree;
-			})
+			# (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+			# 	mktplcRef = {
+			# 		name = "copilot-chat";
+			# 		publisher = "GitHub";
+			# 		version = "0.40.0";
+			# 		sha256 = "1vk25igr8gzycnqchb83lq1y0gk3vn2qxjbsbr1xcm35bwc4n8gf";
+			# 	};
+			# 	meta.license = lib.licenses.unfree;
+			# })
 		];
 			userSettings = {
 				"editor.tabSize" = 2;
@@ -141,5 +142,9 @@
 		settings = {
 			autoupdate = "notify";
 		};
+	};
+
+	programs.claude-code = {
+		enable = true;
 	};
 }
