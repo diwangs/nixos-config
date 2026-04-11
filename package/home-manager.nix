@@ -96,21 +96,24 @@
 				ms-toolsai.vscode-jupyter-slideshow
 				
 				# IDE-based agent
-				anthropic.claude-code				# Unfree
-		] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
-			github.vscode-codeql					# Unfree
-		]) ++ [
-			# vscode 1.112 needs copilot-chat 0.40.0
-			# (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-			# 	mktplcRef = {
-			# 		name = "copilot-chat";
-			# 		publisher = "GitHub";
-			# 		version = "0.40.0";
-			# 		sha256 = "1vk25igr8gzycnqchb83lq1y0gk3vn2qxjbsbr1xcm35bwc4n8gf";
-			# 	};
-			# 	meta.license = lib.licenses.unfree;
-			# })
-		];
+				# 260410: hash override: Anthropic re-uploaded 2.1.92 VSIX (nix-vscode-extensions stale hash)
+				(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+					mktplcRef = {
+						name = "claude-code";
+						publisher = "anthropic";
+						version = "2.1.92";
+						hash = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
+					};
+					postInstall = ''
+						mkdir -p "$out/$installPrefix/resources/native-binary"
+						rm -f "$out/$installPrefix/resources/native-binary/claude"*
+						ln -s "${pkgs.claude-code}/bin/claude" "$out/$installPrefix/resources/native-binary/claude"
+					'';
+					meta.license = lib.licenses.unfree;
+				})
+			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
+				github.vscode-codeql					# Unfree
+			]);
 			userSettings = {
 				"editor.tabSize" = 2;
 				"editor.minimap.enabled" = false;
@@ -129,9 +132,11 @@
 				"window.commandCenter" = false;
 				"editor.inlineSuggest.enabled" = false; # Trigger with Alt + \
 				# Modify with `editor.inlineSuggest.trigger`
-				"chat.commandCenter.enabled" = false;
+				# "chat.commandCenter.enabled" = false;
 				"chat.viewSessions.orientation" = "stacked";
-				"github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
+				# "github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
+				"claudeCode.disableLoginPrompt" = true;
+				"claudeCode.preferredLocation" = "panel";
 			};
 		};
 	};
