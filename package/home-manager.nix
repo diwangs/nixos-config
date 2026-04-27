@@ -95,6 +95,8 @@
 				ms-toolsai.jupyter-keymap
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
+
+				# anthropic.claude-code
 				
 				# IDE-based agent
 				# 260410: hash override: Anthropic re-uploaded 2.1.92 VSIX (nix-vscode-extensions stale hash)
@@ -102,8 +104,8 @@
 					mktplcRef = {
 						name = "claude-code";
 						publisher = "anthropic";
-						version = "2.1.92";
-						hash = "sha256-f+6xXZVb5sYrmrH7eoon6/QoQaTnBuTnb+YnvszqyKA=";
+						version = "2.1.114";
+						hash = "sha256-TfVradC9ZjfLBp8QvZ0AptCS9j2ogzSlsRXxksp+N9I=";
 					};
 					postInstall = ''
 						mkdir -p "$out/$installPrefix/resources/native-binary"

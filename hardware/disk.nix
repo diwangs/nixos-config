@@ -26,17 +26,26 @@ in {
 		options = [ "subvol=@rw" ] ++ defaultMountOptions;
 	};
 
-	boot.initrd.luks.devices."decrypted_root" = { 
+	boot.initrd.luks.devices."decrypted_root" = {
 		device = "/dev/nvme0n1p2";
 		bypassWorkqueues = true;
-		postOpenCommands = ''
-			mkdir /mnt
+	};
+
+	# Reset root subvolume every boot (replaces postOpenCommands for systemd stage 1)
+	boot.initrd.systemd.services."reset-root" = {
+		description = "Reset btrfs root subvolume to clean snapshot";
+		wantedBy = [ "cryptsetup.target" ];
+		after = [ "cryptsetup.target" ];
+		before = [ "sysroot.mount" ];
+		unitConfig.DefaultDependencies = "no";
+		serviceConfig.Type = "oneshot";
+		script = ''
+			mkdir -p /mnt
 			mount /dev/mapper/decrypted_root /mnt
-			rm -rf /mnt/@rw 2> /dev/null # This throws benign error about /var/lib/empty
+			rm -rf /mnt/@rw 2> /dev/null || true # Benign error about /var/lib/empty
 			btrfs subv delete -C /mnt/@rw
 			btrfs subv snapshot /mnt/@snapshots/@ /mnt/@rw
 			umount /mnt
-			rmdir /mnt
 		'';
 	};
 
