@@ -81,6 +81,7 @@
 				
 				# Language support
 				bbenoist.nix
+				unifiedjs.vscode-mdx
 				redhat.ansible
 				redhat.vscode-yaml
 				ms-python.python
