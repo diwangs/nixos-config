@@ -5,6 +5,12 @@
   services.gnome.gnome-keyring.enable = true;   # For non-SSH, use keyring
 
   # For Yubikey
-  services.pcscd.enable = true;
+  services.pcscd = {
+    enable = true;
+    plugins = [
+      pkgs.ccid   # Yubikey
+    ];
+  };
+  
   services.udev.packages = [ pkgs.yubikey-personalization ];
 }
