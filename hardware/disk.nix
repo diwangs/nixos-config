@@ -42,8 +42,7 @@ in {
 		script = ''
 			mkdir -p /mnt
 			mount /dev/mapper/decrypted_root /mnt
-			rm -rf /mnt/@rw 2> /dev/null || true # Benign error about /var/lib/empty
-			btrfs subv delete -C /mnt/@rw
+			btrfs subv show /mnt/@rw && btrfs subv delete -C /mnt/@rw || true
 			btrfs subv snapshot /mnt/@snapshots/@ /mnt/@rw
 			umount /mnt
 		'';

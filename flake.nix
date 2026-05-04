@@ -6,6 +6,7 @@
 		nixos-hardware.url = "https://flakehub.com/f/NixOS/nixos-hardware/*";
 		
 		# NixOS official package source
+		# nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/=0.1.985613";
 		nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
 		nixpkgs-stable.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511"; # Latest stable
 		
