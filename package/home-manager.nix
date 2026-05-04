@@ -20,7 +20,10 @@
 		# System
 		lm_sensors						# Power and temperature monitoring
 		crosspipe							# Pipewire multimedia patchbay
+
+		# Little tools
 		yubioath-flutter			# Yubikey reader
+		jq										# JSON parser
 
 		# Runtime environment (or environment manager)
 		uv										# Python environment manager
