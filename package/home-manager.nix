@@ -99,24 +99,7 @@
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
 
-				# anthropic.claude-code
-				
-				# IDE-based agent
-				# 260410: hash override: Anthropic re-uploaded 2.1.92 VSIX (nix-vscode-extensions stale hash)
-				(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-					mktplcRef = {
-						name = "claude-code";
-						publisher = "anthropic";
-						version = "2.1.114";
-						hash = "sha256-TfVradC9ZjfLBp8QvZ0AptCS9j2ogzSlsRXxksp+N9I=";
-					};
-					postInstall = ''
-						mkdir -p "$out/$installPrefix/resources/native-binary"
-						rm -f "$out/$installPrefix/resources/native-binary/claude"*
-						ln -s "${pkgs.claude-code}/bin/claude" "$out/$installPrefix/resources/native-binary/claude"
-					'';
-					meta.license = lib.licenses.unfree;
-				})
+				anthropic.claude-code
 			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 				github.vscode-codeql					# Unfree
 			]);

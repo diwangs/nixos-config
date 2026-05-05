@@ -71,8 +71,8 @@
 	services.clatd.enable = true;
 
 	# Relaxes strict RFC6052 requirement of not allowing well-known prefix with
-	# private IPv4 addresses, since my home network is not that big and the PLAT
-	# is located within. Tried solutions:
+	# private IPv4 addresses, since I still use public DNS64 that provide well-
+	# known prefix and the PLAT is located locally anyway. Tried solutions:
 	# - clatd's script-up -> doesn't work somehow (error code 1 on `clatd`)
 	# - clatd's cmd-tayga + wrapper script -> works, but has longer code
 	# - (this) Patch tayga source code -> simplest, might be fragile to updates
