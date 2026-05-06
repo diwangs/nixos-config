@@ -42,11 +42,20 @@ in {
 		script = ''
 			mkdir -p /mnt
 			mount /dev/mapper/decrypted_root /mnt
-			btrfs subv show /mnt/@rw > /dev/null 2>&1 && btrfs subv delete -RC /mnt/@rw || true
+			btrfs subv show /mnt/@rw > /dev/null 2>&1 && btrfs subv delete -Rc /mnt/@rw || true
 			btrfs subv snapshot /mnt/@snapshots/@ /mnt/@rw
 			umount /mnt
 		'';
 	};
+
+	# Prevents systemd from creating subvolumes: adds them to 00-nixos.conf
+	systemd.tmpfiles.rules = [
+		"d /srv                0755 root root -"
+		"d /tmp                1777 root root 10d"
+		"d /var/tmp            1777 root root 30d"
+		"d /var/lib/machines   0700 root root -"
+		"d /var/lib/portables  0700 root root -"
+	];
 
 	# States: persistent, snapshoted data
 	fileSystems."/etc/nixos" = { 
