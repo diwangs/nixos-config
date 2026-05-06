@@ -27,7 +27,7 @@
 	# Use the systemd-boot EFI boot loader.
 	boot.loader.systemd-boot = {
 		enable = true;
-		configurationLimit = 10;	# We only have 512MiB of ESP
+		configurationLimit = 5;		# Each initrd is ~62MB; 10 generations overflows 512MiB ESP
 	};
 	boot.loader.timeout = 0;	# could still select by tapping arrow keys
 
