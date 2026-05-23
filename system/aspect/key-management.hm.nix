@@ -17,25 +17,25 @@
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;  # Won't be needed in future versions
-    matchBlocks = {
+    settings = {
       "paladin-ii" = {
-        hostname = secrets.peripherals.paladin-ii-ssh-hostname;
+        HostName = secrets.peripherals.paladin-ii-ssh-hostname;
       };
       "netx11" = {
-        hostname = secrets.peripherals.netx11-ssh-hostname;
-        proxyJump = secrets.peripherals.netx11-ssh-proxyjump;
+        HostName = secrets.peripherals.netx11-ssh-hostname;
+        ProxyJump = secrets.peripherals.netx11-ssh-proxyjump;
       };
       "nova-diwangs-workspace" = {
-        hostname = secrets.peripherals.diwangs-nova-workspace-ssh-hostname;
-        user = "admin";
-        identityFile = "~/diwangs-nova.pem";
+        HostName = secrets.peripherals.diwangs-nova-workspace-ssh-hostname;
+        User = "admin";
+        IdentityFile = "~/diwangs-nova.pem";
       };
       # Fix bug on VSCode remote SSH
       # https://github.com/microsoft/vscode-remote-release/issues/7814#issuecomment-1905654502
       # NOTE: this seems to be a flaky bug, but fix it anyway
       "*" = {
-        forwardAgent = true;
-        identityAgent = "/run/user/1000/gnupg/S.gpg-agent.ssh";
+        ForwardAgent = true;
+        IdentityAgent = "/run/user/1000/gnupg/S.gpg-agent.ssh";
       };
     };
   };

@@ -87,7 +87,7 @@
 				unifiedjs.vscode-mdx
 				redhat.ansible
 				redhat.vscode-yaml
-				ms-python.python
+				# ms-python.python							# Dependency failure
 				# ms-python.vscode-pylance			# Unfree
 				ms-pyright.pyright
 				ms-azuretools.vscode-containers

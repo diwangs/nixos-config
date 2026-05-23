@@ -55,6 +55,7 @@
 		ffmpegthumbnailer	# For video thumbnails
 		ffmpeg-headless
 		gdk-pixbuf				# For picutre thumbnails
+		libheif
 
 		# Peripherals
 		android-tools			# adb and friends
