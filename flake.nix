@@ -8,7 +8,7 @@
 		# NixOS official package source
 		# nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/=0.1.985613";
 		nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
-		nixpkgs-stable.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2511"; # Latest stable
+		nixpkgs-stable.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2605"; # Latest stable
 		
 		# Home manager
 		home-manager = {

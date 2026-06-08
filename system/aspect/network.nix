@@ -83,6 +83,8 @@
 				substituteInPlace conffile.c --replace-fail \
 					'gcfg->wkpf_strict = 1' 'gcfg->wkpf_strict = 0'
 			'';
+			# Upstream tests assert wkpf_strict defaults to 1, which our patch breaks
+			doCheck = false;
 		});
 	})];
 

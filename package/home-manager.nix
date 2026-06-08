@@ -21,10 +21,6 @@
 		lm_sensors						# Power and temperature monitoring
 		crosspipe							# Pipewire multimedia patchbay
 
-		# Little tools
-		yubioath-flutter			# Yubikey reader
-		jq										# JSON parser
-
 		# Runtime environment (or environment manager)
 		uv										# Python environment manager
 		fnm										# Node.js version manager 					(eval $(fnm env))
@@ -41,6 +37,11 @@
 		wsjtx									# FT8 and WSPR
 		flrig									# Radio remote control (part of fldigi)
 		trezor-suite					# Trezor wallet (since no WebUSB in Firefox)
+		ledger-live-desktop
+		yubioath-flutter			# Yubikey reader
+
+		# Little tools
+		jq										# JSON parser
 	] ++ [
 		pkgs-stable.codeql 		# Pin CodeQL. Also prevents download from vscode plugin
 	];

@@ -4,6 +4,7 @@
   services.gpg-agent = {
     enable = true;
     enableSshSupport = true;  # This should set SSH_AUTH_SOCK
+    enableScDaemon = false;   # Conflicts with Yubikey
     sshKeys = [ 
       secrets.diwangs.gpg-agent-ssh-keygrip # Auth subkey keygrip
     ]; 
