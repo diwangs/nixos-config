@@ -26,10 +26,15 @@
         HostName = secrets.peripherals.netx11-ssh-hostname;
         ProxyJump = secrets.peripherals.netx11-ssh-proxyjump;
       };
-      "nova-diwangs-workspace" = {
-        HostName = secrets.peripherals.diwangs-nova-workspace-ssh-hostname;
+      "nova-devbox" = {
+        HostName = secrets.peripherals.nova-devbox-ssh-hostname;
         User = "admin";
         IdentityFile = "~/diwangs-nova.pem";
+      };
+      "dsai-arch-devbox" = {
+        HostName = secrets.peripherals.dsai-arch-devbox-ssh-hostname;
+        User = "ssangdi1";
+        ProxyJump = secrets.peripherals.netx11-ssh-proxyjump;
       };
       # Fix bug on VSCode remote SSH
       # https://github.com/microsoft/vscode-remote-release/issues/7814#issuecomment-1905654502

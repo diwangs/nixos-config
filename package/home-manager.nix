@@ -81,14 +81,15 @@
 			extensions = with pkgs.vscode-extensions; [
 				# DevEx
 				mkhl.direnv
-				ms-vscode-remote.remote-ssh		# Unfree
+				ms-vscode-remote.remote-ssh			# Unfree
 				
 				# Language support
 				bbenoist.nix
 				unifiedjs.vscode-mdx
 				redhat.ansible
 				redhat.vscode-yaml
-				# ms-python.python							# Dependency failure
+				ms-python.python
+				ms-python.vscode-python-envs
 				# ms-python.vscode-pylance			# Unfree
 				ms-pyright.pyright
 				ms-azuretools.vscode-containers
@@ -100,6 +101,7 @@
 				ms-toolsai.vscode-jupyter-cell-tags
 				ms-toolsai.vscode-jupyter-slideshow
 
+				# Agents
 				anthropic.claude-code
 			] ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
 				github.vscode-codeql					# Unfree
