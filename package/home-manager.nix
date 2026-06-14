@@ -26,6 +26,9 @@
 		fnm										# Node.js version manager 					(eval $(fnm env))
 		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
 		conda									# Python environment manager	  		(conda-shell)
+		ansible
+		sshpass
+		ansible-lint
 		github-copilot-cli 		# Agentic LLM in the CLI
 
 		# Media
