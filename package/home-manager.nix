@@ -22,26 +22,26 @@
 		crosspipe							# Pipewire multimedia patchbay
 
 		# Runtime environment (or environment manager)
-		uv										# Python environment manager
 		fnm										# Node.js version manager 					(eval $(fnm env))
 		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
+		uv										# Python environment manager
 		conda									# Python environment manager	  		(conda-shell)
 		ansible
 		sshpass
 		ansible-lint
-		github-copilot-cli 		# Agentic LLM in the CLI
+		# github-copilot-cli 		# Agentic LLM in the CLI
 
 		# Media
 		vlc
 
 		# Peripherals
-		# sdrangel					# SDR, failed on current version of flake?
-		# mbelib						# sdrangel: decode AMBe (e.g., C4FM, D-STAR, DMR)
-		wsjtx									# FT8 and WSPR
-		flrig									# Radio remote control (part of fldigi)
+		yubioath-flutter			# Yubikey reader
 		trezor-suite					# Trezor wallet (since no WebUSB in Firefox)
 		ledger-live-desktop
-		yubioath-flutter			# Yubikey reader
+		wsjtx									# FT8 and WSPR
+		flrig									# Radio remote control (part of fldigi)
+		# sdrangel					# SDR, failed on current version of flake?
+		# mbelib						# sdrangel: decode AMBe (e.g., C4FM, D-STAR, DMR)
 
 		# Little tools
 		jq										# JSON parser
@@ -130,7 +130,8 @@
 				# "chat.commandCenter.enabled" = false;
 				"chat.viewSessions.orientation" = "stacked";
 				# "github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
-				"claudeCode.disableLoginPrompt" = true;
+				# "claudeCode.disableLoginPrompt" = true;
+				"claudeCode.allowDangerouslySkipPermissions" = true;
 				"claudeCode.preferredLocation" = "panel";
 			};
 		};
