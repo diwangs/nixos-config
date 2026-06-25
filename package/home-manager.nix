@@ -64,16 +64,6 @@
 		};
 	};
 
-	# Terminal app: Ghostty
-	programs.ghostty = {
-		enable = true;
-		systemd.enable = false;
-		settings = {
-			window-height = 27; # BUG 260307: additional 3 for title bar
-			window-width = 107;	# Closest approximate to 1080p width
-		};
-	};
-
 	# IDE: VSCode official
 	programs.vscode = {
 		enable = true;
@@ -115,11 +105,15 @@
 				"extensions.autoUpdate" = false;
 				"terminal.integrated.defaultProfile.linux" = "zsh";
 
-				# Extensions
+				# Extension: direnv
 				"redhat.telemetry.enabled" = false;
 				"direnv.restart.automatic" = true;
 
-				# CodeQL plugin
+				# Extension: Container
+				"containers.containerClient"= "com.microsoft.visualstudio.containers.podman";
+				"containers.orchestratorClient"= "com.microsoft.visualstudio.orchestrators.podmancompose";
+
+				# Extension: CodeQL
 				"codeQL.githubDatabase.download" = "never";
 				"codeQL.runningQueries.memory" = 8192;
 
@@ -131,21 +125,34 @@
 				"chat.viewSessions.orientation" = "stacked";
 				# "github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
 				# "claudeCode.disableLoginPrompt" = true;
-				"claudeCode.allowDangerouslySkipPermissions" = true;
+				"claudeCode.useTerminal" = true;
 				"claudeCode.preferredLocation" = "panel";
 			};
 		};
 	};
 
-	# Terminal-based agent: OpenCode
+	# CLI-based agenta: Claude Code through OpenRouter
+	programs.claude-code = {
+		enable = true;
+		settings = {
+			disableBypassPermissionsMode = "disable";
+			env = {
+				"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
+				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
+				"ANTHROPIC_API_KEY" = ""; # Intentionally blank
+				"ANTHROPIC_DEFAULT_OPUS_MODEL" = "~anthropic/claude-opus-latest";
+				"ANTHROPIC_DEFAULT_SONNET_MODEL" = "~anthropic/claude-sonnet-latest";
+				"ANTHROPIC_DEFAULT_HAIKU_MODEL" = "~anthropic/claude-haiku-latest";
+				"CLAUDE_CODE_NO_FLICKER" = "1";
+			};
+		};
+	};
+
+	# CLI-based agent: OpenCode
 	programs.opencode = {
 		enable = true;
 		settings = {
 			autoupdate = "notify";
 		};
-	};
-
-	programs.claude-code = {
-		enable = true;
 	};
 }

@@ -21,7 +21,7 @@
 		oci-containers.backend = "podman";
 		podman = {
 			enable = true;
-			dockerCompat = true;
+			# dockerCompat = true;
 			# For `docker-compose`
 			defaultNetwork.settings.dns_enabled = true;
 		};
@@ -47,7 +47,8 @@
 
 		# Container frontends
 		podman-tui
-		docker-compose
+		podman-compose
+		# docker-compose
 		distrobox
 
 		# Gnome things
