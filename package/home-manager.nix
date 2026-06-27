@@ -33,6 +33,7 @@
 
 		# Media
 		vlc
+		claude-desktop
 
 		# Peripherals
 		yubioath-flutter			# Yubikey reader
@@ -104,10 +105,10 @@
 				"editor.minimap.enabled" = false;
 				"extensions.autoUpdate" = false;
 				"terminal.integrated.defaultProfile.linux" = "zsh";
+				"redhat.telemetry.enabled" = false;
 
 				# Extension: direnv
-				"redhat.telemetry.enabled" = false;
-				"direnv.restart.automatic" = true;
+				"direnv.restart.automatic" = false;
 
 				# Extension: Container
 				"containers.containerClient"= "com.microsoft.visualstudio.containers.podman";
@@ -131,19 +132,20 @@
 		};
 	};
 
-	# CLI-based agenta: Claude Code through OpenRouter
+	# CLI-based agent: Claude Code through OpenRouter
 	programs.claude-code = {
 		enable = true;
 		settings = {
-			disableBypassPermissionsMode = "disable";
+			defaultMode = "auto";
+			effortLevel = "xhigh";
+			tui = "fullscreen"; # No flicker
 			env = {
 				"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
 				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
-				"ANTHROPIC_API_KEY" = ""; # Intentionally blank
-				"ANTHROPIC_DEFAULT_OPUS_MODEL" = "~anthropic/claude-opus-latest";
-				"ANTHROPIC_DEFAULT_SONNET_MODEL" = "~anthropic/claude-sonnet-latest";
-				"ANTHROPIC_DEFAULT_HAIKU_MODEL" = "~anthropic/claude-haiku-latest";
-				"CLAUDE_CODE_NO_FLICKER" = "1";
+				"ANTHROPIC_API_KEY" = ""; # Intentionally blank;
+				# Force 1M context for desktop-invoked Claude Code
+				"DISABLE_COMPACT" = "1";
+				"CLAUDE_CODE_MAX_CONTEXT_TOKENS" = "1000000";
 			};
 		};
 	};

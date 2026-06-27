@@ -24,6 +24,9 @@
       url = "github:nix-community/nix-vscode-extensions/master";
       inputs.nixpkgs.follows = "home-manager";	# vscode is defined by hm
     };
+
+		# aadrick's Claude Desktop
+		claude-desktop.url = "github:aaddrick/claude-desktop-debian";
 	};
 
 	outputs = { 
@@ -34,6 +37,7 @@
 		home-manager, 
 		nix-flatpak, 
 		nix-vscode-extensions, 
+		claude-desktop,
 		... 
 	}: {
 		# nixos-rebuild switch --flake path#hostname
@@ -47,6 +51,7 @@
 					"codeql"
 					"github-copilot-cli"
 					"claude-code"
+					"claude-desktop"
 
 					# VSCode and some unfree extensions
 					"vscode"
