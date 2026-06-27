@@ -93,6 +93,12 @@
 							'return{${toString (mul31 "yukon_silver")}:' \
 							'return{"${toString (mul31 "yukon_silver_thinking")}":{defaultValue:!0},${toString (mul31 "yukon_silver")}:'
 
+					# Misc patch: disable thinking for Haiku because it broke title gen
+					substituteInPlace "$work/contents/.vite/build/index.js" \
+						--replace-fail \
+							'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
+							'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}'
+
 					# Repack app.asar only. The existing app.asar.unpacked dir
 					# carries files the build adds after the original pack
 					# (claude-native stub, cowork daemon) that a fresh --unpack

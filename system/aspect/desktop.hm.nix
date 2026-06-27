@@ -14,6 +14,7 @@
 				# "com.mitchellh.ghostty.desktop"
 				"org.gnome.Console.desktop"
 				"code.desktop"
+				"claude-desktop.desktop"
 				"md.obsidian.Obsidian.desktop"
 				"app.zen_browser.zen.desktop"
 				"com.bitwarden.desktop.desktop"

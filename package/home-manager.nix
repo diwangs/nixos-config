@@ -48,6 +48,10 @@
 		jq										# JSON parser
 	] ++ [
 		pkgs-stable.codeql 		# Pin CodeQL. Also prevents download from vscode plugin
+		(pkgs.writeShellScriptBin "code-wait" ''
+			exec ${pkgs.vscode}/bin/code --wait "$@" \
+				2> >(grep -v "is not in the list of known options, but still passed to Electron/Chromium" >&2)
+		'')
 	];
 
 	# Dev
@@ -72,6 +76,14 @@
 		profiles.default = {
 			enableUpdateCheck = false;
 			enableExtensionUpdateCheck = false;
+			keybindings = [
+				{
+					key = "ctrl+g"; # Conflicts with Claude Code CLI
+					command = "-workbench.action.terminal.goToRecentDirectory";
+					# Technically there's a when clause here, but we don't really need
+					# the other one either.
+				}
+			];
 			extensions = with pkgs.vscode-extensions; [
 				# DevEx
 				mkhl.direnv
@@ -110,6 +122,11 @@
 				# Extension: direnv
 				"direnv.restart.automatic" = false;
 
+				# Extension: Claude Code
+				"claudeCode.useTerminal" = true;
+				"claudeCode.preferredLocation" = "panel";
+				# "claudeCode.disableLoginPrompt" = true;
+
 				# Extension: Container
 				"containers.containerClient"= "com.microsoft.visualstudio.containers.podman";
 				"containers.orchestratorClient"= "com.microsoft.visualstudio.orchestrators.podmancompose";
@@ -125,9 +142,6 @@
 				# "chat.commandCenter.enabled" = false;
 				"chat.viewSessions.orientation" = "stacked";
 				# "github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
-				# "claudeCode.disableLoginPrompt" = true;
-				"claudeCode.useTerminal" = true;
-				"claudeCode.preferredLocation" = "panel";
 			};
 		};
 	};
@@ -138,14 +152,15 @@
 		settings = {
 			defaultMode = "auto";
 			effortLevel = "xhigh";
-			tui = "fullscreen"; # No flicker
+			# tui = "fullscreen"; # No flicker, but spammy if ctrl+g
 			env = {
-				"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
-				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
 				"ANTHROPIC_API_KEY" = ""; # Intentionally blank;
+				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
+				"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
+				# "CLAUDE_CODE_DISABLE_MOUSE_CLICKS" = "1";
 				# Force 1M context for desktop-invoked Claude Code
-				"DISABLE_COMPACT" = "1";
 				"CLAUDE_CODE_MAX_CONTEXT_TOKENS" = "1000000";
+				"DISABLE_COMPACT" = "1";
 			};
 		};
 	};

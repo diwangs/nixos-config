@@ -6,8 +6,8 @@
 	
 	# For Chromium-based program to use Wayland natively instead of XWayland
 	# NOTE: this cause bugs, but so far it's bearable
-	# 	- Spotify: no title bar, crashes if hover on title for too long
 	environment.sessionVariables.NIXOS_OZONE_WL = "1";
+	environment.sessionVariables.EDITOR = "code-wait"; # For Claude
 
 	# Enable the X11 windowing system.
 	# services.xserver.enable = true;
