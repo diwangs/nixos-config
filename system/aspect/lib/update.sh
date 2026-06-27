@@ -18,6 +18,11 @@ KERNEL_NIX="$SCRIPT_DIR/kernel.nix"
 err()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
 
+# major.minor of a (possibly -hardenedN-suffixed) version, e.g.
+#   7.0.12 -> 7.0   |   7.1 -> 7.1   |   7.1-hardened1 -> 7.1
+# Plain "${v%.*}" is wrong for ".0" releases like 7.1 (gives "7").
+mm_of() { echo "${1%%-*}" | awk -F. '{print $1"."$2}'; }
+
 for cmd in curl jq nix-prefetch-url sed awk grep; do
   command -v "$cmd" >/dev/null || err "missing required command: $cmd"
 done
@@ -28,14 +33,19 @@ all_tags=$(
   curl -fsSL "https://api.github.com/repos/anthraxx/linux-hardened/releases?per_page=100" \
     | jq -r '.[].tag_name' \
     | sed 's/^v//' \
-    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-hardened[0-9]+$' \
+    | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)?-hardened[0-9]+$' \
     | sort -V -r
 )
 [[ -n "$all_tags" ]] || err "no usable release tags returned"
 
 # Pick the newest anthraxx tag whose major.minor matches $1 (e.g. "6.18").
+# Tags may be two- or three-component (7.1-hardened1 vs 7.0.12-hardened1), so
+# derive major.minor with mm_of rather than a fixed field split.
 pick_latest_in_branch() {
-  echo "$all_tags" | awk -F. -v mm="$1" 'mm == ($1 "." $2) {print; exit}'
+  local want="$1" tag
+  while IFS= read -r tag; do
+    [[ "$(mm_of "$tag")" == "$want" ]] && { echo "$tag"; return; }
+  done <<< "$all_tags"
 }
 
 if [[ $# -ge 2 ]]; then
@@ -51,8 +61,8 @@ else
     | sort -V -r | head -n1)
   [[ -n "$stable_full" && -n "$lts_full" ]] \
     || err "could not parse kernel.org release metadata"
-  stable_mm="${stable_full%.*}"
-  lts_mm="${lts_full%.*}"
+  stable_mm="$(mm_of "$stable_full")"
+  lts_mm="$(mm_of "$lts_full")"
 fi
 
 latest_stable=$(pick_latest_in_branch "$stable_mm")
@@ -86,8 +96,8 @@ update_block() {
 
   local new_version="${new_full%-hardened*}"
   local new_extra="-${new_full#*-}"                          # "-hardened1"
-  local new_mm="${new_version%.*}"                           # "7.0"
-  local new_ver_under="${new_version//./_}"                  # "7_0_10"
+  local new_mm; new_mm="$(mm_of "$new_version")"             # "7.0" / "7.1"
+  local new_ver_under="${new_version//./_}"                  # "7_0_10" / "7_1"
 
   local start end
   start=$(grep -nE "$marker_re" "$KERNEL_NIX" | head -n1 | cut -d: -f1)
@@ -97,14 +107,14 @@ update_block() {
 
   local block cur_version cur_extra cur_full cur_mm cur_ver_under
   block=$(sed -n "${start},${end}p" "$KERNEL_NIX")
-  cur_version=$(echo "$block" | grep -oE 'version *= *"[0-9]+\.[0-9]+\.[0-9]+"' \
-                | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+  cur_version=$(echo "$block" | grep -oE 'version *= *"[0-9]+\.[0-9]+(\.[0-9]+)?"' \
+                | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
   cur_extra=$(echo "$block" | grep -oE 'extra *= *"-hardened[0-9]+"' \
               | head -n1 | grep -oE -- '-hardened[0-9]+')
   [[ -n "$cur_version" && -n "$cur_extra" ]] \
     || err "could not parse current version/extra in $kind block"
   cur_full="${cur_version}${cur_extra}"
-  cur_mm="${cur_version%.*}"
+  cur_mm="$(mm_of "$cur_version")"
   cur_ver_under="${cur_version//./_}"
 
   local cur_kernel_sha cur_patch_sha

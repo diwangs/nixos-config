@@ -19,7 +19,7 @@
 # along with kernelPatches.hardened and pkgs/os-specific/linux/kernel/hardened/config.nix.
 # We re-implement them here so the overlay remains self-contained.
 
-# Last updated: 130626
+# Last updated: 270626
 { config, pkgs, lib, ... }:
 
 let
@@ -93,7 +93,10 @@ let
       patch        = linuxKernel.kernelPatches.hardened.${kernel.meta.branch};
       version      = patch.version;
       major        = lib.versions.major version;
-      modDirVersion' = builtins.replaceStrings [ kernel.version ] [ version ] kernel.modDirVersion;
+      # The kernel's module directory uses the full 3-component release, so a
+      # ".0" line like 7.1 builds as 7.1.0. Pad here to match what the kernel
+      # Makefile reports (else: "modDirVersion ... is wrong, should be 7.1.0-...").
+      modDirVersion' = lib.versions.pad 3 version;
     in kernel.override {
       structuredExtraConfig = hardenedConfig {
         stdenv  = kernel.stdenv;
@@ -116,19 +119,19 @@ let
 in {
 
   # Latest stable from anthraxx
-  linuxKernel_7_0_12_hardenedOverlay = (final: prev: {
+  linuxKernel_7_1_hardenedOverlay = (final: prev: {
     linuxKernel = prev.linuxKernel // {
       kernelPatches = prev.linuxKernel.kernelPatches // {
         hardened = (prev.linuxKernel.kernelPatches.hardened or {}) // {
-          "7.0" = {
-            version = "7.0.12";
+          "7.1" = {
+            version = "7.1";
             extra   = "-hardened1";
-            sha256  = "1nk5lans9qg1avmmcwyadfps43d3hyjz9a5gjyvsc77w3sjckvap";		# Hash of the pre-patch kernel
-            name    = "linux-hardened-7.0.12-hardened1";
+            sha256  = "18344l5fv3hgsqjrjr3dgg96lll7f294qq11lg40sydygxwl87v9";		# Hash of the pre-patch kernel
+            name    = "linux-hardened-7.1-hardened1";
             patch   = final.fetchurl {
-              name   = "linux-hardened-v7.0.12-hardened1.patch";
-              url    = "https://github.com/anthraxx/linux-hardened/releases/download/v7.0.12-hardened1/linux-hardened-v7.0.12-hardened1.patch";
-              sha256 = "11sq1sdfg3yc2jjzxap13v412biw4p7xgxm6gkd6mz4qn5hx6zjc";	# Hash of the patch itself
+              name   = "linux-hardened-v7.1-hardened1.patch";
+              url    = "https://github.com/anthraxx/linux-hardened/releases/download/v7.1-hardened1/linux-hardened-v7.1-hardened1.patch";
+              sha256 = "04i3vj108q2xylcirlxl49rpqj2ik390y2r3wgdgm21fg4fy772n";	# Hash of the patch itself
             };
           };
         };
