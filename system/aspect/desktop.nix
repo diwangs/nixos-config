@@ -14,6 +14,23 @@
 	services.gvfs.enable = true;
 	services.udev.packages = [ pkgs.gnome-settings-daemon ];
 
+	# Claude Desktop Computer Use needs ydotool's uinput daemon for mouse/keyboard
+	# input on Wayland (xdotool can't inject events into Wayland compositors). This
+	# runs the hardened ydotoold service, creates the `ydotool` group (membership
+	# set in aspect/users.nix), and grants /dev/uinput.
+	programs.ydotool.enable = true;
+
+	# The ydotool module only exports YDOTOOL_SOCKET via environment.variables,
+	# which lands in /etc/set-environment (login SHELLS only). GNOME/GDM-launched
+	# GUI apps don't source that, so Claude Desktop couldn't find ydotoold and its
+	# clicks hung with `spawnSync /bin/sh ETIMEDOUT`. Re-export it through
+	# sessionVariables -> /etc/pam/environment, the same PAM channel that already
+	# delivers NIXOS_OZONE_WL to graphical sessions. The literal path matches the
+	# module's RuntimeDirectory ("ydotoold") + socket-path; it's hardcoded there,
+	# and we can't reference config.environment.variables here (sessionVariables is
+	# merged into it, so that would be infinite recursion).
+	environment.sessionVariables.YDOTOOL_SOCKET = "/run/ydotoold/socket";
+
 	# Fonts: nerd-fonts
 	fonts.packages = builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
 

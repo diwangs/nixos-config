@@ -25,8 +25,15 @@
       inputs.nixpkgs.follows = "home-manager";	# vscode is defined by hm
     };
 
-		# aadrick's Claude Desktop
-		claude-desktop.url = "github:aaddrick/claude-desktop-debian";
+		# patrickjaja's Claude Desktop (ships ~42 Linux patches: Cowork/Code,
+		# autoupdater removal, locale fixes, native stubs, 3p enterprise config)
+		claude-desktop.url = "github:patrickjaja/claude-desktop-bin";
+
+		# Native Linux backend for Claude Desktop's Cowork feature. Claude
+		# Desktop probes its unix socket; without it, Cowork AND Chat hang in
+		# 3p mode. We expose the package via overlay and run it as a user
+		# service from home-manager (see package/home-manager.nix).
+		claude-cowork-service.url = "github:patrickjaja/claude-cowork-service";
 	};
 
 	outputs = { 
@@ -36,9 +43,10 @@
 		nixpkgs-stable, 
 		home-manager, 
 		nix-flatpak, 
-		nix-vscode-extensions, 
+		nix-vscode-extensions,
 		claude-desktop,
-		... 
+		claude-cowork-service,
+		...
 	}: {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
@@ -52,6 +60,7 @@
 					"github-copilot-cli"
 					"claude-code"
 					"claude-desktop"
+					"claude-desktop-bin"	# patrickjaja's pname
 
 					# VSCode and some unfree extensions
 					"vscode"

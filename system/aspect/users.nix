@@ -7,13 +7,14 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
 	users.users.diwangs = {
 		isNormalUser = true;
-		extraGroups = [ 
+		extraGroups = [
 			"wheel" 		# For ‘sudo’ and `iwd`.
 			"networkmanager"
 			"dialout"		# Serial connection
 			"adbusers"	# Android debugging
 			"plugdev"		# HackRF
-		]; 
+			"ydotool"		# Claude Desktop Computer Use input (ydotoold /dev/uinput)
+		];
 		initialHashedPassword = secrets.diwangs.hashed-password;		# Enable for GDM to detect it?
 		# NOTE: The same password is used for Gnome keyring, but is not synced
 		shell = pkgs.zsh; # Enable here but manage at package/home-manager.nix

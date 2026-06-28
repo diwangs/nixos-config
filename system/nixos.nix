@@ -17,113 +17,32 @@
 		../package/nixos.nix
 	];
 
-	nixpkgs.overlays = let
-		# mul31: Java String.hashCode-style hash (seed 0, ×31 per char, kept as
-		# uint32). Claude Desktop's growthbook seed map keys flags by this hash
-		# of the flag name, not the name itself. Computing it here lets the
-		# third patch reference the stable flag NAME instead of a magic number,
-		# and stays correct as long as the hash algorithm doesn't change.
-		# Verified against known pairs: yukon_silver=574905726,
-		# yukon_silver_thinking=1658632017, model_selector_enabled=4108768567.
-		mul31 = name: builtins.foldl'
-			(acc: c: lib.mod (acc * 31 + lib.strings.charToInt c) 4294967296)
-			0
-			(lib.stringToCharacters name);
-	in [
+	nixpkgs.overlays = [
 		self.inputs.nix-vscode-extensions.overlays.default
-		self.inputs.claude-desktop.overlays.default
 
-		# Claude Desktop 3p (OpenRouter) additional overlays
-		#
-		# Problem: OpenRouter has a different model ID than Anthropic 1p. This
-		# 	caused problems, particularly when it comes to effort selection, 
-		# 	thinking toggle, and 1m context selection across Chat, Cowork, and 
-		# 	Code. Therefore, we make these patches:
-		#
-		# First patch: disable the guard that makes the app exits when remote debug
-		# 	port is enabled. This is not directly related to the problem, but a 
-		# 	necessary intermediate step to enable dynamic analysis.
-		#
-		# Second patch: change the normalization regex of the model ID. Claude 
-		# 	Desktop could handle non Anthropic 1p model ID, but it only covers 
-		#		dot-based syntax used by Bedrock and Vertex, not slash-based syntax
-		#		used by OpenRouter. Changing this make Claude Desktop recognizes the 
-		# 	model ID and assign the correct capabilities and description.
-		#
-		# Third patch: enable the `yukon_silver_thinking` feature flag. While the
-		#		second patch enables the fable disablement and effort slider in Cowork
-		#		and Code, it does not enable the thinking toggle. Setting the right
-		#		feature flag in the 3p bootstrap enables this in Cowork. The seed map
-		#		keys flags by their `mul31` hash, which we compute from the flag name
-		#		via the `mul31` helper above (yukon_silver_thinking -> 1658632017)
-		#		rather than hardcoding the number. P.S. `yukonSilver` ~ Cowork's VM
-		#
-		# Fourth patch: change the `De` value. Chat has an
-		#		additional guard to enable effort slider and thinking toggle. Changing
-		# 	this guard (which is true for Cowork and Code but false for chat) in
-		#		the ion bundle is required to apply the third patch to Chat as well.
-		# 
-		# TODO: this fourth patch is the least robust since it has a lot of 
-		#		minified variables. Find a more robust way to patch this.
+		# Expose claude-cowork-service (Cowork's native Linux backend) as a
+		# package. The flake has no overlays.default, so pull it from its
+		# per-system packages output. Enabled as a user service + added to
+		# home.packages in package/home-manager.nix.
 		(final: prev: {
-			claude-desktop = prev.claude-desktop.overrideAttrs (old: {
-				postInstall = (old.postInstall or "") + ''
-					asarRoot=$out/lib/claude-desktop/electron/resources
-					work=$(mktemp -d)
-					asar extract "$asarRoot/app.asar" "$work/contents"
-
-					# First patch: tertiary statement that checks process.argv and exits
-					substituteInPlace "$work/contents/.vite/build/index.pre.js" \
-						--replace-fail \
-							'&&process.exit(1)' \
-							'&&void 0'
-
-					# Second patch
-					substituteInPlace "$work/contents/.vite/build/index.js" \
-						--replace-fail \
-							'.replace(/^(?:[a-z][a-z0-9-]*\.)?anthropic\./,"")' \
-							'.replace(/^(?:[a-z][a-z0-9-]*[./])?anthropic[./]/,"")' \
-						--replace-fail \
-							'.replace(/-\d{8}$/,"")}' \
-							'.replace(/-\d{8}$/,"").replace(/(\d)\.(\d)/g,"$1-$2")}'
-
-					# Third patch: inject growthbook with mul31 of yukon_silver_thinking
-					substituteInPlace "$work/contents/.vite/build/index.js" \
-						--replace-fail \
-							'return{${toString (mul31 "yukon_silver")}:' \
-							'return{"${toString (mul31 "yukon_silver_thinking")}":{defaultValue:!0},${toString (mul31 "yukon_silver")}:'
-
-					# Misc patch: disable thinking for Haiku because it broke title gen
-					substituteInPlace "$work/contents/.vite/build/index.js" \
-						--replace-fail \
-							'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
-							'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}'
-
-					# Repack app.asar only. The existing app.asar.unpacked dir
-					# carries files the build adds after the original pack
-					# (claude-native stub, cowork daemon) that a fresh --unpack
-					# would drop, so leave it untouched.
-					asar pack "$work/contents" "$work/app.asar" --unpack '**/*.node'
-					cp -f "$work/app.asar" "$asarRoot/app.asar"
-					rm -rf "$work"
-
-					# Fourth patch: unlock the thinking/effort toggle on the Chat
-					# surface (see the Second-patch comment). The renderer guard
-					# `De` is false on Chat (considerEnabledForNonUI = Cowork
-					# capability store), so force it true. CDP-confirmed: with
-					# this, Chat's model selector shows Effort/thinking like
-					# Code/Cowork. The ion bundle is a loose file in the output
-					# (not in app.asar), so patch it directly; its filename hash
-					# varies per build, hence the glob.
-					for ionBundle in "$asarRoot/ion-dist/assets/v1/"index-*.js; do
-						substituteInPlace "$ionBundle" \
-							--replace-fail \
-								'De=xe.considerEnabledForNonUI&&(_&&!ve||Q||j&&G)&&!Y,Pe=Ae&&De&&!J' \
-								'De=!0,Pe=Ae&&De&&!J'
-					done
-				'';
-			});
+			claude-cowork-service =
+				self.inputs.claude-cowork-service.packages.${final.stdenv.hostPlatform.system}.claude-cowork-service;
 		})
+
+		# Claude Desktop 3p (OpenRouter). `base.nix` constructs `claude-desktop`
+		# from patrickjaja's package.nix; each ./patches/*.nix is an INDEPENDENT
+		# overlay layering one OpenRouter/Computer-Use patch on top. They commute
+		# (per-fragment extract/repack), so add, remove, or reorder the patch
+		# imports freely — but keep base.nix first. See ../package/overlay/claude-desktop-bin.
+		(import ../package/overlay/claude-desktop-bin/base.nix { inherit self; })
+		(import ../package/overlay/claude-desktop-bin/patches/01-debug-port-guard.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/3p/02-model-id-normalization.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/3p/03-thinking-toggle-flag.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/3p/04-titlegen-thinking.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/05-computer-use-flags.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/06-force-xdotool-under-xwayland.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/3p/07-chat-effort-toggle.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/08-screenshot-downsample.nix)
 	];
 
 	nix.settings.experimental-features = [ "nix-command" "flakes" ];

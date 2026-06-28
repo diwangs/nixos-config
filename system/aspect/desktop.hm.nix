@@ -6,6 +6,9 @@
 			# Enable minimize and maximize button
 			button-layout = "appmenu:minimize,maximize,close";
 		};
+		"org/gnome/desktop/peripherals/mouse" = {
+			accel-profile = "flat";	# For ydotool
+		};
 		"org/gnome/shell" = {
 			app-picker-layout = [];	# Sort menu alphabetically
 			# Find the name with `dconf watch /` and dragging and dropping
@@ -14,7 +17,7 @@
 				# "com.mitchellh.ghostty.desktop"
 				"org.gnome.Console.desktop"
 				"code.desktop"
-				"claude-desktop.desktop"
+				"claude.desktop"	# patrickjaja's makeDesktopItem name = "claude"
 				"md.obsidian.Obsidian.desktop"
 				"app.zen_browser.zen.desktop"
 				"com.bitwarden.desktop.desktop"
