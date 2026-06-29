@@ -25,14 +25,11 @@
       inputs.nixpkgs.follows = "home-manager";	# vscode is defined by hm
     };
 
-		# patrickjaja's Claude Desktop (ships ~42 Linux patches: Cowork/Code,
-		# autoupdater removal, locale fixes, native stubs, 3p enterprise config)
-		claude-desktop.url = "github:patrickjaja/claude-desktop-bin";
+		# patrickjaja's Claude Desktop
+		claude-desktop-bin.url = "github:patrickjaja/claude-desktop-bin";
 
-		# Native Linux backend for Claude Desktop's Cowork feature. Claude
-		# Desktop probes its unix socket; without it, Cowork AND Chat hang in
-		# 3p mode. We expose the package via overlay and run it as a user
-		# service from home-manager (see package/home-manager.nix).
+		# patrickjaja's Claude Desktop native backend
+		# Without a backend, Chat and Cowork doesn't work
 		claude-cowork-service.url = "github:patrickjaja/claude-cowork-service";
 	};
 
@@ -44,32 +41,29 @@
 		home-manager, 
 		nix-flatpak, 
 		nix-vscode-extensions,
-		claude-desktop,
+		claude-desktop-bin,
 		claude-cowork-service,
 		...
 	}: {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
 			system = "x86_64-linux";
+			# For nixos, but also passed to HM
 			specialArgs = rec {
 				inherit self;
+				inherit claude-desktop-bin;
 
 				# Self-defined args to pass allowed unfree packages
 				allowedUnfree = [
 					"codeql"
-					"github-copilot-cli"
 					"claude-code"
 					"claude-desktop"
 					"claude-desktop-bin"	# patrickjaja's pname
 
 					# VSCode and some unfree extensions
 					"vscode"
-					"vscode-extension-github-copilot"
-					"vscode-extension-github-copilot-chat"
-					"vscode-extension-GitHub-copilot-chat"
-					"vscode-extension-MS-python-vscode-pylance"
-					"vscode-extension-ms-vscode-remote-remote-ssh"
 					"vscode-extension-anthropic-claude-code"
+					"vscode-extension-ms-vscode-remote-remote-ssh"
 
 					# AppImages
 					"trezor-suite"
@@ -117,6 +111,9 @@
 				# Flatpak (packages included)
 				nix-flatpak.nixosModules.nix-flatpak
 				./system/flatpak.nix
+
+				# Claude Desktop native backend (Cowork/Chat). Enabled in nixos.nix.
+				claude-cowork-service.nixosModules.default
 			];
 		};
 	};

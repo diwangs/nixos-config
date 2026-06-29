@@ -2,7 +2,7 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
-{ self, config, lib, pkgs, allowedUnfree, ... }: {
+{ self, config, lib, pkgs, allowedUnfree, claude-desktop-bin, ... }: {
 	imports = [
 		./aspect/audio.nix
 		./aspect/locale.nix
@@ -20,32 +20,25 @@
 	nixpkgs.overlays = [
 		self.inputs.nix-vscode-extensions.overlays.default
 
-		# Expose claude-cowork-service (Cowork's native Linux backend) as a
-		# package. The flake has no overlays.default, so pull it from its
-		# per-system packages output. Enabled as a user service + added to
-		# home.packages in package/home-manager.nix.
-		(final: prev: {
-			claude-cowork-service =
-				self.inputs.claude-cowork-service.packages.${final.stdenv.hostPlatform.system}.claude-cowork-service;
-		})
+		# Inject `claude-code-bin` into `pkgs` and attach our native Claude Code CLI to it
+		(import ../package/overlay/claude-desktop-bin/base.nix { inherit claude-desktop-bin; })
 
-		# Claude Desktop 3p (OpenRouter). `base.nix` constructs `claude-desktop`
-		# from patrickjaja's package.nix; each ./patches/*.nix is an INDEPENDENT
-		# overlay layering one OpenRouter/Computer-Use patch on top. They commute
-		# (per-fragment extract/repack), so add, remove, or reorder the patch
-		# imports freely — but keep base.nix first. See ../package/overlay/claude-desktop-bin.
-		(import ../package/overlay/claude-desktop-bin/base.nix { inherit self; })
+		# Additional overlay to `pkgs.claude-desktop-bin` (always place after injection)
 		(import ../package/overlay/claude-desktop-bin/patches/01-debug-port-guard.nix)
 		(import ../package/overlay/claude-desktop-bin/patches/3p/02-model-id-normalization.nix)
 		(import ../package/overlay/claude-desktop-bin/patches/3p/03-thinking-toggle-flag.nix)
 		(import ../package/overlay/claude-desktop-bin/patches/3p/04-titlegen-thinking.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/05-computer-use-flags.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/06-force-xdotool-under-xwayland.nix)
 		(import ../package/overlay/claude-desktop-bin/patches/3p/07-chat-effort-toggle.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/05-computer-use-flags.nix)
 		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/08-screenshot-downsample.nix)
+		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/10-wayland-primary-monitor.nix)
 	];
 
 	nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+	# Whitelist unfree packages
+	# Define here instead of flake.nix to avoid replacing the whole pkgs
+	nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) allowedUnfree;
 
 	# nix-ld: for packages that hasn't been nixified
   # e.g., `fw-ectool` and virtualhere
@@ -56,9 +49,19 @@
 
 	security.rtkit.enable = true;
 
-	# Whitelist unfree packages
-	# Define here instead of flake.nix to avoid replacing the whole pkgs
-	nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) allowedUnfree;
+	# Cowork native backend daemon. Claude Desktop probes its unix socket
+	# ($XDG_RUNTIME_DIR/cowork-vm-service.sock); without it, Cowork — and, in
+	# 3p mode, Chat — hang. The upstream module wires a per-user systemd service
+	# (Claude Desktop is itself a per-user package) and imports the Wayland/display
+	# env so spawned Claude Code can reach the display/clipboard/D-Bus.
+	services.claude-cowork = {
+		enable = true;
+		# The native backend resolves the `claude` CLI via exec.LookPath against
+		# its own PATH first, and shells out to bash/cp, so PATH must carry all
+		# three. claude-code 2.1.191 in nixpkgs satisfies the >=2.1.86 Dispatch
+		# requirement.
+		extraPath = [ pkgs.claude-code pkgs.bash pkgs.coreutils ];
+	};
 
 	# Configure keymap in X11
 	# services.xserver.xkb.layout = "us";
