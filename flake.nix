@@ -25,12 +25,13 @@
       inputs.nixpkgs.follows = "home-manager";	# vscode is defined by hm
     };
 
-		# patrickjaja's Claude Desktop
-		claude-desktop-bin.url = "github:patrickjaja/claude-desktop-bin";
-
-		# patrickjaja's Claude Desktop native backend
-		# Without a backend, Chat and Cowork doesn't work
-		claude-cowork-service.url = "github:patrickjaja/claude-cowork-service";
+		# trycua's computer-use driver flake (package + nixosModule).
+		# Follow nixpkgs-stable (also 26.05) so the driver is built against the
+		# same baseline upstream tests, without a duplicate nixpkgs in the closure.
+		cua = {
+			url = "github:trycua/cua/cua-driver-rs-v0.7.0";
+			inputs.nixpkgs.follows = "nixpkgs-stable";
+		};
 	};
 
 	outputs = { 
@@ -41,8 +42,7 @@
 		home-manager, 
 		nix-flatpak, 
 		nix-vscode-extensions,
-		claude-desktop-bin,
-		claude-cowork-service,
+		cua,
 		...
 	}: {
 		# nixos-rebuild switch --flake path#hostname
@@ -51,14 +51,13 @@
 			# For nixos, but also passed to HM
 			specialArgs = rec {
 				inherit self;
-				inherit claude-desktop-bin;
+				inherit cua;
 
 				# Self-defined args to pass allowed unfree packages
 				allowedUnfree = [
 					"codeql"
 					"claude-code"
 					"claude-desktop"
-					"claude-desktop-bin"	# patrickjaja's pname
 
 					# VSCode and some unfree extensions
 					"vscode"
@@ -112,8 +111,8 @@
 				nix-flatpak.nixosModules.nix-flatpak
 				./system/flatpak.nix
 
-				# Claude Desktop native backend (Cowork/Chat). Enabled in nixos.nix.
-				claude-cowork-service.nixosModules.default
+				# trycua computer-use driver. Enabled in nixos.nix.
+				cua.nixosModules.cua-driver
 			];
 		};
 	};

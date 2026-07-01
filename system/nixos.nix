@@ -2,7 +2,7 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
-{ self, config, lib, pkgs, allowedUnfree, claude-desktop-bin, ... }: {
+{ self, config, lib, pkgs, allowedUnfree, cua, ... }: {
 	imports = [
 		./aspect/audio.nix
 		./aspect/locale.nix
@@ -13,6 +13,7 @@
 		./aspect/users.nix
 		./aspect/desktop.nix
 		./aspect/key-management.nix
+		./aspect/virtualisation.nix
 
 		../package/nixos.nix
 	];
@@ -20,18 +21,22 @@
 	nixpkgs.overlays = [
 		self.inputs.nix-vscode-extensions.overlays.default
 
-		# Inject `claude-code-bin` into `pkgs` and attach our native Claude Code CLI to it
-		(import ../package/overlay/claude-desktop-bin/base.nix { inherit claude-desktop-bin; })
-
-		# Additional overlay to `pkgs.claude-desktop-bin` (always place after injection)
-		(import ../package/overlay/claude-desktop-bin/patches/01-debug-port-guard.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/3p/02-model-id-normalization.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/3p/03-thinking-toggle-flag.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/3p/04-titlegen-thinking.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/3p/07-chat-effort-toggle.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/05-computer-use-flags.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/08-screenshot-downsample.nix)
-		(import ../package/overlay/claude-desktop-bin/patches/patrickjaja/10-wayland-primary-monitor.nix)
+		# Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
+		# Migrated off patrickjaja's `claude-desktop-bin` (base + 9 patches); those
+		# files remain under ../package/overlay/claude-desktop-bin/ for reference/
+		# rollback but are no longer imported. Re-applied here: the OpenRouter/3p
+		# patches (model-id, thinking-flag, titlegen, chat-effort) + debug-port +
+		# the Cowork-VM path patch. Patrickjaja's Computer-Use/screenshot/ydotool
+		# patches (05/08/10/11) are NOT migrated. Each patch runs its own
+		# extract/repack or loose-file edit (see patch/lib.nix), so order is
+		# irrelevant.
+		(import ../package/overlay/claude-desktop/overlay.nix)
+		(import ../package/overlay/claude-desktop/patch/debug-port-guard.nix)
+		(import ../package/overlay/claude-desktop/patch/vm-path.nix)
+		(import ../package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
+		(import ../package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
+		(import ../package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
+		(import ../package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
 	];
 
 	nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -49,18 +54,18 @@
 
 	security.rtkit.enable = true;
 
-	# Cowork native backend daemon. Claude Desktop probes its unix socket
-	# ($XDG_RUNTIME_DIR/cowork-vm-service.sock); without it, Cowork — and, in
-	# 3p mode, Chat — hang. The upstream module wires a per-user systemd service
-	# (Claude Desktop is itself a per-user package) and imports the Wayland/display
-	# env so spawned Claude Code can reach the display/clipboard/D-Bus.
-	services.claude-cowork = {
+	# NOTE: the official Claude Desktop bundles and self-spawns its own Cowork
+	# backend (cowork-linux-helper, restart-backoff supervised, in-$HOME rpc.sock),
+	# so patrickjaja's external `services.claude-cowork` daemon was removed in the
+	# migration — it's no longer used.
+
+	# Enable cua-driver (also sets CUA_DRIVER_BIN)
+	#
+	# NOTE: this does not start a daemon, since the intended design is to spawn 
+	# on-demand for MCP.
+	services.cua-driver = {
 		enable = true;
-		# The native backend resolves the `claude` CLI via exec.LookPath against
-		# its own PATH first, and shells out to bash/cp, so PATH must carry all
-		# three. claude-code 2.1.191 in nixpkgs satisfies the >=2.1.86 Dispatch
-		# requirement.
-		extraPath = [ pkgs.claude-code pkgs.bash pkgs.coreutils ];
+		package = cua.packages.${pkgs.stdenv.hostPlatform.system}.cua-driver;
 	};
 
 	# Configure keymap in X11

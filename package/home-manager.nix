@@ -32,6 +32,7 @@
 
 		# Agentic
 		claude-desktop
+		# cua-driver: installed system-wide via services.cua-driver (nixos.nix)
 		# github-copilot-cli 		# Agentic LLM in the CLI
 
 		# Media
@@ -157,7 +158,7 @@
 		settings = {
 			defaultMode = "auto";
 			effortLevel = "xhigh";
-			# tui = "fullscreen"; # No flicker, but spammy if ctrl+g
+			tui = "default"; # Prevent spammy ctrl+g
 			env = {
 				"ANTHROPIC_API_KEY" = ""; # Intentionally blank;
 				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
