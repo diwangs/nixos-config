@@ -56,4 +56,16 @@
 		enableZshIntegration = true;
 		# No settings, just use the `pure` shell
 	};
+
+	# Nautilus video properties (https://github.com/NixOS/nixpkgs/issues/195936):
+	# This is set per-user via systemd.user.sessionVariables instead of 
+	# environment.sessionVariables -> /etc/pam/environment to avoid colon-joining
+	# onto GIO_EXTRA_MODULES in the GNOME session, breaking GIO module loading.
+	systemd.user.sessionVariables.GST_PLUGIN_SYSTEM_PATH_1_0 =
+		lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" (with pkgs.gst_all_1; [
+			gst-plugins-good
+			gst-plugins-bad
+			gst-plugins-ugly
+			gst-libav
+		]);
 }
