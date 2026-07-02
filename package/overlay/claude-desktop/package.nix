@@ -16,22 +16,24 @@
 # the counterpart to ../claude-desktop-bin (the community patrickjaja build);
 # only one should inject `claude-desktop` at a time — see ../../nixos.nix.
 #
-# --no-sandbox rationale: the .deb's postinst installs an *unconfined AppArmor
-# profile* on Debian/Ubuntu so Chromium's user-namespace sandbox works under
-# the modern userns restriction. We can't reproduce that from a derivation, and
-# the setuid chrome-sandbox helper can't live in the (non-setuid) Nix store
-# anyway. So we launch with --no-sandbox. To restore the sandbox later, expose
-# chrome-sandbox via NixOS `security.wrappers` and drop the flag.
+# GPU/rendering: HW acceleration is ON. Chromium `dlopen`s the glvnd dispatcher
+# soname `libEGL.so.1`, which is a NEEDED-less runtime load (so autoPatchelf
+# can't wire it) and is present in NONE of the obvious places: the bundle ships
+# only ANGLE's sonameless `libEGL.so`, and /run/opengl-driver/lib ships the mesa
+# *vendor* impl `libEGL_mesa.so` — neither has the `.1` soname. The dispatcher
+# lives in `libglvnd`. So the postFixup wrapper prefixes LD_LIBRARY_PATH with
+# `${libglvnd}/lib` (provides libEGL.so.1 / libGLESv2.so.2 / libGLX.so.0) AND
+# `${addDriverRunpath.driverLink}/lib` (= /run/opengl-driver/lib: mesa vendor
+# impls + dri/ + gbm/). Once libEGL.so.1 loads, glvnd finds the real driver via
+# its EGL vendor JSON: NixOS' libglvnd hardcodes /run/opengl-driver/share/glvnd/
+# egl_vendor.d, whose 50_mesa.json points at libEGL_mesa.so.0 by absolute store
+# path — so the chain to this box's AMD radeonsi driver resolves automatically,
+# no Chromium GL flags needed. Without accel Chromium logged "Could not dlopen
+# native EGL: libEGL.so.1" and ran the gpu-process with --use-gl=disabled
+# (SwiftShader software GL); the community electron build showed the same log.
 #
-# GPU/rendering: at runtime the bundled Chromium logs "Could not dlopen native
-# EGL: libEGL.so.1" and falls back to SwiftShader (software GL). Verified this
-# is BENIGN — the app launches to a stable multi-process Wayland state and the
-# same log appears with the community electron-based build. It's the libglvnd
-# EGL *dispatcher* being dlopen()ed (not a NEEDED entry, so autoPatchelf can't
-# see it); putting /run/opengl-driver/lib on LD_LIBRARY_PATH does NOT resolve it
-# (that dir ships libEGL_mesa.so, not libEGL.so.1), so we intentionally add no
-# GL env munging here. If HW acceleration is ever wanted, wrap with libglvnd +
-# the addDriverRunpath driver link on LD_LIBRARY_PATH and re-verify.
+# NOTE: on hardened kernel, make sure to either enable unprivileged user NS or
+# disable Chromium sandbox.
 #
 # Version + hash are PINNED below and maintained by ./update.sh — do not edit
 # the two UPDATE MARKER lines by hand.
@@ -44,6 +46,7 @@
 , autoPatchelfHook
 , makeWrapper
 , wrapGAppsHook3
+, addDriverRunpath  # .driverLink = /run/opengl-driver (HW GL/Vulkan driver path)
 , # runtime libs — from the .deb's `Depends` mapped to nixpkgs, plus the usual
   # Electron/Chromium shared-object closure that autoPatchelfHook resolves.
   glib
@@ -156,6 +159,11 @@ stdenv.mkDerivation (finalAttrs: {
   # --prefix, so defer the hook's own wrapping.
   dontWrapGApps = true;
 
+  # Drop the bundled chrome-sandbox: it can't be setuid in the store, and a
+  # NON-setuid helper present on disk makes Chromium abort ("SUID sandbox
+  # helper found but not configured correctly"). Removing it lets Chromium
+  # fall through to the userns sandbox (see header); also spares autoPatchelf
+  # a helper we never invoke.
   installPhase = ''
     runHook preInstall
 
@@ -168,9 +176,6 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 usr/share/applications/claude-desktop.desktop \
       $out/share/applications/claude-desktop.desktop
 
-    # The setuid sandbox helper cannot live in (or work from) the Nix store; we
-    # launch with --no-sandbox instead (see header). Drop it so autoPatchelf
-    # doesn't try to fix a helper we never invoke.
     rm -f $out/lib/claude-desktop/chrome-sandbox
 
     runHook postInstall
@@ -180,18 +185,26 @@ stdenv.mkDerivation (finalAttrs: {
   # libvk_swiftshader, libvulkan.so.1) when relinking the main binary.
   runtimeDependencies = [ "${placeholder "out"}/lib/claude-desktop" ];
 
+  # Wrap the real Electron entrypoint: pull in the GApps env (GTK theme,
+  # GSettings schemas, typelibs) from wrapGAppsHook3, and put xdg-utils on
+  # PATH for external-link / claude:// handling. No --no-sandbox: the userns
+  # sandbox is kept on (see header).
+  #
+  # LD_LIBRARY_PATH: libglvnd (the EGL/GLES/GLX dispatchers, incl. the
+  # libEGL.so.1 Chromium dlopen()s) + the HW driver link, to enable GPU
+  # acceleration (see the GPU/rendering note in the header). --prefix (not
+  # --set) so any LD_LIBRARY_PATH from gappsWrapperArgs is preserved; it's
+  # scoped to this launcher and inherited by the Electron gpu/renderer children.
+  #
+  # Point the .desktop Exec= at the wrapped store binary (Debian's was a bare
+  # "claude-desktop" resolved via /usr/bin), keeping the %U and the claude://
+  # action args intact.
   postFixup = ''
-    # Wrap the real Electron entrypoint: pull in the GApps env (GTK theme,
-    # GSettings schemas, typelibs) from wrapGAppsHook3, force --no-sandbox, and
-    # put xdg-utils on PATH for external-link / claude:// handling.
     makeWrapper $out/lib/claude-desktop/claude-desktop $out/bin/claude-desktop \
       "''${gappsWrapperArgs[@]}" \
       --prefix PATH : ${lib.makeBinPath [ xdg-utils ]} \
-      --add-flags "--no-sandbox"
+      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ libglvnd ]}:${addDriverRunpath.driverLink}/lib"
 
-    # Point the .desktop Exec= at the wrapped store binary (Debian's was a bare
-    # "claude-desktop" resolved via /usr/bin), keeping the %U and the claude://
-    # action args intact.
     substituteInPlace $out/share/applications/claude-desktop.desktop \
       --replace-warn 'Exec=claude-desktop' "Exec=$out/bin/claude-desktop"
   '';
