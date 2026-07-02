@@ -11,41 +11,37 @@
 
 			# Gossip
 			"com.discordapp.Discord"            # Official!
-			"org.signal.Signal"
-			"us.zoom.Zoom"
+			"im.riot.Riot"
 			"com.slack.Slack"
+			"us.zoom.Zoom"
+			"org.signal.Signal"
 
 			# Local media (install via flatpak only if official for faster update)
 			"app.zen_browser.zen"								# Official!
 			"com.moonlight_stream.Moonlight"    # Official!
-			"com.brave.Browser"                 # Official!
 			"md.obsidian.Obsidian"              # Official!
 		];
 
-		# Many packages need X11 socket (not fallback-x11) to open
-		overrides = lib.recursiveUpdate (lib.listToAttrs 
-			(builtins.map (pkg: {
-				name = pkg;
-				value = { Context.sockets = [ "wayland" "x11" ]; };
-			}) [
-				"com.bitwarden.desktop"
-				"com.spotify.Client"
-				"com.valvesoftware.Steam"
+		overrides = lib.recursiveUpdate (lib.listToAttrs (builtins.map (pkg: {
+			name = pkg;
+			value = { Context.sockets = [ "wayland" "x11" ]; };
+		}) [
+			# Packages that need X11 socket (not fallback-x11) to open
+			"com.bitwarden.desktop"
+			"com.valvesoftware.Steam"
+			# "com.spotify.Client" # Works, but ugly border
 
-				"com.discordapp.Discord"
-				"org.signal.Signal"
-				"us.zoom.Zoom"
-				
-				"com.brave.Browser"
-				"md.obsidian.Obsidian"
-			])) 
+			"com.discordapp.Discord"
+			"us.zoom.Zoom"
+		])) {
 			# Misc specific overrides
-			{
-				# "org.signal.Signal" = { 
-				# 	# https://github.com/flathub/org.signal.Signal/issues/752
-				# 	# https://community.signalusers.org/t/warning-do-not-update-from-flathub-database-error/63222/17
-				# 	Environment.SIGNAL_PASSWORD_STORE="basic";
-				# };
+			"im.riot.Riot" = {
+				# Permission to check power state
+				"System Bus Policy"."org.freedesktop.UPower" = "talk";
+
+				# Permission to reach gnome-keyring
+				"Session Bus Policy"."org.freedesktop.secrets" = "talk";
 			};
+		};
 	};
 }
