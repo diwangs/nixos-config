@@ -76,6 +76,12 @@
 , libseccomp  # bundled virtiofsd (Cowork VM helper)
 , libcap_ng   # bundled virtiofsd (Cowork VM helper)
 , xdg-utils   # runtime: xdg-open for external links / claude:// scheme
+, python3     # runtime: interpreter for Python-based Desktop Extensions (MCP)
+, nodejs      # runtime: interpreter for Node-based Desktop Extensions (has a built-in fallback)
+, claude-code # runtime: the CLI the Code/Cowork surfaces drive (resolved via PATH scan)
+, qemu_kvm    # runtime: qemu-system-x86_64 for Cowork's micro-VM PATH scan (host-cpu-only)
+
+# X11
 , libx11
 , libxcb
 , libxcomposite
@@ -153,17 +159,15 @@ stdenv.mkDerivation (finalAttrs: {
   dontConfigure = true;
   dontBuild = true;
 
-  # wrapGAppsHook3 would wrap $out/bin/* automatically, but the launcher we want
-  # to wrap is the Electron binary deep in lib/. Do the wrapping by hand in
-  # postFixup (after autoPatchelf) and let the gappsWrapperArgs flow in via
-  # --prefix, so defer the hook's own wrapping.
+  # Anthropic ships a symlink in `bin/claude-desktop` to `lib/claude-desktop`.
+  # Instead of wrapping the symlink, we wrap the script in `lib` directly.
+  # (see fixup)
   dontWrapGApps = true;
 
   # Drop the bundled chrome-sandbox: it can't be setuid in the store, and a
   # NON-setuid helper present on disk makes Chromium abort ("SUID sandbox
   # helper found but not configured correctly"). Removing it lets Chromium
-  # fall through to the userns sandbox (see header); also spares autoPatchelf
-  # a helper we never invoke.
+  # fall through to the userns sandbox
   installPhase = ''
     runHook preInstall
 
@@ -183,27 +187,27 @@ stdenv.mkDerivation (finalAttrs: {
 
   # autoPatchelfHook needs to find the app-local .so's (libEGL, libGLESv2,
   # libvk_swiftshader, libvulkan.so.1) when relinking the main binary.
-  runtimeDependencies = [ "${placeholder "out"}/lib/claude-desktop" ];
+  # runtimeDependencies = [ "${placeholder "out"}/lib/claude-desktop" ];
 
-  # Wrap the real Electron entrypoint: pull in the GApps env (GTK theme,
-  # GSettings schemas, typelibs) from wrapGAppsHook3, and put xdg-utils on
-  # PATH for external-link / claude:// handling. No --no-sandbox: the userns
-  # sandbox is kept on (see header).
-  #
-  # LD_LIBRARY_PATH: libglvnd (the EGL/GLES/GLX dispatchers, incl. the
-  # libEGL.so.1 Chromium dlopen()s) + the HW driver link, to enable GPU
-  # acceleration (see the GPU/rendering note in the header). --prefix (not
-  # --set) so any LD_LIBRARY_PATH from gappsWrapperArgs is preserved; it's
-  # scoped to this launcher and inherited by the Electron gpu/renderer children.
-  #
-  # Point the .desktop Exec= at the wrapped store binary (Debian's was a bare
-  # "claude-desktop" resolved via /usr/bin), keeping the %U and the claude://
-  # action args intact.
+  # Fixup:
+  # - Wrap the `lib` entrypoint by passing the `gappsWrapperArgs`
+  # - Pass necessary runtime dependencies
+  # - Fix the .desktop Exec= keeping the %U and the claude:// action args
   postFixup = ''
     makeWrapper $out/lib/claude-desktop/claude-desktop $out/bin/claude-desktop \
       "''${gappsWrapperArgs[@]}" \
-      --prefix PATH : ${lib.makeBinPath [ xdg-utils ]} \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ libglvnd ]}:${addDriverRunpath.driverLink}/lib"
+      --prefix PATH : ${lib.makeBinPath [
+        qemu_kvm    # For Cowork (host arch only, much smaller than `qemu`)
+        nodejs      # Node-based Desktop extensions runtime
+        python3     # Python-based Desktop extensions runtime
+        xdg-utils   # For deeplink
+      ]} \
+      --suffix PATH : ${lib.makeBinPath [
+        claude-code # Code/Cowork CLI; --suffix so a user's own PATH `claude` wins
+      ]} \
+      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [
+        libglvnd    # For hw acceleration (see header comment)
+      ]}:${addDriverRunpath.driverLink}/lib"
 
     substituteInPlace $out/share/applications/claude-desktop.desktop \
       --replace-warn 'Exec=claude-desktop' "Exec=$out/bin/claude-desktop"

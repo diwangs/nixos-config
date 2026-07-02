@@ -29,6 +29,8 @@
 # visible build-log warning instead of breaking the whole nixos-rebuild — same
 # policy as ../../claude-desktop-bin. KVM/vsock device access is a separate,
 # system-level gate handled by the virtualisation aspect.
+#
+# NOTE: this is x86 only. ARM depends on another line.
 final: prev:
 let
   helpers = import ./lib.nix { inherit (final) lib; };
