@@ -36,8 +36,11 @@
 				# re-gate them via disable-user-extensions (GNOME flips this to true
 				# after an unclean Shell restart, which is what hid Vitals).
 				disable-user-extensions = false;
-				enabled-extensions = with pkgs.gnomeExtensions; [
+				enabled-extensions = (with pkgs.gnomeExtensions; [
 					vitals.extensionUuid
+				]) ++ [
+					# cua-driver Wayland helper; packaged in package/nixos.nix
+					"winrects@cua"
 				];
 			};
 		};
