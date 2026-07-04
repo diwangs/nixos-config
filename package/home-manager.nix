@@ -60,6 +60,7 @@
 	
 	# Dev
 	programs.direnv.enable = true; # Add direnv package and sets the shell hook
+	programs.gh.enable = true; # Add direnv package and sets the shell hook
 	programs.java = { # Aside from installing jdk (latest LTS), this sets JAVA_HOME
 		enable = true;
 		package = pkgs.jdk25;							# Latest LTS
@@ -169,6 +170,10 @@
 				"DISABLE_COMPACT" = "1";
 			};
 		};
+	};
+
+	programs.t3code = {
+		enable = true;
 	};
 
 	# CLI-based agent: OpenCode

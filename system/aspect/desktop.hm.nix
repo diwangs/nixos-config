@@ -22,10 +22,10 @@
 				# Find the name with `dconf watch /` and dragging and dropping
 				favorite-apps = [
 					"org.gnome.Nautilus.desktop"	# Files
-					# "com.mitchellh.ghostty.desktop"
 					"org.gnome.Console.desktop"
 					"code.desktop"
-					"claude-desktop.desktop"	# official Anthropic .desktop id
+					"t3code.desktop"
+					# "claude-desktop.desktop"	# official Anthropic .desktop id
 					"md.obsidian.Obsidian.desktop"
 					"app.zen_browser.zen.desktop"
 					"com.bitwarden.desktop.desktop"
