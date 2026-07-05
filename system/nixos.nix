@@ -38,9 +38,6 @@
 		(import ../package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
 		(import ../package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
 
-		# Fix t3code remote-SSH "cannot find t3@40.10.x" (leaks Electron's version
-		# as the remote npm spec because no app-root package.json is installed).
-		(import ../package/overlay/t3code.nix)
 	];
 
 	nix.settings.experimental-features = [ "nix-command" "flakes" ];
