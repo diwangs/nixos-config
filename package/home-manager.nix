@@ -153,34 +153,50 @@
 		};
 	};
 
-	# CLI-based agent: Claude Code through OpenRouter
+	# CLI-based agent: Claude Code
+	# NOTE: `settings` is intentionally left empty. home-manager writes
+	# settings.json as a read-only /nix/store symlink, which makes Claude Code's
+	# own runtime writes (e.g. adjusting the effort level) fail with EROFS. We
+	# instead materialize a writable copy in the activation script below.
 	programs.claude-code = {
 		enable = true;
-		settings = {
-			defaultMode = "auto";
-			effortLevel = "xhigh";
-			tui = "default"; # Prevent spammy ctrl+g
-			env = {
-				"ANTHROPIC_API_KEY" = ""; # Intentionally blank;
-				"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
-				"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
-				# "CLAUDE_CODE_DISABLE_MOUSE_CLICKS" = "1";
-				# Force 1M context for desktop-invoked Claude Code
-				"CLAUDE_CODE_MAX_CONTEXT_TOKENS" = "1000000";
-				"DISABLE_COMPACT" = "1";
-			};
-		};
+		settings = { };
 	};
 
+	# Copy settings.json into place as a real, writable file so Claude Code can
+	# persist runtime changes (effort level, etc.). Runs unconditionally on
+	# every switch and every boot, so any runtime edits are reset to these
+	# declarative defaults on the next activation.
+	home.activation.claudeSettings =
+		lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+			dst="$HOME/.claude/settings.json"
+			run rm -f "$dst"
+			run install -Dm600 ${(pkgs.formats.json { }).generate "claude-code-settings.json" {
+				"$schema" = "https://json.schemastore.org/claude-code-settings.json";
+				defaultMode = "auto";
+				tui = "default"; # Prevent spammy ctrl+g
+				env = {
+					"ANTHROPIC_API_KEY" = ""; # Intentionally blank;
+					"ANTHROPIC_AUTH_TOKEN" = secrets.diwangs.openrouter-token-personal;
+					"ANTHROPIC_BASE_URL" = "https://openrouter.ai/api";
+					# "CLAUDE_CODE_DISABLE_MOUSE_CLICKS" = "1";
+					# Force 1M context for desktop-invoked Claude Code
+					"CLAUDE_CODE_MAX_CONTEXT_TOKENS" = "1000000";
+					"DISABLE_COMPACT" = "1";
+				};
+			}} "$dst"
+		'';
+
+	# CLI-based agent orchestrator
 	programs.t3code = {
 		enable = true;
 	};
 
 	# CLI-based agent: OpenCode
-	programs.opencode = {
-		enable = true;
-		settings = {
-			autoupdate = "notify";
-		};
-	};
+	# programs.opencode = {
+	# 	enable = true;
+	# 	settings = {
+	# 		autoupdate = "notify";
+	# 	};
+	# };
 }

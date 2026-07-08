@@ -25,7 +25,7 @@
 					"org.gnome.Console.desktop"
 					"code.desktop"
 					"t3code.desktop"
-					# "claude-desktop.desktop"	# official Anthropic .desktop id
+					"claude-desktop.desktop"
 					"md.obsidian.Obsidian.desktop"
 					"app.zen_browser.zen.desktop"
 					"com.bitwarden.desktop.desktop"

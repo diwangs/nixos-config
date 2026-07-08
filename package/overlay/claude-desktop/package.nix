@@ -207,6 +207,7 @@ stdenv.mkDerivation (finalAttrs: {
       ]} \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [
         libglvnd    # For hw acceleration (see header comment)
+        libsecret   # For signin persistence (1p only)
       ]}:${addDriverRunpath.driverLink}/lib"
 
     substituteInPlace $out/share/applications/claude-desktop.desktop \
