@@ -10,10 +10,11 @@
 		./aspect/performance.nix
 		./aspect/power.nix
 		./aspect/security.nix
-		./aspect/users.nix
+		./aspect/user.nix
 		./aspect/desktop.nix
 		./aspect/key-management.nix
 		./aspect/virtualisation.nix
+		./aspect/secret.nix
 
 		../package/nixos.nix
 	];

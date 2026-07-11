@@ -1,4 +1,4 @@
-{ config, lib, pkgs, secrets, ... }: {
+{ config, lib, pkgs, ... }: {
   # Printing
 	services.printing.enable = true;
 	# No Avahi
@@ -7,17 +7,27 @@
 	# IPP (port 631) doesn't work
 	# DNS also doesn't seem to work
 	services.printing.drivers = [ pkgs.hplip ];
-	hardware.printers = {
-		ensurePrinters = [{
-			name = "Office";
-			location = "Malone 360";
-			deviceUri = secrets.peripherals.printer-uri;
-			# DNS doesn't work, IPP doesn't print
-			model = "HP/hp-laserjet_600_m601_m602_m603-ps.ppd.gz";
-			ppdOptions = {
-				"HPOption_Duplexer" = "True";
-			};
-		}];
-		ensureDefaultPrinter = "Office";
+
+	# URI is a secret (see system/aspect/secret.nix): decrypted to
+	# /run/agenix/malone-360-printer-uri at activation and read when this
+	# service starts. Replaces hardware.printers.ensurePrinters, whose
+	# deviceUri is eval-time and leaks into the world-readable nix store.
+	systemd.services.ensure-printers = {
+		description = "Ensure CUPS printers (URI from agenix)";
+		wantedBy = [ "multi-user.target" ];
+		requires = [ "cups.service" ];
+		after = [ "cups.service" ];
+		serviceConfig = {
+			Type = "oneshot";
+			RemainAfterExit = true;
+		};
+		script = ''
+			${pkgs.cups}/bin/lpadmin -p Office -E \
+				-v "$(cat ${config.age.secrets."malone-360-printer-uri".path})" \
+				-m HP/hp-laserjet_600_m601_m602_m603-ps.ppd.gz \
+				-L "Malone 360" \
+				-o HPOption_Duplexer=True
+			${pkgs.cups}/bin/lpadmin -d Office
+		'';
 	};
 }

@@ -15,7 +15,7 @@
 	services.udev.packages = [ pkgs.gnome-settings-daemon ];
 
 	# NOTE: the ydotool stack (programs.ydotool + YDOTOOL_SOCKET, and the `ydotool`
-	# group in aspect/users.nix) was removed in the migration to the official
+	# group in aspect/user.nix) was removed in the migration to the official
 	# Claude Desktop — it existed only for Computer Use input injection, which the
 	# official Linux beta reports as unsupported_platform.
 

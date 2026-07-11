@@ -6,6 +6,9 @@ let
 		"nodatasum"		# No checksuming since AEGIS already has signature
 		"nodiscard"		# No TRIM
 	];
+
+	boot-partition-uuid = "02CE-E779";
+	root-partition-uuid = "5f6d2a11-566c-42ed-ba66-4a5284b1636b";
 in {
 	# Add kernel module in initrd for decrypting AEAD
 	boot.initrd.availableKernelModules = [ 
@@ -15,13 +18,13 @@ in {
 
 	# Boot partition: EFI System Partition
 	fileSystems."/boot" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.boot-partition-uuid}";
+		device = "/dev/disk/by-uuid/${boot-partition-uuid}";
 		fsType = "vfat";
 	};
 
 	# Root partition: reset every boot
 	fileSystems."/" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=@rw" ] ++ defaultMountOptions;
 	};
@@ -59,63 +62,63 @@ in {
 
 	# States: persistent, snapshoted data
 	fileSystems."/etc/nixos" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=states/@nixos" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/etc/NetworkManager/system-connections" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=states/@network" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/var/lib/bluetooth" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=states/@bluetooth" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/var/lib/boltd" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=states/@thunderbolt" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/home/diwangs" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=states/@home" ] ++ defaultMountOptions;
 	};
 
 	# Caches: persistent, non-snapshoted data
 	fileSystems."/nix" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@nix" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/var/cache" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@varcache" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/home/diwangs/.cache" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@homecache" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/var/lib/flatpak" = { 
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@flatpak" ] ++ defaultMountOptions;
 	};
 
 	# Swap: same size as RAM (64 GiB), disables CoW
 	fileSystems."/var/swap" = {
-		device = "/dev/disk/by-uuid/${secrets.paladin-iii.root-partition-uuid}";
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@swap" "nodatacow" ] ++ defaultMountOptions;
 	};

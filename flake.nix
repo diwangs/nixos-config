@@ -32,6 +32,22 @@
 			url = "github:trycua/cua/cua-driver-rs-v0.7.0";
 			inputs.nixpkgs.follows = "nixpkgs-stable";
 		};
+
+		# Encrypted secrets, decrypted at activation time (runtime-only; eval-time
+		# values stay in secret.toml). Editing identity: YubiKey PIV P-256 via
+		# age-plugin-yubikey. Machine identity: /nix/secret/host.key.
+		agenix = {
+			url = "github:ryantm/agenix";
+			inputs.nixpkgs.follows = "nixpkgs";
+			inputs.home-manager.follows = "home-manager";
+			inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
+		};
+
+		# Private secrets (eval-time toml + runtime .age), pinned like any input.
+		# After every edit in the secrets repo: `nix flake update agenix-secrets`.
+		# TODO: after moving the dir out and pushing, switch the URL to
+		# "git+ssh://git@github.com/diwangs/agenix-secrets.git"
+		agenix-secrets.url = "path:/home/diwangs/Codes/agenix-secrets";
 	};
 
 	outputs = { 
@@ -43,6 +59,8 @@
 		nix-flatpak, 
 		nix-vscode-extensions,
 		cua,
+		agenix,
+		agenix-secrets,
 		...
 	}: {
 		# nixos-rebuild switch --flake path#hostname
@@ -52,6 +70,8 @@
 			specialArgs = rec {
 				inherit self;
 				inherit cua;
+				inherit agenix; # for the CLI package in aspect/secret.nix
+				inherit agenix-secrets; # .age file paths in aspect/secret.nix
 
 				# Self-defined args to pass allowed unfree packages
 				allowedUnfree = [
@@ -69,8 +89,8 @@
 					"wootility"
 				];
 
-				# Secrets from TOML
-				secrets = builtins.fromTOML (builtins.readFile ./secret.toml);
+				# Eval-time secrets (TOML), from the private agenix-secrets input
+				secrets = agenix-secrets.lib.toml;
 
 				# Modify `allowUnfreePredicate` of `pkgs-stable`
 				# We don't similarly modify `pkgs` here to retain the ability of 
@@ -93,6 +113,8 @@
 				./hardware/hardware-configuration.nix
 
 				# System (packages included)
+				# agenix (secrets configured in system/aspect/secret.nix)
+				agenix.nixosModules.default
 				./system/nixos.nix
 
 				# Home Manager (packages included)

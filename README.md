@@ -57,6 +57,7 @@ Specifically, this is for:
 PGP, SSH, Git signing, age
 - Use a PGP
 - Use `gpg-agent` for SSH
+- Use `agenix` for system-level secrets (separate directory for now)
 
 ### Package
 Packages are split into 3 categories

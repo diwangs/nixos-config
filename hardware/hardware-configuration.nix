@@ -47,13 +47,13 @@
 
 		# Avoid generating machine-id every boot 
 		# This is used for NetworkManager IPv6 DUID
-		"systemd.machine_id=${secrets.paladin-iii.machine-id}"
+		# "systemd.machine_id=${secrets.paladin-iii.machine-id}"
 		# "amdgpu.dcdebugmask=0x10"
 	];
 	boot.extraModulePackages = [ ];
 
-	networking.hostId = secrets.paladin-iii.host-id;
 	networking.hostName = "paladin-iii";
+	networking.hostId = "cafebabe";
 
 	# Peripherals
   hardware.hackrf.enable = true;

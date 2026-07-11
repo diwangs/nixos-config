@@ -1,3 +1,5 @@
-secret.toml
+# Future separate private repo (agenix-secrets), consumed as a flake input
+/secrets/
 .claude
 result
+.envrc
