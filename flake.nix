@@ -62,32 +62,36 @@
 		agenix,
 		agenix-secrets,
 		...
-	}: {
+	}: let
+		system = "x86_64-linux";
+
+		# Self-defined args to pass allowed unfree packages (shared by the
+		# laptop nixosConfiguration and the devbox homeConfigurations)
+		allowedUnfree = [
+			"codeql"
+			"claude-code"
+			"claude-desktop"
+
+			# VSCode and some unfree extensions
+			"vscode"
+			"vscode-extension-anthropic-claude-code"
+			"vscode-extension-ms-vscode-remote-remote-ssh"
+
+			# AppImages
+			"trezor-suite"
+			"wootility"
+		];
+	in {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
-			system = "x86_64-linux";
+			inherit system;
 			# For nixos, but also passed to HM
 			specialArgs = rec {
 				inherit self;
 				inherit cua;
 				inherit agenix; # for the CLI package in aspect/secret.nix
 				inherit agenix-secrets; # .age file paths in aspect/secret.nix
-
-				# Self-defined args to pass allowed unfree packages
-				allowedUnfree = [
-					"codeql"
-					"claude-code"
-					"claude-desktop"
-
-					# VSCode and some unfree extensions
-					"vscode"
-					"vscode-extension-anthropic-claude-code"
-					"vscode-extension-ms-vscode-remote-remote-ssh"
-
-					# AppImages
-					"trezor-suite"
-					"wootility"
-				];
+				inherit allowedUnfree;
 
 				# Eval-time secrets (TOML), from the private agenix-secrets input
 				secrets = agenix-secrets.lib.toml;
@@ -137,5 +141,58 @@
 				cua.nixosModules.cua-driver
 			];
 		};
+
+		# Rootless devbox servers, keyed by username only: hostnames are AWS
+		# private-IP-derived and not committed, so home-manager's default
+		# `$USER@$HOST` lookup falls through to `homeConfigurations.$USER`.
+		# Workflow on a devbox:
+		#   git clone git@github.com:diwangs/nixos-config.git ~/.config/home-manager
+		#   home-manager switch
+		# Adding a devbox user = adding one string to the list below.
+		homeConfigurations = nixpkgs.lib.genAttrs [ "admin" ] (username:
+			home-manager.lib.homeManagerConfiguration {
+				pkgs = import nixpkgs {
+					inherit system;
+					config.allowUnfreePredicate = pkg:
+						builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
+				};
+				# No laptop-only args here (`secrets`, `pkgs-stable`): devbox-reachable
+				# modules must not reference them.
+				extraSpecialArgs = { inherit self allowedUnfree; };
+				modules = [
+					# Shared subset of the laptop config
+					./system/home-manager.devbox.nix
+
+					# Devbox-specific config lives inline here
+					({ pkgs, ... }: {
+						home.username = username;
+						home.homeDirectory = "/home/${username}";
+						home.stateVersion = "25.05";
+
+						# Non-NixOS Linux hosts need profile/session glue that NixOS
+						# normally provides.
+						targets.genericLinux.enable = true;
+						xdg.enable = true;
+						manual.manpages.enable = true;
+
+						home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
+						home.sessionPath = [ "$HOME/.local/bin" ];
+
+						# Headless tools that NixOS provides system-wide on the laptop
+						home.packages = with pkgs; [
+							nano
+							ripgrep
+							tree
+							htop
+							tmux
+							wget
+							curl
+							unzip
+							zip
+							rsync
+						];
+					})
+				];
+			});
 	};
 }

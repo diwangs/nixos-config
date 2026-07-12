@@ -1,15 +1,15 @@
 # home-manager configuration for diwangs
 { config, pkgs, lib, ... }: {
 	imports = [
+		# Shared with rootless devboxes (shell + headless packages/agents)
+		./home-manager.devbox.nix
+
 		./aspect/desktop.hm.nix
 		./aspect/key-management.hm.nix
 
 		../package/home-manager.nix
 	];
 
-	programs.home-manager.enable = true;
-	
 	home.stateVersion = "25.05";
 	home.username = "diwangs";
-	home.enableNixpkgsReleaseCheck = false;
 }

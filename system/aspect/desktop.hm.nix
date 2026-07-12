@@ -46,16 +46,7 @@
 		};
 	};
 
-	# Shell
-	programs.zsh = {
-		enable = true;	# required by home-manager `gpg-agent` to expose SSH keys
-		historySubstringSearch.enable = true; # The only feature I need from OMZ
-	};
-	programs.starship = {		# Prompt theming
-		enable = true;
-		enableZshIntegration = true;
-		# No settings, just use the `pure` shell
-	};
+	# Shell: see aspect/shell.devbox.hm.nix (shared with devboxes)
 
 	# Nautilus video properties (https://github.com/NixOS/nixpkgs/issues/195936):
 	# This is set per-user via systemd.user.sessionVariables instead of 

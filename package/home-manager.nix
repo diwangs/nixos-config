@@ -16,15 +16,18 @@
 # snapshoted 
 
 { config, lib, pkgs, pkgs-stable, secrets, ... }: rec {
+	imports = [
+		# Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
+		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
+		./home-manager.devbox.nix
+	];
+
 	home.packages = with pkgs; [
 		# System
 		lm_sensors						# Power and temperature monitoring
 		crosspipe							# Pipewire multimedia patchbay
 
 		# Runtime environment (or environment manager)
-		fnm										# Node.js version manager 					(eval $(fnm env))
-		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
-		uv										# Python environment manager
 		conda									# Python environment manager	  		(conda-shell)
 		ansible
 		sshpass
@@ -46,9 +49,6 @@
 		flrig									# Radio remote control (part of fldigi)
 		# sdrangel					# SDR, failed on current version of flake?
 		# mbelib						# sdrangel: decode AMBe (e.g., C4FM, D-STAR, DMR)
-
-		# Little tools
-		jq										# JSON parser
 	] ++ [
 		pkgs-stable.codeql 		# Pin CodeQL. Also prevents download from vscode plugin
 		# Small script to launch VSCode from Claude Code CLI
@@ -58,9 +58,7 @@
 		'')
 	];
 	
-	# Dev
-	programs.direnv.enable = true; # Add direnv package and sets the shell hook
-	programs.gh.enable = true; # Add direnv package and sets the shell hook
+	# Dev (direnv and gh live in home-manager.devbox.nix)
 	programs.java = { # Aside from installing jdk (latest LTS), this sets JAVA_HOME
 		enable = true;
 		package = pkgs.jdk25;							# Latest LTS
@@ -154,47 +152,7 @@
 		};
 	};
 
-	# CLI-based agent: Claude Code
-	programs.claude-code = {
-		enable = true;
-		settings = { };	# Intentionally empty to allow mutability (e.g., effort)
-	};
-
-	# Copy settings.json into place as a real, writable file so Claude Code can
-	# persist runtime changes (effort level, etc.). Runs unconditionally on
-	# every switch and every boot, so any runtime edits are reset to these
-	# declarative defaults on the next activation.
-	home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-		dst="$HOME/.claude/settings.json"
-		run rm -f "$dst"
-		run install -Dm600 ${(pkgs.formats.json { }).generate "claude-code-settings.json" {
-			"$schema" = "https://json.schemastore.org/claude-code-settings.json";
-			defaultMode = "auto";
-			tui = "default"; # Prevent spammy ctrl+g
-			sandbox = {
-				enable = true;
-				
-			};
-		}} "$dst"
-	'';
-
-	# CLI-based agent: Codex
-	programs.codex = {
-		enable = true;
-		settings = { }; # Intentionally empty to allow mutability (e.g., dir trust)
-	};
-
-	# Copy config.toml into place as a real, writable file so Codex can persist
-	# runtime changes (trusted directories, etc.). Runs unconditionally on every
-	# switch and every boot, so any runtime edits are reset to these declarative
-	# defaults on the next activation.
-	home.activation.codexSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-		dst="$HOME/.codex/config.toml"
-		run rm -f "$dst"
-		run install -Dm600 ${(pkgs.formats.toml { }).generate "codex-config.toml" {
-			model_provider = "amazon-bedrock";
-		}} "$dst"
-	'';
+	# CLI-based agents (Claude Code, Codex): home-manager.devbox.nix
 
 	# CLI-based agent orchestrator
 	programs.t3code = {
