@@ -15,7 +15,11 @@
 # it is reproducible in the synchronization sense, since the data are 
 # snapshoted 
 
-{ config, lib, pkgs, pkgs-stable, secrets, ... }: rec {
+{ config, lib, pkgs, pkgs-stable, secrets, ... }:
+let
+	# YubiKey PIV slot 9a public key (SSH auth + git signing identity)
+	pivSshPubKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAlqJuT2Lkccq5Q3Jkc8msxn9FQ1tvtP4i/fvTIpBrjUAB/RayymoXWLQUly3o9ytPcJK1PDI/EuxbdjmxKEaSI=";
+in rec {
 	imports = [
 		# Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
 		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
@@ -67,10 +71,17 @@
 		enable = true;
 		lfs.enable = true;
 		signing = {
-			format = "openpgp";
-			key = secrets.diwangs.gpg-git-sign-fingerprint; # S subkey fingerprint
+			# SSH-based signing via the YubiKey PIV key served by yubikey-agent
+			# (ssh-keygen -Y sign goes through SSH_AUTH_SOCK; pinentry per session)
+			format = "ssh";
+			key = "key::${pivSshPubKey}";
+		};
+		extraConfig = {
+			# Lets `git log --show-signature` verify our own signatures
+			gpg.ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
 		};
 	};
+	xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
 
 	# IDE: VSCode official
 	programs.vscode = {
@@ -123,6 +134,7 @@
 				"extensions.autoUpdate" = "off";
 				"extensions.autoCheckUpdates" = false;
 				"terminal.integrated.defaultProfile.linux" = "zsh";
+				"terminal.integrated.initialHint" = false;
 				"redhat.telemetry.enabled" = false;
 
 				# Copilot

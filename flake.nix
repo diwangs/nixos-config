@@ -47,7 +47,7 @@
 		# After every edit in the secrets repo: `nix flake update agenix-secrets`.
 		# TODO: after moving the dir out and pushing, switch the URL to
 		# "git+ssh://git@github.com/diwangs/agenix-secrets.git"
-		agenix-secrets.url = "path:/home/diwangs/Codes/agenix-secrets";
+		agenix-secrets.url = "git+ssh://git@github.com/diwangs/age-secrets.git";
 	};
 
 	outputs = { 

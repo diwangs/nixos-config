@@ -56,11 +56,14 @@ in {
 		# Peripherals
 		android-tools			# adb and friends
 		config.boot.kernelPackages.usbip
+		yubico-piv-tool		# Use lighter ykcs11 instead of opensc-pkcs11
 
 		# Misc
 		# brightnessctl		# Set brightness at boot
 		iio-sensor-proxy	# For auto-brightness
-		ntfs3g					# Open-source NTFS on FUSE (alt to kernel's NTFS3)
+		ntfs3g						# Open-source NTFS on FUSE (alt to kernel's NTFS3)
 		hwloc
 	];
+
+	programs.yubikey-manager.enable = true;
 }

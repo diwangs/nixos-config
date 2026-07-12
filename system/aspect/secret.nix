@@ -27,21 +27,10 @@
   # ones there (flake.nix lib.age + secret.nix recipients), then here.
   # Consume via config.age.secrets."<name>".path (decrypts to /run/agenix/*).
 
-  # Decrypted at activation, before user creation (agenix orders itself
-	# ahead of the `users` activation script for root-owned secrets).
-	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
-	age.secrets."bedrock-token".file = agenix-secrets.lib.age.bedrock-token;
-	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
-	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;
-	age.secrets."ssh-hosts" = {
-    file = agenix-secrets.lib.age.ssh-hosts;
-    owner = "diwangs";
-  };
   age.secrets."paladin-iii-machine-id" = {
     file = agenix-secrets.lib.age.paladin-iii-machine-id;
     mode = "0444";   # machine-id must be world-readable (dbus, user sessions, NM)
   };
-
   # Regular file at the canonical path, ordered after agenix decryption
   system.activationScripts.machineId = {
     deps = [ "agenix" ];
@@ -50,4 +39,19 @@
     '';
   };
 
+  # Decrypted at activation, before user creation (agenix orders itself
+	# ahead of the `users` activation script for root-owned secrets).
+	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
+	age.secrets."bedrock-token".file = agenix-secrets.lib.age.bedrock-token;
+
+	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
+	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;
+	age.secrets."ssh-hosts" = {
+    file = agenix-secrets.lib.age.ssh-hosts;
+    owner = "diwangs";
+  };
+  age.secrets."diwangs-nova.pem" = {
+    file = agenix-secrets.lib.age."diwangs-nova.pem";
+    owner = "diwangs";
+  };
 }

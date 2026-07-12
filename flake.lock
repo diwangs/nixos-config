@@ -27,14 +27,17 @@
     },
     "agenix-secrets": {
       "locked": {
-        "lastModified": 1783801465,
-        "narHash": "sha256-HjWkur4Pa8sd/AB7FOCr/HAGU/lQoeMo0yIQCGWiCHE=",
-        "path": "/home/diwangs/Codes/agenix-secrets",
-        "type": "path"
+        "lastModified": 1783837799,
+        "narHash": "sha256-UU3xqqVINTDa7+psAdCj/DiKpnA6lGNzeX7e7fFDieM=",
+        "ref": "refs/heads/main",
+        "rev": "508aff24462986fbee1c2e83592ab26b984a2ce7",
+        "revCount": 1,
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/age-secrets.git"
       },
       "original": {
-        "path": "/home/diwangs/Codes/agenix-secrets",
-        "type": "path"
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/age-secrets.git"
       }
     },
     "cua": {

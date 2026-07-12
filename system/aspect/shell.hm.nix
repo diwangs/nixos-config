@@ -5,7 +5,7 @@
 { config, pkgs, lib, ... }: {
 	# Shell
 	programs.zsh = {
-		enable = true;	# required by home-manager `gpg-agent` to expose SSH keys
+		enable = true;	# also required by home-manager `sshAuthSock` to export SSH_AUTH_SOCK
 		# Pin the pre-XDG default explicitly; home-manager warns (and will flip
 		# the default to $XDG_CONFIG_HOME/zsh) if left unset.
 		dotDir = config.home.homeDirectory;
