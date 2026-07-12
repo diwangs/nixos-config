@@ -10,6 +10,14 @@
 
 		# Little tools
 		jq										# JSON parser
+
+		# Claude Code sandboxed Bash tool (Linux): bubblewrap enforces the
+		# filesystem/network boundary, socat relays traffic through the proxy.
+		# The optional seccomp helper (@anthropic-ai/sandbox-runtime, npm-global)
+		# is intentionally skipped: without it Unix-socket blocking is absent,
+		# which keeps ssh-agent reachable for `git push` from sandboxed Bash.
+		bubblewrap
+		socat
 	];
 
 	# Dev
@@ -27,54 +35,6 @@
 	programs.claude-code = {
 		enable = true;
 		settings = { };
-		hooks = {
-			block-envrc = ''
-				#!/usr/bin/env bash
-				# Best-effort guardrail against reading .envrc (which commonly holds
-				# secrets) via the *Bash* tool.
-				# NOTE: this is a guardrail, not a security boundary. The agent runs
-				# as the same (rootless) user that owns .envrc, so a determined
-				# process can still read it (e.g. by constructing the filename at
-				# runtime inside an interpreter). The only real fix is to not
-				# materialize the secret in a file the user can read.
-				input=$(cat)
-				tool_name=$(jq -r '.tool_name // empty' <<<"$input")
-
-				deny() {
-					jq -n --arg reason "$1" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $reason}}'
-					exit 0
-				}
-
-				# True if the string, treated as a path/glob, targets .envrc: the
-				# literal name (.envrc, .envrc.local, ...) or a glob that could
-				# expand to it (.env*, .envr?, .env?c, .envr[c], ...).
-				targets_envrc() {
-					grep -qiE '\.envrc([^a-z0-9]|$)|\.env[a-z0-9]*[*?[]' <<<"$1"
-				}
-
-				case "$tool_name" in
-					Bash)
-						command=$(jq -r '.tool_input.command // empty' <<<"$input")
-						if [[ -n "$command" ]]; then
-							# Collapse the common obfuscations (quotes, backslashes) so
-							# spellings like .env"r"c, split-quote forms, and .env\rc all
-							# normalize back to .envrc before matching.
-							norm=''${command//\"/}
-							norm=''${norm//\'/}
-							norm=''${norm//\\/}
-							# Block ANY reference to .envrc, not just known readers: cp/mv/
-							# ln, source/., find -exec, dd, base64 and even `f=.envrc`
-							# assignments all name the file and are caught here.
-							if targets_envrc "$norm"; then
-								deny "Referencing .envrc in a shell command is blocked (may contain secrets)."
-							fi
-						fi
-						;;
-				esac
-
-				exit 0
-			'';
-		};
 	};
 
 	# Copy settings.json into place as a real, writable file so Claude Code can
@@ -88,35 +48,35 @@
 			"$schema" = "https://json.schemastore.org/claude-code-settings.json";
 			defaultMode = "auto";
 			tui = "default"; # Prevent spammy ctrl+g
-			sandbox = {
-				enable = true;
-			};
 			env = {
 				CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
 			};
-			# Block the Read and Grep tools from touching .envrc at the harness
-			# permission layer (enforced in-process, no hook needed).
-			permissions = {
-				deny = [
-					"Read(.envrc)"
-					"Read(**/.envrc)"
-					"Read(//**/.envrc)"
-					"Grep(.envrc)"
-					"Grep(**/.envrc)"
-					"Grep(//**/.envrc)"
+			# OS-level (bubblewrap) sandbox for the Bash tool. Writes are confined
+			# to the working directory + session $TMPDIR by default; reads default
+			# to the whole filesystem, so sensitive paths are denied explicitly
+			# below. Bash commands that need out-of-repo access fail in-sandbox and
+			# escalate to a normal permission prompt (the "ask" fallback).
+			sandbox = {
+				enabled = true;             # NB: real schema key is `enabled`, not `enable`.
+				failIfUnavailable = true;   # Never silently run unsandboxed (incl. devboxes).
+				network = {
+					allowedDomains = [ "*" ];   # Unrestricted network, no per-domain prompts.
+					allowLocalBinding = true;   # Let dev servers bind localhost inside the sandbox.
+				};
+				# Block reads of credential material from sandboxed Bash. `deny`
+				# denies file reads and unsets matching env vars per command.
+				credentials.files = [
+					{ path = "~/.ssh"; mode = "deny"; }
+					{ path = "~/.aws"; mode = "deny"; }
+					{ path = "~/.gnupg"; mode = "deny"; }
+					{ path = "~/.claude/.credentials.json"; mode = "deny"; } # Claude Code OAuth token
 				];
-			};
-			hooks = {
-				PreToolUse = [
-					{
-						matcher = "Bash";
-						hooks = [
-							{
-								type = "command";
-								command = "${config.home.homeDirectory}/.claude/hooks/block-envrc";
-							}
-						];
-					}
+				# Absolute secret paths (native sandbox syntax: `/` = filesystem root).
+				# If the agenix home-manager module is ever adopted, its secrets land
+				# in $XDG_RUNTIME_DIR/agenix (/run/user/<uid>/agenix) — add that here.
+				filesystem.denyRead = [
+					"/nix/secret"   # agenix host key
+					"/run/agenix"   # decrypted agenix secrets (system module)
 				];
 			};
 		}} "$dst"
