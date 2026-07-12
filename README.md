@@ -35,7 +35,7 @@ that I manage to do in my laptop with Nix.
 - `system` - How the OS (and 'system-layer') is managed
     - `aspect` - Configurations of the various aspects of the system
 - `package` - Define packages to install
-- Secrets are separated in a `secret.toml` file (not commited)
+- Secrets are located in separate repo, decrypted using agenix.
 
 ### Hardware
 These are Nix files that is not-portable across machines.
@@ -57,7 +57,7 @@ Specifically, this is for:
 PGP, SSH, Git signing, age
 - Use a PGP
 - Use `gpg-agent` for SSH
-- Use `agenix` for system-level secrets (separate directory for now)
+- Use `agenix` for system-level secrets
 
 ### Package
 Packages are split into 3 categories

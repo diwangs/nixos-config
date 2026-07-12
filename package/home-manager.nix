@@ -79,6 +79,11 @@ in rec {
 		extraConfig = {
 			# Lets `git log --show-signature` verify our own signatures
 			gpg.ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
+			# SSH_AUTH_SOCK is cached by the GNOME environment, restart if changed
+			# gpg.ssh.program = "${pkgs.writeShellScript "ssh-keygen-yubikey" ''
+			# 	export SSH_AUTH_SOCK="''${SSH_AUTH_SOCK:-''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock}"
+			# 	exec ${pkgs.openssh}/bin/ssh-keygen "$@"
+			# ''}";
 		};
 	};
 	xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
