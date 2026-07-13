@@ -42,7 +42,10 @@
   # Decrypted at activation, before user creation (agenix orders itself
 	# ahead of the `users` activation script for root-owned secrets).
 	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
-	age.secrets."bedrock-token".file = agenix-secrets.lib.age.bedrock-token;
+	age.secrets."bedrock-token" = {
+    file = agenix-secrets.lib.age.bedrock-token;
+    owner = "diwangs";
+  };
 
 	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
 	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;

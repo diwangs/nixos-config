@@ -1,3 +1,2 @@
 # Verification
-- Verify build per package.
-- Do not building the whole system, as it requires sudo.
+- Only do syntax check, as verification requires sudo and unix socket, which is not available in the sandbox

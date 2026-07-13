@@ -81,7 +81,10 @@
 			"trezor-suite"
 			"wootility"
 		];
-	in {
+		# Wraps `claude` to canonicalize PATH for the bwrap Bash sandbox. Static
+		# env (SHELL etc.) is set via settings.json in home-manager.devbox.nix.
+		claudeCodeSandboxPathOverlay = import ./package/overlay/claude-code-sandbox-path.nix;
+	in rec {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
 			inherit system;
@@ -153,6 +156,9 @@
 			home-manager.lib.homeManagerConfiguration {
 				pkgs = import nixpkgs {
 					inherit system;
+					overlays = [
+						claudeCodeSandboxPathOverlay
+					];
 					config.allowUnfreePredicate = pkg:
 						builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
 				};

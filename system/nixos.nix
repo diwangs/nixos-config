@@ -21,6 +21,7 @@
 
 	nixpkgs.overlays = [
 		self.inputs.nix-vscode-extensions.overlays.default
+		(import ../package/overlay/claude-code-sandbox-path.nix)
 
 		# Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
 		# Migrated off patrickjaja's `claude-desktop-bin` (base + 9 patches); those
