@@ -27,11 +27,11 @@
     },
     "agenix-secrets": {
       "locked": {
-        "lastModified": 1783936941,
-        "narHash": "sha256-3rvE3A452oz+0jAPtoteG3F6piC0D7HNGVYVvzT1n5I=",
+        "lastModified": 1783937656,
+        "narHash": "sha256-vCgGy8rGle4V/F8XalqW9TlvW9mBd+ZkK9nCF7iWsZw=",
         "ref": "refs/heads/main",
-        "rev": "6129b57b6e3b05c6fd86d26c0c63a90bde9d480d",
-        "revCount": 2,
+        "rev": "b83185ba1738de3cfda93988e400533e355810a5",
+        "revCount": 3,
         "type": "git",
         "url": "ssh://git@github.com/diwangs/age-secrets.git"
       },
