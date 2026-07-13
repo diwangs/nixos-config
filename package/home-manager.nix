@@ -76,7 +76,7 @@ in rec {
 			format = "ssh";
 			key = "key::${pivSshPubKey}";
 		};
-		extraConfig = {
+		settings = {
 			# Lets `git log --show-signature` verify our own signatures
 			gpg.ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
 			# SSH_AUTH_SOCK is cached by the GNOME environment, restart if changed

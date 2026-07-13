@@ -92,6 +92,15 @@
 				fi
 			done
 
+			# Claude's sandbox can materialize this allowRead path in the host
+			# checkout. Git tolerates `commondir` = ".", but Nix/libgit2 then
+			# refuses the flake source as an invalid repository. Only remove the
+			# leaked main-worktree marker; real linked worktrees use a .git file
+			# and a commondir path that points elsewhere.
+			if [ -d .git ] && [ -f .git/commondir ] && [ "$(< .git/commondir)" = "." ]; then
+				rm -f -- .git/commondir || true
+			fi
+
 			if [ -d node_modules ]; then
 				find node_modules -depth -type f -empty -delete 2>/dev/null || true
 				find node_modules -depth -type d -empty -delete 2>/dev/null || true
@@ -147,7 +156,8 @@
 					"/nix/secret"   # agenix host key
 					"/run/agenix.d"   # decrypted agenix secrets (system module)
 				];
-				# Re-allow commondir because it breaks git operation on main branch
+				# Re-allow commondir because denying it breaks git on the main branch.
+				# The cleanup hook above removes Claude's host-side "." leak.
 				filesystem.allowRead = [ "**/.git/commondir" ];
 			};
 			# Sweep bwrap's leftover deny-mount stub files after every sandboxed
