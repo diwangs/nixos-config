@@ -164,10 +164,15 @@
 				};
 				# No laptop-only args here (`secrets`, `pkgs-stable`): devbox-reachable
 				# modules must not reference them.
-				extraSpecialArgs = { inherit self allowedUnfree; };
+				extraSpecialArgs = { inherit self allowedUnfree agenix agenix-secrets; };
 				modules = [
 					# Shared subset of the laptop config
 					./system/home-manager.devbox.nix
+
+					# agenix (secrets configured in system/aspect/secret.hm.nix): the
+					# rootless, per-user counterpart to the laptop's NixOS module
+					agenix.homeManagerModules.default
+					./system/aspect/secret.hm.nix
 
 					# Devbox-specific config lives inline here
 					({ pkgs, ... }: {
