@@ -63,51 +63,52 @@
 
 		# NOTE: This still leaves 3 subdir inside of .claude, don't remove them.
 		hooks."claude-clean-sandbox-debris" = ''
-			#!${pkgs.bashInteractive}/bin/bash
-			set -euo pipefail
+#!${pkgs.runtimeShell}
+set -eu
 
-			cwd="$(${pkgs.jq}/bin/jq -r '.cwd // empty')"
-			[ -n "$cwd" ] && cd "$cwd" 2>/dev/null || exit 0
+cwd="$(${pkgs.jq}/bin/jq -r '.cwd // empty')"
+[ -n "$cwd" ] && cd "$cwd" 2>/dev/null || exit 0
 
-			junk=(
-				.bashrc .bash_profile .zshrc .zprofile .profile .gitconfig .mcp.json
-				.idea .vscode .github .ripgreprc scripts
-				.env .env.local .env.development .env.development.local
-				.env.test .env.test.local .env.production .env.production.local .envrc
-				.npmrc .yarnrc .yarnrc.yml package.json package-lock.json
-				pnpm-lock.yaml yarn.lock bunfig.toml .gitmodules
-			)
+for name in \
+	.bashrc .bash_profile .zshrc .zprofile .profile .gitconfig .mcp.json \
+	.idea .vscode .github .ripgreprc scripts \
+	.env .env.local .env.development .env.development.local \
+	.env.test .env.test.local .env.production .env.production.local .envrc \
+	.npmrc .yarnrc .yarnrc.yml package.json package-lock.json \
+	pnpm-lock.yaml yarn.lock bunfig.toml .gitmodules; do
+	${pkgs.util-linux}/bin/umount -- "$name" 2>/dev/null \
+		|| ${pkgs.util-linux}/bin/umount -l -- "$name" 2>/dev/null \
+		|| true
+	[ -e "$name" ] || [ -L "$name" ] || continue
+	if [ -c "$name" ]; then
+		rm -f -- "$name" || true
+	elif [ -f "$name" ] && [ ! -s "$name" ]; then
+		rm -f -- "$name" || true
+	elif [ -d "$name" ] && [ -z "$(ls -A "$name" 2>/dev/null)" ]; then
+		rmdir -- "$name" 2>/dev/null || true
+	fi
+done
 
-			for name in "''${junk[@]}"; do
-				${pkgs.util-linux}/bin/umount -- "$name" 2>/dev/null \
-					|| ${pkgs.util-linux}/bin/umount -l -- "$name" 2>/dev/null \
-					|| true
-				[ -e "$name" ] || [ -L "$name" ] || continue
-				if [ -c "$name" ]; then
-					rm -f -- "$name" || true
-				elif [ -f "$name" ] && [ ! -s "$name" ]; then
-					rm -f -- "$name" || true
-				elif [ -d "$name" ] && [ -z "$(ls -A "$name" 2>/dev/null)" ]; then
-					rmdir -- "$name" 2>/dev/null || true
-				fi
-			done
+# Claude's sandbox can materialize this allowRead path in the host
+# checkout. Git tolerates `commondir` = ".", but Nix/libgit2 then
+# refuses the flake source as an invalid repository. Only remove the
+# leaked main-worktree marker; real linked worktrees use a .git file
+# and a commondir path that points elsewhere.
+if [ -d .git ] && [ -f .git/commondir ]; then
+	commondir=
+	IFS= read -r commondir < .git/commondir || true
+fi
+if [ "''${commondir:-}" = "." ]; then
+	rm -f -- .git/commondir || true
+fi
 
-			# Claude's sandbox can materialize this allowRead path in the host
-			# checkout. Git tolerates `commondir` = ".", but Nix/libgit2 then
-			# refuses the flake source as an invalid repository. Only remove the
-			# leaked main-worktree marker; real linked worktrees use a .git file
-			# and a commondir path that points elsewhere.
-			if [ -d .git ] && [ -f .git/commondir ] && [ "$(< .git/commondir)" = "." ]; then
-				rm -f -- .git/commondir || true
-			fi
+if [ -d node_modules ]; then
+	find node_modules -depth -type f -empty -delete 2>/dev/null || true
+	find node_modules -depth -type d -empty -delete 2>/dev/null || true
+fi
 
-			if [ -d node_modules ]; then
-				find node_modules -depth -type f -empty -delete 2>/dev/null || true
-				find node_modules -depth -type d -empty -delete 2>/dev/null || true
-			fi
-
-			exit 0
-		'';
+exit 0
+'';
 	};
 
 	# Copy settings.json into place as a real, writable file so Claude Code can
