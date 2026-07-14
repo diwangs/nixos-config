@@ -28,6 +28,12 @@
 	# wrapper's EXIT trap; once ZDOTDIR is set nothing reads them.
 	home.file.".zshenv".enable = false;
 	home.activation.zshenvBootstrap = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+		for name in .zshrc .zprofile; do
+			path="$HOME/$name"
+			if [ -L "$path" ] || { [ -f "$path" ] && [ ! -s "$path" ]; }; then
+				run rm -f "$path"
+			fi
+		done
 		run install -m644 ${pkgs.writeText "zshenv-bootstrap" ''
 			source "${config.xdg.configHome}/zsh/.zshenv"
 		''} "$HOME/.zshenv"

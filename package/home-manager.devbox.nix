@@ -60,6 +60,13 @@ set -eu
 cwd="$(${pkgs.jq}/bin/jq -r '.cwd // empty')"
 [ -n "$cwd" ] && cd "$cwd" 2>/dev/null || exit 0
 
+for name in .zshrc .zprofile; do
+	path="$HOME/$name"
+	if [ -L "$path" ] || { [ -f "$path" ] && [ ! -s "$path" ]; }; then
+		rm -f -- "$path" || true
+	fi
+done
+
 for name in \
 	.bashrc .bash_profile .zshrc .zprofile .profile .gitconfig .mcp.json \
 	.idea .vscode .github .ripgreprc scripts \
