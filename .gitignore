@@ -1,5 +1,5 @@
-# Future separate private repo (agenix-secrets), consumed as a flake input
-/secrets/
-.claude
+.claude/.cc-writes
+.claude/agents
+.claude/commands
 result
 .envrc

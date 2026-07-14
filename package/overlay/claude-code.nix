@@ -14,13 +14,26 @@
  * 
  * This patch does three things:
  * - Wraps the `bwrap` call inside Claude Code with `unshare` so that all stub
- * 		files are cleanly unmounted post-call, preparing the way for `rm` when 
+ * 		files are cleanly unmounted post-call, preparing the way for `rm` when
  * 		they are ready to be removed. Especially important for `MS_SHARED`.
- * - Special handling of `.git/commondir` where, because of CVE-2026-55607, it
- * 		is included as part of the sensitive list as read-only. Empty commondir
- * 		causes any git operation inside the sandbox to fail. Thus, if missing 
- * 		outside the sandbox (main branch), fill it with "." instead.
- * - Fix an issue where a change in NixOS generation would change the path of 
+ * - Swaps the `/dev/null` source of every masked-file bind for a real empty
+ * 		regular file. Sensitive paths (`.zshrc`, `.gitmodules`, etc. -- part of
+ * 		the sandbox's read-only mask list, notably `.git/commondir` because of
+ * 		CVE-2026-55607) get bind-mounted from `/dev/null`, which is a character
+ * 		device. On any filesystem mounted `nodev` (as our `/etc/nixos` btrfs
+ * 		subvolume is), opening a device node through the mount is rejected by
+ * 		the kernel with EACCES -- e.g. libgit2 failing to parse `.gitmodules`
+ * 		with "is locked: Permission denied". A regular-file bind isn't subject
+ * 		to `nodev`, so it works everywhere `/dev/null` did plus nodev mounts.
+ * 		`.git/commondir` additionally needs real content, not just emptiness:
+ * 		an empty/"." commondir is fine for the git CLI (it resolves relative to
+ * 		the `.git` dir containing the file, i.e. to itself) but libgit2 -- used
+ * 		by `nix` for `git+file://` fetches -- resolves it differently and fails
+ * 		to find the repository. So it gets the absolute path of the real `.git`
+ * 		directory (derived from the bind target itself) instead, fed to `bwrap
+ * 		--ro-bind-data` via an fd from process substitution so no host temp
+ * 		file (and thus no cleanup, keeping the tail-call `exec`) is needed.
+ * - Fix an issue where a change in NixOS generation would change the path of
  * 		the symlinked wrapper.
  * 
  * Currently, the cleanup themselves are handled by hooks to avoid issues with
@@ -28,14 +41,21 @@
  */
 
 final: prev: let
-	gitCommondirDot = final.writeText "git-commondir" ".";
+	# Regular-file stand-in for /dev/null: bind-mounting the real device node
+	# onto a path under a `nodev` filesystem makes it unopenable (EACCES).
+	emptyFile = final.writeText "claude-sandbox-empty" "";
+
 	bwrapShim = final.writeShellScriptBin "bwrap" ''
 		args=(); n=$#; i=1
 		while [ "$i" -le "$n" ]; do
 			a="''${@:$i:1}"; b="''${@:$((i + 1)):1}"; c="''${@:$((i + 2)):1}"
-			if [ "$a" = "--ro-bind" ] && [ "$b" = "/dev/null" ] \
-					&& [ "''${c%/.git/commondir}" != "$c" ]; then
-				args+=( --ro-bind ${gitCommondirDot} "$c" ); i=$((i + 3))
+			if [ "$a" = "--ro-bind" ] && [ "$b" = "/dev/null" ]; then
+				if [ "''${c%/.git/commondir}" != "$c" ]; then
+					exec {fd}< <(printf '%s\n' "''${c%/commondir}")
+					args+=( --ro-bind-data "$fd" "$c" ); i=$((i + 3))
+				else
+					args+=( --ro-bind ${emptyFile} "$c" ); i=$((i + 3))
+				fi
 			else
 				args+=( "$a" ); i=$((i + 1))
 			fi

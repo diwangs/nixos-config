@@ -130,8 +130,8 @@ exit 0
 			permissions.deny =
 				lib.concatMap (p: map (t: "${t}(${p})") secretTools) secretGlobs;
 			# Bash tool restriction: sandboxing (restricting at the mount level)
-			# - Writes -> allow cwd, tmpdir, and a few /dev (null, etc.) + Edit permission
-			# - Read -> allow all + deny known creds path + Read permission
+			# - Write allowlist -> allow cwd, tmpdir, and a few /dev (null, etc.) + Edit permission
+			# - Read denylist -> allow all + deny known creds path + Read permission
 			sandbox = {
 				enabled = true;             # NB: real schema key is `enabled`, not `enable`.
 				failIfUnavailable = true;   # Never silently run unsandboxed (incl. devboxes).
@@ -139,6 +139,7 @@ exit 0
 				network = {
 					allowedDomains = [ "*" ];   # Unrestricted network, no per-domain prompts.
 					allowLocalBinding = true;   # Let dev servers bind localhost inside the sandbox.
+					# allowAllUnixSockets = true; # Enable for nix-project only
 				};
 			};
 			# Sweep bwrap's 0-byte deny-mount leftover files after every sandboxed
