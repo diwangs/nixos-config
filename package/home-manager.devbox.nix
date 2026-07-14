@@ -37,31 +37,22 @@
 		enable = true;
 		settings = { };
 
-		# Sweeps the empty stub files/dirs/char-devices that bubblewrap leaves
-		# behind in the sandboxed working directory when it deny-mounts /dev/null
-		# over a path that doesn't exist yet (upstream: anthropics/claude-code#17087,
-		# anthropic-experimental/sandbox-runtime#139 — reopened after a partial fix,
-		# still unresolved for non-graceful command termination as of 2026-07).
-		# Matched by exact name *and* emptiness, so a file that ever gains real
-		# content (e.g. an actual package.json) is never touched.
+		# Minimal rm-only sweep of the mount-point files bwrap leaves on the real
+		# working dir when it deny-binds a path that doesn't exist yet. The bwrap
+		# shim (../overlay/claude-code-sandbox-path.nix) now contains the *mounts*
+		# in a private-propagation namespace so they no longer leak and stick as
+		# unremovable char-devices — but the mount-point *files* themselves are
+		# writes through the rw cwd bind and persist on disk. No umount needed
+		# anymore (nothing stays mounted), no worktreeConfig handling.
 		#
-		# Anthropic's own in-process cleanup (sandbox-runtime's cleanupAfterCommand,
-		# confirmed by decompiling the shipped bun-compiled binary) assumes the bind
-		# mount is already torn down by the time it runs and never calls `umount` —
-		# zero occurrences of that string in the whole binary. When the mount
-		# outlives the command (orphaned/non-gracefully-killed bwrap, or a mount
-		# that leaked into a longer-lived namespace) its own `rm`-equivalent hits
-		# EBUSY, gets silently swallowed, and the path is never retried. So we
-		# unmount first (plain, then lazy as a fallback for a still-referenced
-		# mount) before ever touching the path, and every mutating step is
-		# `|| true`-guarded so one busy/failed entry can't abort the rest of the
-		# sweep under `set -e` the way a bare `rm -f` here once did.
-		#
-		# Materialized (as an executable file, not a settings.json entry) via
-		# the `hooks` option so it lands at a stable path in ~/.claude/hooks/
-		# that the hand-rolled settings.json below can reference by name.
-
-		# NOTE: This still leaves 3 subdir inside of .claude, don't remove them.
+		# The general list is matched by exact name *and* emptiness, so a file
+		# that ever gains real content (e.g. an actual package.json) is never
+		# touched. `.git/commondir` is special-cased: in a main worktree (`.git`
+		# is a directory) git resolves the common dir to `.git` itself and a
+		# `commondir` file must NOT exist — any leftover (empty from the shim's
+		# bind, or a stray "." from an earlier run) makes libgit2/nixos-rebuild
+		# reject the repo — so remove it regardless of content. Linked worktrees
+		# have a `.git` *file*, not a directory, so this never touches theirs.
 		hooks."claude-clean-sandbox-debris" = ''
 #!${pkgs.runtimeShell}
 set -eu
@@ -76,9 +67,6 @@ for name in \
 	.env.test .env.test.local .env.production .env.production.local .envrc \
 	.npmrc .yarnrc .yarnrc.yml package.json package-lock.json \
 	pnpm-lock.yaml yarn.lock bunfig.toml .gitmodules; do
-	${pkgs.util-linux}/bin/umount -- "$name" 2>/dev/null \
-		|| ${pkgs.util-linux}/bin/umount -l -- "$name" 2>/dev/null \
-		|| true
 	[ -e "$name" ] || [ -L "$name" ] || continue
 	if [ -c "$name" ]; then
 		rm -f -- "$name" || true
@@ -89,22 +77,18 @@ for name in \
 	fi
 done
 
-# Claude's sandbox can materialize this allowRead path in the host
-# checkout. Git tolerates `commondir` = ".", but Nix/libgit2 then
-# refuses the flake source as an invalid repository. Only remove the
-# leaked main-worktree marker; real linked worktrees use a .git file
-# and a commondir path that points elsewhere.
-if [ -d .git ] && [ -f .git/commondir ]; then
-	commondir=
-	IFS= read -r commondir < .git/commondir || true
-fi
-if [ "''${commondir:-}" = "." ]; then
+if [ -d .git ] && { [ -e .git/commondir ] || [ -L .git/commondir ]; } \
+		&& [ ! -d .git/commondir ]; then
 	rm -f -- .git/commondir || true
 fi
 
+# bwrap leaves an empty-file/dir skeleton under node_modules when it deny-binds
+# nested paths there. Prune the empties bottom-up (files first, then the dirs
+# they leave behind); a populated node_modules is untouched since -empty skips
+# anything with real content.
 if [ -d node_modules ]; then
-	find node_modules -depth -type f -empty -delete 2>/dev/null || true
-	find node_modules -depth -type d -empty -delete 2>/dev/null || true
+	${pkgs.findutils}/bin/find node_modules -depth -type f -empty -delete 2>/dev/null || true
+	${pkgs.findutils}/bin/find node_modules -depth -type d -empty -delete 2>/dev/null || true
 fi
 
 exit 0
@@ -157,15 +141,10 @@ exit 0
 					"/nix/secret"   # agenix host key
 					"/run/agenix.d"   # decrypted agenix secrets (system module)
 				];
-				# Re-allow commondir because denying it breaks git on the main branch.
-				# The cleanup hook above removes Claude's host-side "." leak.
-				filesystem.allowRead = [ "**/.git/commondir" ];
 			};
-			# Sweep bwrap's leftover deny-mount stub files after every sandboxed
-			# Bash call (the common case) and again at session start (catches
-			# whatever a non-gracefully-terminated previous session left behind,
-			# since its mount namespace is already gone by then — see the
-			# claude-clean-sandbox-debris hook above for the upstream bug refs).
+			# Sweep bwrap's 0-byte deny-mount leftover files after every sandboxed
+			# Bash call (the common case) and once at session start (belt-and-
+			# suspenders for anything a crashed previous session left behind).
 			hooks = {
 				PostToolUse = [
 					{
