@@ -39,7 +39,7 @@
 
 		# Minimal rm-only sweep of the mount-point files bwrap leaves on the real
 		# working dir when it deny-binds a path that doesn't exist yet. The bwrap
-		# shim (../overlay/claude-code-sandbox-path.nix) now contains the *mounts*
+		# shim (../overlay/claude-code.nix) now contains the *mounts*
 		# in a private-propagation namespace so they no longer leak and stick as
 		# unremovable char-devices — but the mount-point *files* themselves are
 		# writes through the rw cwd bind and persist on disk. No umount needed
@@ -102,7 +102,21 @@ exit 0
 	home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
 		dst="$HOME/.claude/settings.json"
 		run rm -f "$dst"
-		run install -Dm600 ${(pkgs.formats.json { }).generate "claude-code-settings.json" {
+		run install -Dm600 ${(pkgs.formats.json { }).generate "claude-code-settings.json" (
+		let
+			# Path where agents should not access
+			secretGlobs = [
+				"~/.ssh/**"
+				"~/.aws/**"
+				"~/.gnupg/**"
+				"~/.claude/.credentials.json"   # Claude Code OAuth token
+				"//nix/secret/**"               # agenix host key
+				"//run/agenix.d/**"             # decrypted agenix secrets (nixos module)
+				"//run/user/**"                 # decrypted agenix secrets (home-manager module)
+			];
+			# Tools to restrict: Grep and Glob follows Read, Write follows Edit
+			secretTools = [ "Read" "Edit" ]; 
+		in {
 			"$schema" = "https://json.schemastore.org/claude-code-settings.json";
 			defaultMode = "auto";
 			tui = "default"; # Prevent spammy ctrl+g
@@ -113,11 +127,11 @@ exit 0
 				CLAUDE_CODE_SHELL = "${pkgs.bashInteractive}/bin/bash";
 				CLAUDE_BASH_NO_LOGIN = "1";
 			};
-			# OS-level (bubblewrap) sandbox for the Bash tool. Writes are confined
-			# to the working directory + session $TMPDIR by default; reads default
-			# to the whole filesystem, so sensitive paths are denied explicitly
-			# below. Bash commands that need out-of-repo access fail in-sandbox and
-			# escalate to a normal permission prompt (the "ask" fallback).
+			permissions.deny =
+				lib.concatMap (p: map (t: "${t}(${p})") secretTools) secretGlobs;
+			# Bash tool restriction: sandboxing (restricting at the mount level)
+			# - Writes -> allow cwd, tmpdir, and a few /dev (null, etc.) + Edit permission
+			# - Read -> allow all + deny known creds path + Read permission
 			sandbox = {
 				enabled = true;             # NB: real schema key is `enabled`, not `enable`.
 				failIfUnavailable = true;   # Never silently run unsandboxed (incl. devboxes).
@@ -126,21 +140,6 @@ exit 0
 					allowedDomains = [ "*" ];   # Unrestricted network, no per-domain prompts.
 					allowLocalBinding = true;   # Let dev servers bind localhost inside the sandbox.
 				};
-				# Block reads of credential material from sandboxed Bash. `deny`
-				# denies file reads and unsets matching env vars per command.
-				credentials.files = [
-					{ path = "~/.ssh"; mode = "deny"; }
-					{ path = "~/.aws"; mode = "deny"; }
-					{ path = "~/.gnupg"; mode = "deny"; }
-					{ path = "~/.claude/.credentials.json"; mode = "deny"; } # Claude Code OAuth token
-				];
-				# Absolute secret paths (native sandbox syntax: `/` = filesystem root).
-				# If the agenix home-manager module is ever adopted, its secrets land
-				# in $XDG_RUNTIME_DIR/agenix (/run/user/<uid>/agenix) — add that here.
-				filesystem.denyRead = [
-					"/nix/secret"   # agenix host key
-					"/run/agenix.d"   # decrypted agenix secrets (system module)
-				];
 			};
 			# Sweep bwrap's 0-byte deny-mount leftover files after every sandboxed
 			# Bash call (the common case) and once at session start (belt-and-
@@ -158,7 +157,7 @@ exit 0
 					}
 				];
 			};
-		}} "$dst"
+		})} "$dst"
 	'';
 
 	# CLI-based agent: Codex

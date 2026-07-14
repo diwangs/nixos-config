@@ -83,7 +83,7 @@
 		];
 		# Wraps `claude` to canonicalize PATH for the bwrap Bash sandbox. Static
 		# env (SHELL etc.) is set via settings.json in home-manager.devbox.nix.
-		claudeCodeSandboxPathOverlay = import ./package/overlay/claude-code-sandbox-path.nix;
+		claudeCodeSandboxPathOverlay = import ./package/overlay/claude-code.nix;
 	in rec {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
