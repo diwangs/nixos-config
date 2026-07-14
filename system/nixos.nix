@@ -35,10 +35,11 @@
 		(import ../package/overlay/claude-desktop/overlay.nix)
 		(import ../package/overlay/claude-desktop/patch/debug-port-guard.nix)
 		(import ../package/overlay/claude-desktop/patch/vm-path.nix)
-		(import ../package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
-		(import ../package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
-		(import ../package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
-		(import ../package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
+		(import ../package/overlay/claude-desktop/patch/cli-path.nix)
+		# (import ../package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
+		# (import ../package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
+		# (import ../package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
+		# (import ../package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
 
 	];
 

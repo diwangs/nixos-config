@@ -10,11 +10,9 @@
 # the bundled .so's, and the .node addons into the Nix store; wrapGAppsHook3
 # supplies the GTK/GIO/GSettings-schema + typelib env at runtime.
 #
-# This derivation is deliberately FAITHFUL to the official build: no app.asar
-# patching, no claude-code wiring, no portal/screenshot deps. (Computer Use
-# isn't in the Linux beta, and the app bundles its own Cowork backend.) It is
-# the counterpart to ../claude-desktop-bin (the community patrickjaja build);
-# only one should inject `claude-desktop` at a time — see ../../nixos.nix.
+# The Code surface normally downloads a version-pinned Claude Code binary under
+# the Electron user-data directory. We set its local-binary override to the
+# packaged CLI instead, so Desktop and the terminal share the Nix patches.
 #
 # GPU/rendering: HW acceleration is ON. Chromium `dlopen`s the glvnd dispatcher
 # soname `libEGL.so.1`, which is a NEEDED-less runtime load (so autoPatchelf
@@ -78,7 +76,7 @@
 , xdg-utils   # runtime: xdg-open for external links / claude:// scheme
 , python3     # runtime: interpreter for Python-based Desktop Extensions (MCP)
 , nodejs      # runtime: interpreter for Node-based Desktop Extensions (has a built-in fallback)
-, claude-code # runtime: the CLI the Code/Cowork surfaces drive (resolved via PATH scan)
+, claude-code # runtime: shared patched CLI for the Code surface and PATH users
 , qemu_kvm    # runtime: qemu-system-x86_64 for Cowork's micro-VM PATH scan (host-cpu-only)
 
 # X11
@@ -196,14 +194,12 @@ stdenv.mkDerivation (finalAttrs: {
   postFixup = ''
     makeWrapper $out/lib/claude-desktop/claude-desktop $out/bin/claude-desktop \
       "''${gappsWrapperArgs[@]}" \
+      --set CLAUDE_CODE_LOCAL_BINARY ${lib.getExe claude-code} \
       --prefix PATH : ${lib.makeBinPath [
         qemu_kvm    # For Cowork (host arch only, much smaller than `qemu`)
         nodejs      # Node-based Desktop extensions runtime
         python3     # Python-based Desktop extensions runtime
         xdg-utils   # For deeplink
-      ]} \
-      --suffix PATH : ${lib.makeBinPath [
-        claude-code # Code/Cowork CLI; --suffix so a user's own PATH `claude` wins
       ]} \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [
         libglvnd    # For hw acceleration (see header comment)
