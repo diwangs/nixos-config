@@ -1,5 +1,20 @@
 {
   "nodes": {
+    "age-secrets": {
+      "locked": {
+        "lastModified": 1784116117,
+        "narHash": "sha256-yAhQ2WW2mY/uAInKQvrZI5uxlJiaMMhJNnfFkzYra4U=",
+        "ref": "refs/heads/main",
+        "rev": "5d1245668707947a7361d400f9dc1e442da7a77b",
+        "revCount": 7,
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/age-secrets.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/age-secrets.git"
+      }
+    },
     "agenix": {
       "inputs": {
         "darwin": [],
@@ -23,21 +38,6 @@
         "owner": "ryantm",
         "repo": "agenix",
         "type": "github"
-      }
-    },
-    "agenix-secrets": {
-      "locked": {
-        "lastModified": 1784109304,
-        "narHash": "sha256-/5lBjrlXziNr1an1f/SyXuWPQTvky4xA+CdcBqH0Xng=",
-        "ref": "refs/heads/main",
-        "rev": "b57c51fa0398c546d4658308e0d43e3c79c722db",
-        "revCount": 5,
-        "type": "git",
-        "url": "ssh://git@github.com/diwangs/age-secrets.git"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/diwangs/age-secrets.git"
       }
     },
     "crane": {
@@ -256,8 +256,8 @@
     },
     "root": {
       "inputs": {
+        "age-secrets": "age-secrets",
         "agenix": "agenix",
-        "agenix-secrets": "agenix-secrets",
         "cua": "cua",
         "home-manager": "home-manager",
         "lanzaboote": "lanzaboote",

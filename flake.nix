@@ -52,7 +52,7 @@
 
 		# Private secrets (eval-time toml + runtime .age), pinned like any input.
 		# After every edit in the secrets repo: `nix flake update agenix-secrets`.
-		agenix-secrets.url = "git+ssh://git@github.com/diwangs/age-secrets.git";
+		age-secrets.url = "git+ssh://git@github.com/diwangs/age-secrets.git";
 	};
 
 	outputs = { 
@@ -65,7 +65,7 @@
 		nix-vscode-extensions,
 		cua,
 		agenix,
-		agenix-secrets,
+		age-secrets,
 		lanzaboote,
 		...
 	}: let
@@ -99,11 +99,11 @@
 				inherit self;
 				inherit cua;
 				inherit agenix; # for the CLI package in aspect/secret.nix
-				inherit agenix-secrets; # .age file paths in aspect/secret.nix
+				inherit age-secrets; # .age file paths in aspect/secret.nix
 				inherit allowedUnfree;
 
 				# Eval-time secrets (TOML), from the private agenix-secrets input
-				secrets = agenix-secrets.lib.toml;
+				# secrets = agenix-secrets.lib.toml;
 
 				# Modify `allowUnfreePredicate` of `pkgs-stable`
 				# We don't similarly modify `pkgs` here to retain the ability of 
@@ -129,6 +129,8 @@
 				# System (packages included)
 				# agenix (secrets configured in system/aspect/secret.nix)
 				agenix.nixosModules.default
+				# Host-specific agenix identity; the secret aspect is reusable.
+				{ age.identityPaths = [ "/nix/secret/host.key" ]; }
 				cua.nixosModules.cua-driver
 				./system/nixos.nix
 
@@ -169,7 +171,7 @@
 				};
 				# No laptop-only args here (`secrets`, `pkgs-stable`): devbox-reachable
 				# modules must not reference them.
-				extraSpecialArgs = { inherit self allowedUnfree agenix agenix-secrets; };
+				extraSpecialArgs = { inherit self allowedUnfree agenix age-secrets; };
 				modules = [
 					# Shared subset of the laptop config
 					./system/home-manager.devbox.nix
@@ -177,6 +179,8 @@
 					# agenix (secrets configured in system/aspect/secret.hm.nix): the
 					# rootless, per-user counterpart to the laptop's NixOS module
 					agenix.homeManagerModules.default
+					# Host-specific identity, provisioned outside this configuration.
+					{ age.identityPaths = [ "/nix/secret/nova-devbox.key" ]; }
 					./system/aspect/secret.hm.nix
 
 					# Devbox-specific config lives inline here

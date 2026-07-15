@@ -1,14 +1,13 @@
-{ pkgs, agenix, agenix-secrets, ... }: {
+{ pkgs, agenix, age-secrets, ... }: {
   # Secret management (agenix)
   # Runtime-only: secrets decrypt at activation into /run/agenix/*. Eval-time
   # values (partition UUIDs, hostnames, keygrips, ...) stay in secret.toml.
   #
-  # Two identities, every .age file is encrypted to both (secrets/secret.nix):
-  # - Machine (unattended decrypt at boot): dedicated host key below, NOT in
-  #   git, no sshd involved. Back it up offline.
+  # Every .age file is encrypted to both identities (secrets/secret.nix):
+  # - Machine (unattended decrypt at boot): dedicated host key, configured in
+  #   flake.nix, NOT in git, no sshd involved. Back it up offline.
   # - Human (agenix -e): YubiKey PIV P-256 via age-plugin-yubikey.
   systemd.tmpfiles.rules = [ "d /nix/secret 0700 root root -" ];
-  age.identityPaths = [ "/nix/secret/host.key" ];
 
   # Use rage (Rust) instead of Go age, for both boot-time decryption and the
   # editing CLI. Same format + plugin protocol, so .age files are unaffected.
@@ -24,16 +23,16 @@
   ];
 
   # Root secrets (decrypts to `/run/agenix/*`)
-  age.secrets."paladin-iii/secureboot/GUID".file = agenix-secrets.lib.age.paladin-iii.secureboot.GUID;
-  age.secrets."paladin-iii/secureboot/keys/PK/PK.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.PK."PK.key";
-  age.secrets."paladin-iii/secureboot/keys/PK/PK.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.PK."PK.pem";
-  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.KEK."KEK.key";
-  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.KEK."KEK.pem";
-  age.secrets."paladin-iii/secureboot/keys/db/db.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.db."db.key";
-  age.secrets."paladin-iii/secureboot/keys/db/db.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.db."db.pem";
+  age.secrets."paladin-iii/secureboot/GUID".file = age-secrets.paladin-iii.secureboot.GUID;
+  age.secrets."paladin-iii/secureboot/keys/PK/PK.key".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.key";
+  age.secrets."paladin-iii/secureboot/keys/PK/PK.pem".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.pem";
+  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.key".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.key";
+  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.pem".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.pem";
+  age.secrets."paladin-iii/secureboot/keys/db/db.key".file = age-secrets.paladin-iii.secureboot.keys.db."db.key";
+  age.secrets."paladin-iii/secureboot/keys/db/db.pem".file = age-secrets.paladin-iii.secureboot.keys.db."db.pem";
 
-  age.secrets."paladin-iii-machine-id" = {
-    file = agenix-secrets.lib.age.paladin-iii-machine-id;
+  age.secrets."paladin-iii/machine-id" = {
+    file = age-secrets.paladin-iii.machine-id;
     mode = "0444";   # machine-id must be world-readable (dbus, user sessions, NM)
   };
 
@@ -41,29 +40,29 @@
   system.activationScripts.machineId = {
     deps = [ "agenix" ];
     text = ''
-      install -m 0444 /run/agenix/paladin-iii-machine-id /etc/machine-id
+      install -m 0444 /run/agenix/paladin-iii/machine-id /etc/machine-id
     '';
   };
 
-	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
+	age.secrets."paladin-iii/hashed-password".file = age-secrets.paladin-iii.hashed-password;
 
 	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
-	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;
+	age.secrets."network/malone-360-printer-uri".file = age-secrets.network.malone-360-printer-uri;
   
   
   # User secrets (should decrypt to `/run/user/$UID/agenix/*`)
   # Decrypted at activation, before user creation (agenix orders itself
 	# ahead of the `users` activation script for root-owned secrets).
-	age.secrets."bedrock-token" = {
-    file = agenix-secrets.lib.age.bedrock-token;
+  age.secrets."network/ssh-hosts" = {
+    file = age-secrets.network.ssh-hosts;
     owner = "diwangs";
   };
-	age.secrets."ssh-hosts" = {
-    file = agenix-secrets.lib.age.ssh-hosts;
+  age.secrets."network/diwangs-nova.pem" = {
+    file = age-secrets.network."diwangs-nova.pem";
     owner = "diwangs";
   };
-  age.secrets."diwangs-nova.pem" = {
-    file = agenix-secrets.lib.age."diwangs-nova.pem";
+  age.secrets."token/bedrock" = {
+    file = age-secrets.token.bedrock;
     owner = "diwangs";
   };
 }
