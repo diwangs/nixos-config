@@ -10,6 +10,11 @@
   # enableAskPassword only covers login shells; sessionVariables goes through
   # PAM so it also reaches the systemd user manager (= GNOME-launched apps).
   programs.ssh.enableAskPassword = true;
+  # Home Manager exports this for shells, D-Bus activation, and the user
+  # manager, but GNOME's desktop launcher inherits its environment from PAM.
+  # Give its first VS Code process the PIV agent socket as well.
+  environment.sessionVariables.SSH_AUTH_SOCK =
+    "/run/user/${toString config.users.users.diwangs.uid}/yubikey-agent/yubikey-agent.sock";
   # environment.sessionVariables.SSH_ASKPASS = config.programs.ssh.askPassword;
 
   # For Yubikey

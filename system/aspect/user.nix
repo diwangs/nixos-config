@@ -7,6 +7,7 @@
   # Define a user account. Don't forget to set a password with ‘passwd’.
 	users.users.diwangs = {
 		isNormalUser = true;
+		uid = 1000;  # Stable runtime directory for the desktop SSH agent.
 		extraGroups = [
 			"wheel" 		# For ‘sudo’ and `iwd`.
 			"networkmanager"
