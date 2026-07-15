@@ -8,6 +8,7 @@
 		# ./qualcomm-ncm865.nix
 
 		# Peripherals
+		./peripherals/kensington-infinity-dock.nix
 		./peripherals/printer.nix
 		# ./peripherals/udev-rules/hackrf-one.nix
 		# ./peripherals/udev-rules/wooting.nix
