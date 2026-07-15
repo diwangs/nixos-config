@@ -38,6 +38,7 @@ in {
 		# For firmware things
 		fw-ectool     	# This is the same as tree's ectool
 		dmidecode				# For updating too?
+		sbctl						# Secure Boot status and verification
 
 		# Container frontends
 		podman-tui

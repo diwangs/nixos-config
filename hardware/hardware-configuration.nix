@@ -24,10 +24,19 @@
 	# Framework Laptop are x86-only (for now...)
 	nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
-	# Use the systemd-boot EFI boot loader.
-	boot.loader.systemd-boot = {
+	# Lanzaboote replaces the systemd-boot module and signs the boot chain.
+	boot.loader.systemd-boot.enable = lib.mkForce false;
+	boot.lanzaboote = {
 		enable = true;
+		pkiBundle = "/run/agenix/paladin-iii/secureboot";
 		configurationLimit = 5;		# Each initrd is ~62MB; 10 generations overflows 512MiB ESP
+		autoGenerateKeys.enable = false;	# We use agenix
+		autoEnrollKeys = {
+			enable = true;
+			autoReboot = false;
+			includeMicrosoftKeys = true;
+			includeFirmwareBuiltinKeys = true;
+		};
 	};
 	boot.loader.timeout = 0;	# could still select by tapping arrow keys
 
@@ -44,11 +53,6 @@
 	# Kernel
 	boot.kernelParams = [
 		"quiet"
-
-		# Avoid generating machine-id every boot 
-		# This is used for NetworkManager IPv6 DUID
-		# "systemd.machine_id=${secrets.paladin-iii.machine-id}"
-		# "amdgpu.dcdebugmask=0x10"
 	];
 	boot.extraModulePackages = [ ];
 

@@ -43,10 +43,15 @@
 			inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
 		};
 
+		# Secure Boot
+		lanzaboote = {
+			# Post-v1.1 revision with Framework firmware-builtin key enrollment.
+			url = "github:nix-community/lanzaboote/6183ac79eadb079a1e72fa2c60915601be669100";
+			inputs.nixpkgs.follows = "nixpkgs";
+		};
+
 		# Private secrets (eval-time toml + runtime .age), pinned like any input.
 		# After every edit in the secrets repo: `nix flake update agenix-secrets`.
-		# TODO: after moving the dir out and pushing, switch the URL to
-		# "git+ssh://git@github.com/diwangs/agenix-secrets.git"
 		agenix-secrets.url = "git+ssh://git@github.com/diwangs/age-secrets.git";
 	};
 
@@ -61,6 +66,7 @@
 		cua,
 		agenix,
 		agenix-secrets,
+		lanzaboote,
 		...
 	}: let
 		system = "x86_64-linux";
@@ -117,11 +123,13 @@
 			modules = [
 				# Hardware (not portable)
 				nixos-hardware.nixosModules.framework-13-7040-amd
+				lanzaboote.nixosModules.lanzaboote
 				./hardware/hardware-configuration.nix
 
 				# System (packages included)
 				# agenix (secrets configured in system/aspect/secret.nix)
 				agenix.nixosModules.default
+				cua.nixosModules.cua-driver
 				./system/nixos.nix
 
 				# Home Manager (packages included)
@@ -139,9 +147,6 @@
 				# Flatpak (packages included)
 				nix-flatpak.nixosModules.nix-flatpak
 				./system/flatpak.nix
-
-				# trycua computer-use driver. Enabled in nixos.nix.
-				cua.nixosModules.cua-driver
 			];
 		};
 

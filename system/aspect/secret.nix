@@ -23,14 +23,20 @@
     pkgs.age-plugin-yubikey
   ];
 
-  # .age files come from the private agenix-secrets flake input; register new
-  # ones there (flake.nix lib.age + secret.nix recipients), then here.
-  # Consume via config.age.secrets."<name>".path (decrypts to /run/agenix/*).
+  # Root secrets (decrypts to `/run/agenix/*`)
+  age.secrets."paladin-iii/secureboot/GUID".file = agenix-secrets.lib.age.paladin-iii.secureboot.GUID;
+  age.secrets."paladin-iii/secureboot/keys/PK/PK.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.PK."PK.key";
+  age.secrets."paladin-iii/secureboot/keys/PK/PK.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.PK."PK.pem";
+  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.KEK."KEK.key";
+  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.KEK."KEK.pem";
+  age.secrets."paladin-iii/secureboot/keys/db/db.key".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.db."db.key";
+  age.secrets."paladin-iii/secureboot/keys/db/db.pem".file = agenix-secrets.lib.age.paladin-iii.secureboot.keys.db."db.pem";
 
   age.secrets."paladin-iii-machine-id" = {
     file = agenix-secrets.lib.age.paladin-iii-machine-id;
     mode = "0444";   # machine-id must be world-readable (dbus, user sessions, NM)
   };
+
   # Regular file at the canonical path, ordered after agenix decryption
   system.activationScripts.machineId = {
     deps = [ "agenix" ];
@@ -39,16 +45,19 @@
     '';
   };
 
+	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
+
+	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
+	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;
+  
+  
+  # User secrets (should decrypt to `/run/user/$UID/agenix/*`)
   # Decrypted at activation, before user creation (agenix orders itself
 	# ahead of the `users` activation script for root-owned secrets).
-	age.secrets."hashed-password".file = agenix-secrets.lib.age.hashed-password;
 	age.secrets."bedrock-token" = {
     file = agenix-secrets.lib.age.bedrock-token;
     owner = "diwangs";
   };
-
-	# Consumed by ensure-printers (hardware/peripherals/printer.nix)
-	age.secrets."malone-360-printer-uri".file = agenix-secrets.lib.age.malone-360-printer-uri;
 	age.secrets."ssh-hosts" = {
     file = agenix-secrets.lib.age.ssh-hosts;
     owner = "diwangs";
