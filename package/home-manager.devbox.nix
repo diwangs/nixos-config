@@ -184,6 +184,7 @@ exit 0
 		run install -Dm600 ${(pkgs.formats.toml { }).generate "codex-config.toml" {
 			model_provider = "amazon-bedrock";
 			approval_policy = "on-request";
+			approvals_reviewer = "auto_review";
 			model = "openai.gpt-5.6-terra";
 			model_reasoning_effort = "xhigh";
 		}} "$dst"

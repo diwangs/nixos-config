@@ -54,7 +54,7 @@
   programs.ssh = {
     enable = true;
     enableDefaultConfig = false;  # Won't be needed in future versions
-    includes = [ "/run/agenix/ssh-hosts" ];
+    includes = [ "/run/agenix/network/ssh-hosts" ];
     settings = {
       # Fix bug on VSCode remote SSH
       # https://github.com/microsoft/vscode-remote-release/issues/7814#issuecomment-1905654502
