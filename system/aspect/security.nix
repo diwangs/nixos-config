@@ -36,13 +36,14 @@
 			name = "lsm-patch";
 			patch = null;
 			structuredExtraConfig = with lib.kernel; {	# Not to be confused with `structuedExtraConfig`, what a horrible naming scheme
+				SECURITY_LOCKDOWN_LSM = lib.mkForce yes; 	# Get kernel ready for lockdown mode
+				
 				MODULE_SIG = lib.mkForce yes;							# Generate key, sign module, dump the private part
-				# SECURITY_LOCKDOWN_LSM = lib.mkForce yes; 	# Get kernel ready for lockdown mode
-
-				# /dev/mem: strict but enable BIOS access for Chromebook firmware update
-				DEVMEM = yes;
-				STRICT_DEVMEM = lib.mkForce yes;
-				IO_STRICT_DEVMEM = no;
+				# MODULE_SIG_FORCE?
+				DEVMEM = lib.mkForce no; # /dev/mem: disable, not needed for 7040
+				# Options for BIOS access for Chromebook
+				# STRICT_DEVMEM = lib.mkForce yes;
+				# IO_STRICT_DEVMEM = no;
 			};
 		}
 	];
@@ -55,6 +56,8 @@
 
 	# Enabling LSM
 	security.apparmor.enable = true;
+	security.lsm = [ "lockdown" ];
+	boot.kernelParams = [ "lockdown=integrity" ]; # TODO: try confidentiality
 
 	# Yubikey U2F PAM
 	# known_keys are located in .config/Yubico/u2fkeys

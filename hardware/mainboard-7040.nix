@@ -15,4 +15,8 @@
   # boot.kernelParams = [
 	# 	"cros_charge-control.probe_with_fwk_charge_control=1"
 	# ];
+
+  # Disable since out-of-tree module marks the kernel tainted. This disables 
+  # custom battery control too. Just control it from the firmware.
+  hardware.framework.enableKmod = false;
 }
