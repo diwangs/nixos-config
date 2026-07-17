@@ -5,14 +5,12 @@
 		./mainboard-7040.nix
 		# ./mainboard-chromebook.nix
 		./disk.nix
-		# ./qualcomm-ncm865.nix
+		./measured-boot.nix
 
 		# Peripherals
 		./peripherals/kensington-infinity-dock.nix
 		./peripherals/printer.nix
 		./peripherals/yubikey.nix
-		# ./peripherals/udev-rules/hackrf-one.nix
-		# ./peripherals/udev-rules/wooting.nix
 		# ./peripherals/egpu.nix # My setup changes, so we don't need egpu anymore
 	];
 
@@ -44,18 +42,6 @@
 				includeMicrosoftKeys = true;
 				includeFirmwareBuiltinKeys = true;
 			};
-			# Managed systemd-pcrlock policy to unlock `/dev/mapper/fido2-fde-salt`
-			measuredBoot = {
-				enable = true;
-				pcrs = [ 
-					0 		# platform-code (firmware version)
-					4 		# boot-loader-code (lanzaboote stub)
-					7 		# secure-boot-policy (PK, KEK, db, status)
-				];
-				# Define explicitly because of impermanence
-				pcrlockDirectory = "/var/lib/pcrlock.d";
-				pcrlockPolicy = "/var/lib/pcrlock.d/policy.json";
-			};
 		};
 		initrd = {
 			availableKernelModules = [ 
@@ -65,22 +51,13 @@
 				"usb_storage" 
 				"sd_mod" 
 			];
+			secrets."/run/fde/fido2-fde-salt.luks" = 
+      	"/run/agenix/paladin-iii/measured-boot/fido2-fde-salt.luks";
 		};
 		kernelParams = [
 			"quiet"
 		];
 	};
-
-	# The upstream units only order themselves after var.mount. Ensure every
-	# writer sees the nested persistent mount instead of the ephemeral root.
-	systemd.services = lib.genAttrs [
-		"systemd-pcrlock-firmware-code"
-		"systemd-pcrlock-secureboot-policy"
-		"systemd-pcrlock-secureboot-authority"
-		"systemd-pcrlock-make-policy"
-	] (_: {
-		unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
-	});
 
 	networking.hostName = "paladin-iii";
 	networking.hostId = "cafebabe";
