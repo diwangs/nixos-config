@@ -6,6 +6,13 @@
 
   # LVFS, instead of MrChromebox script
   services.fwupd.enable = true;
+	systemd.services.fwupd = {
+		unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
+		serviceConfig = {
+			ReadWritePaths = [ "/var/lib/pcrlock.d" ];
+			RuntimeDirectory = "fwupd-pcrlock";
+		};
+	};
 
   # Manage battery via tlp exclusively
   # 260310 NOTE: as of BIOS 3.18 and kernel 6.18, this is broken
