@@ -2,14 +2,14 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
-{ self, config, lib, pkgs, allowedUnfree, cua, ... }: {
+{ self, config, lib, pkgs, allowedUnfree, cua, ... }@args: {
 	imports = [
 		./aspect/audio.nix
 		./aspect/locale.nix
 		./aspect/network.nix
-		./aspect/performance.nix
+		# ./aspect/performance.nix
 		./aspect/power.nix
-		./aspect/security.nix
+		# ./aspect/security.nix
 		./aspect/user.nix
 		./aspect/desktop.nix
 		./aspect/key-management.nix
@@ -20,6 +20,8 @@
 	];
 
 	nixpkgs.overlays = [
+		(import ../package/overlay/kernel/kernel.nix args).linuxKernel_7_1_3_hardenedOverlay
+		
 		self.inputs.nix-vscode-extensions.overlays.default
 		(import ../package/overlay/claude-code.nix)
 
@@ -49,14 +51,55 @@
 	# Define here instead of flake.nix to avoid replacing the whole pkgs
 	nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) allowedUnfree;
 
+	# Replace stdenv with Clang/LLVM and compile with NixOS' hardening
+	# This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
+	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_1 (old: {
+		stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] (import ../package/overlay/bintools.nix args).llvm;
+		# stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] pkgs.llvmPackages.stdenv;
+
+		extraMakeFlags = [ "LLVM=1" ];	# Use all LLVM bintools instead of just Clang
+		ignoreConfigErrors = true;			# Some GCC-specific hardening (e.g. GCC_PLUGINS) are set as non-optionally yes
+	});
+
+	# Kernel LSM support:
+	# Exclusive LSM: NixOS doesn't really have a strong implementation: no SELinux, AppArmor has limited profile (due to non-FHS)
+	# Stackable LSM: capability,landlock,yama,safesetid,bpf. No loadpin (fine since it's not embedded), lockdown, or integrity
+	boot.kernelPatches = [
+		{
+			name = "patch";
+			patch = null;
+			structuredExtraConfig = with lib.kernel; {	# Not to be confused with `structuedExtraConfig`, what a horrible naming scheme
+				# Lockdown will deter firmware update on Chromebook
+				SECURITY_LOCKDOWN_LSM = lib.mkForce yes; 	# Get kernel ready for lockdown mode
+				
+				MODULE_SIG = lib.mkForce yes;							# Generate key, sign module, dump the private part
+				# MODULE_SIG_FORCE?
+				DEVMEM = lib.mkForce no; # /dev/mem: disable, not needed for 7040
+				# Options for BIOS access for Chromebook
+				# STRICT_DEVMEM = lib.mkForce yes;
+				# IO_STRICT_DEVMEM = no;
+
+				# Compiler
+				LTO_CLANG_FULL = yes;			# Enable full ClangLTO optimization (full). Note that since kCFI, this doesn't have any security benefit
+			};
+		}
+	];
+
+	# Enabling LSM
+	security.apparmor.enable = true;
+	security.lsm = [ "lockdown" ];
+	boot.kernelParams = [ "lockdown=integrity" ]; # TODO: try confidentiality
+
+	# Hardened profile doesn't allow this?
+	services.logrotate.checkConfig = false;
+	security.rtkit.enable = true;
+
 	# nix-ld: for packages that hasn't been nixified
   # e.g., `fw-ectool` and virtualhere
   programs.nix-ld.enable = true;
 	# programs.nix-ld.libraries = with pkgs; [
 	# 	libusb1			# For firmware updates with SuzyQ
 	# ];
-
-	security.rtkit.enable = true;
 
 	# NOTE: the official Claude Desktop bundles and self-spawns its own Cowork
 	# backend (cowork-linux-helper, restart-backoff supervised, in-$HOME rpc.sock),

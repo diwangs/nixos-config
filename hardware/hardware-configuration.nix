@@ -10,6 +10,7 @@
 		# Peripherals
 		./peripherals/kensington-infinity-dock.nix
 		./peripherals/printer.nix
+		./peripherals/yubikey.nix
 		# ./peripherals/udev-rules/hackrf-one.nix
 		# ./peripherals/udev-rules/wooting.nix
 		# ./peripherals/egpu.nix # My setup changes, so we don't need egpu anymore
@@ -26,36 +27,60 @@
 	nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
 	# Lanzaboote replaces the systemd-boot module and signs the boot chain.
-	boot.loader.systemd-boot.enable = lib.mkForce false;
-	boot.lanzaboote = {
-		enable = true;
-		pkiBundle = "/run/agenix/paladin-iii/secureboot";
-		configurationLimit = 5;		# Each initrd is ~62MB; 10 generations overflows 512MiB ESP
-		autoGenerateKeys.enable = false;	# We use agenix
-		autoEnrollKeys = {
-			enable = true;
-			autoReboot = false;
-			includeMicrosoftKeys = true;
-			includeFirmwareBuiltinKeys = true;
+	boot = {
+		loader = {
+			timeout = 0;	# Could still select by tapping arrow keys
+			efi.canTouchEfiVariables = true;
+			systemd-boot.enable = lib.mkForce false; # Use through lanzaboote instead
 		};
+		lanzaboote = {
+			enable = true;
+			pkiBundle = "/run/agenix/paladin-iii/secure-boot";
+			configurationLimit = 5;		# Limit is 8. Each initrd is ~62MB;
+			autoGenerateKeys.enable = false;	# Use through agenix instead
+			autoEnrollKeys = {
+				enable = true;
+				autoReboot = false;
+				includeMicrosoftKeys = true;
+				includeFirmwareBuiltinKeys = true;
+			};
+			# Managed systemd-pcrlock policy to unlock `/dev/mapper/fido2-fde-salt`
+			measuredBoot = {
+				enable = true;
+				pcrs = [ 
+					0 		# platform-code (firmware version)
+					4 		# boot-loader-code (lanzaboote stub)
+					7 		# secure-boot-policy (PK, KEK, db, status)
+				];
+				# Define explicitly because of impermanence
+				pcrlockDirectory = "/var/lib/pcrlock.d";
+				pcrlockPolicy = "/var/lib/pcrlock.d/policy.json";
+			};
+		};
+		initrd = {
+			availableKernelModules = [ 
+				"nvme" 					# For disk
+				"thunderbolt" 	# For dock
+				"xhci_pci" 			# For USB (but doesn't work?)
+				"usb_storage" 
+				"sd_mod" 
+			];
+		};
+		kernelParams = [
+			"quiet"
+		];
 	};
-	boot.loader.timeout = 0;	# could still select by tapping arrow keys
 
-	# initrd
-	boot.initrd.availableKernelModules = [ 
-		"nvme" 					# For disk
-		"thunderbolt" 	# For dock
-		"xhci_pci" 			# For USB (but doesn't work?)
-		"usb_storage" 
-		"sd_mod" 
-	];
-	boot.initrd.kernelModules = [ ];
-
-	# Kernel
-	boot.kernelParams = [
-		"quiet"
-	];
-	boot.extraModulePackages = [ ];
+	# The upstream units only order themselves after var.mount. Ensure every
+	# writer sees the nested persistent mount instead of the ephemeral root.
+	systemd.services = lib.genAttrs [
+		"systemd-pcrlock-firmware-code"
+		"systemd-pcrlock-secureboot-policy"
+		"systemd-pcrlock-secureboot-authority"
+		"systemd-pcrlock-make-policy"
+	] (_: {
+		unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
+	});
 
 	networking.hostName = "paladin-iii";
 	networking.hostId = "cafebabe";

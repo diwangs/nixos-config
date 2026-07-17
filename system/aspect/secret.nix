@@ -23,13 +23,14 @@
   ];
 
   # Root secrets (decrypts to `/run/agenix/*`)
-  age.secrets."paladin-iii/secureboot/GUID".file = age-secrets.paladin-iii.secureboot.GUID;
-  age.secrets."paladin-iii/secureboot/keys/PK/PK.key".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.key";
-  age.secrets."paladin-iii/secureboot/keys/PK/PK.pem".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.pem";
-  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.key".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.key";
-  age.secrets."paladin-iii/secureboot/keys/KEK/KEK.pem".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.pem";
-  age.secrets."paladin-iii/secureboot/keys/db/db.key".file = age-secrets.paladin-iii.secureboot.keys.db."db.key";
-  age.secrets."paladin-iii/secureboot/keys/db/db.pem".file = age-secrets.paladin-iii.secureboot.keys.db."db.pem";
+  age.secrets."paladin-iii/secure-boot/GUID".file = age-secrets.paladin-iii.secureboot.GUID;
+  age.secrets."paladin-iii/secure-boot/keys/PK/PK.key".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.key";
+  age.secrets."paladin-iii/secure-boot/keys/PK/PK.pem".file = age-secrets.paladin-iii.secureboot.keys.PK."PK.pem";
+  age.secrets."paladin-iii/secure-boot/keys/KEK/KEK.key".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.key";
+  age.secrets."paladin-iii/secure-boot/keys/KEK/KEK.pem".file = age-secrets.paladin-iii.secureboot.keys.KEK."KEK.pem";
+  age.secrets."paladin-iii/secure-boot/keys/db/db.key".file = age-secrets.paladin-iii.secureboot.keys.db."db.key";
+  age.secrets."paladin-iii/secure-boot/keys/db/db.pem".file = age-secrets.paladin-iii.secureboot.keys.db."db.pem";
+  age.secrets."paladin-iii/measured-boot/fido2-fde-salt.luks".file = age-secrets.paladin-iii.measured-boot."fido2-fde-salt.luks";
 
   age.secrets."paladin-iii/machine-id" = {
     file = age-secrets.paladin-iii.machine-id;

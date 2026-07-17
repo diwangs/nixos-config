@@ -16,8 +16,4 @@
   # environment.sessionVariables.SSH_AUTH_SOCK =
   #   "/run/user/${toString config.users.users.diwangs.uid}/yubikey-agent/yubikey-agent.sock";
   # environment.sessionVariables.SSH_ASKPASS = config.programs.ssh.askPassword;
-
-  # For Yubikey
-  services.pcscd.enable = true;
-  services.udev.packages = [ pkgs.yubikey-personalization ];
 }

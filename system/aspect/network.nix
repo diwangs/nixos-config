@@ -39,6 +39,8 @@
 	# declarations with `networking.interfaces.<interface>.useDHCP`.
 	networking.useDHCP = lib.mkDefault true;
 
+	networking.networkmanager.wifi.macAddress = "random";	# Prevent tracking via MAC address
+
   # Open ports in the firewall.
 	networking.firewall = {
 		enable = true; # Enabled by default, but just to make it explicit

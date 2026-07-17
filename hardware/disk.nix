@@ -15,6 +15,7 @@ in {
 		"dm-integrity"
 		"aegis128"
 	];
+	boot.initrd.systemd.tpm2.enable = true;
 
 	# Boot partition: EFI System Partition
 	fileSystems."/boot" = { 
@@ -108,6 +109,12 @@ in {
 		device = "/dev/disk/by-uuid/${root-partition-uuid}";
 		fsType = "btrfs";
 		options = [ "subvol=caches/@homecache" ] ++ defaultMountOptions;
+	};
+
+	fileSystems."/var/lib/pcrlock.d" = {
+		device = "/dev/disk/by-uuid/${root-partition-uuid}";
+		fsType = "btrfs";
+		options = [ "subvol=caches/@pcrlock" ] ++ defaultMountOptions;
 	};
 
 	fileSystems."/var/lib/flatpak" = { 

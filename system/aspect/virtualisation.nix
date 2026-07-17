@@ -28,6 +28,10 @@
   # init, so it is not listed here.)
   boot.kernelModules = [ "vhost_vsock" ];
 
+	# Enable unprivileged user NS
+	# Historically this allows for some CVE, but a bunch of packages rely on this (e.g. chromium-based, Zoom, etc.)
+	security.unprivilegedUsernsClone = true;
+
   # Podman
 	virtualisation = {
 		containers = {

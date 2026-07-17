@@ -1,5 +1,5 @@
 { config, pkgs, lib, secrets, ... }: {
-  # Key management
+  # TODO: disable GPG entirely
   programs.gpg.enable = true;
   services.gpg-agent = {
     enable = true;            # GPG only (git commit signing); SSH moved to yubikey-agent below
@@ -10,15 +10,15 @@
     };
   };
 
-  # SSH: uses YubiKey to store the secret key. We use PIV-based for balance 
+  # SSH: uses YubiKey to store the secret key. We use PIV-based for balance
   # of app compatibility (i.e., pinentry-support, card-agent exclusivity):
-  # - FIDO2 is buggy in some GUI frontend (e.g., Claude Desktop interprets 
+  # - FIDO2 is buggy in some GUI frontend (e.g., Claude Desktop interprets
   #   waiting for touch as error, and no-touch is even more buggy)
   # - OpenPGP scdaemon conflicts with pcscd, making YubiKey Manager GUI stuck
-  # NOTE: holds a persistent PIV transaction — stop the unit before using
+  # NOTE: holds a persistent PIV transaction - stop the unit before using
   # age-plugin-yubikey/ykman (agenix editing uses the host key instead).
   # This is a less exclusive hold than gpg's scdaemon.
-  # NOTE: the 9a key is pin-policy=once, touch=never (fp 3oSftftMh33…).
+  # NOTE: the 9a key is pin-policy=once, touch=never.
   services.yubikey-agent.enable = true;
   # yubikey-agent 0.1.6 does not consume systemd-activated sockets: it always
   # opens the path passed to `-l`. Home Manager's socket unit therefore strands
