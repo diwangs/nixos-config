@@ -9,7 +9,7 @@
 # startup the app (app.asar `.vite/build/index.js`) resolves three deps and
 # reports the feature "unsupported" if any is missing:
 #   - qemu-system-x86_64 : found via a $PATH scan → handled by the system
-#     (system/aspect/virtualisation.nix puts qemu on PATH). NOT patched here.
+#     (aspect/virtualisation.nix puts qemu on PATH). NOT patched here.
 #   - OVMF firmware      : looked up ONLY at the hardcoded absolute paths
 #     ["/usr/share/OVMF/OVMF_CODE_4M.fd","/usr/share/OVMF/OVMF_CODE.fd"] — no
 #     env override, never joined with resourcesPath. Doesn't exist on NixOS.

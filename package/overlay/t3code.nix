@@ -28,7 +28,7 @@
 # runtimePackages (enableCodex/enableGitHub/enableGit default true). Keep this
 # in sync if those enable flags are ever overridden.
 #
-# Standalone overlay: import in ../../system/nixos.nix. Remove once nixpkgs
+# Standalone overlay: import in ../../nixos.nix. Remove once nixpkgs
 # ships an app-root package.json for t3code.
 final: prev:
 let

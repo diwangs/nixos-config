@@ -6,7 +6,7 @@
 # substituteInPlace(s), and repacks. The patches touch disjoint minified
 # anchors, so running each against a freshly-extracted tree (rather than
 # chaining one shared extraction) makes them commute — add, remove, or reorder
-# the imports in ../../../system/nixos.nix without reasoning about interactions.
+# the imports in ../../../../nixos.nix without reasoning about interactions.
 #
 # The ONE load-bearing subtlety of the repack lives here, in `mkAsarPatch`, so
 # it is written exactly once instead of copy-pasted into every fragment:

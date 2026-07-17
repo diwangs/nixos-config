@@ -108,7 +108,7 @@
 				# Modify `allowUnfreePredicate` of `pkgs-stable`
 				# We don't similarly modify `pkgs` here to retain the ability of 
 				# setting `nixpkgs.overlays` on modules. Instead, set any overlays and
-				# config on ./system/nixos.nix.
+				# config on ./nixos.nix.
 				pkgs-stable = import nixpkgs-stable {
 					inherit system;
 					config.allowUnfreePredicate = pkg: (
@@ -127,12 +127,12 @@
 				./hardware/hardware-configuration.nix
 
 				# System (packages included)
-				# agenix (secrets configured in system/aspect/secret.nix)
+				# agenix (secrets configured in aspect/secret.nix)
 				agenix.nixosModules.default
 				# Host-specific agenix identity; the secret aspect is reusable.
 				{ age.identityPaths = [ "/nix/secret/host.key" ]; }
 				cua.nixosModules.cua-driver
-				./system/nixos.nix
+				./nixos.nix
 
 				# Home Manager (packages included)
 				home-manager.nixosModules.home-manager {
@@ -142,13 +142,13 @@
 					home-manager.useUserPackages = true;	
 					home-manager.backupFileExtension = "bak";
 					home-manager.extraSpecialArgs = specialArgs; # rec
-					# Home packages are imported inside `system/home-manager.nix`
-					home-manager.users.diwangs = import ./system/home-manager.nix;
+					# Home packages are imported inside `home-manager.nix`
+					home-manager.users.diwangs = import ./home-manager.nix;
 				}
 
 				# Flatpak (packages included)
 				nix-flatpak.nixosModules.nix-flatpak
-				./system/flatpak.nix
+				./flatpak.nix
 			];
 		};
 
@@ -174,14 +174,14 @@
 				extraSpecialArgs = { inherit self allowedUnfree agenix age-secrets; };
 				modules = [
 					# Shared subset of the laptop config
-					./system/home-manager.devbox.nix
+					./home-manager.devbox.nix
 
-					# agenix (secrets configured in system/aspect/secret.hm.nix): the
+					# agenix (secrets configured in aspect/secret.hm.nix): the
 					# rootless, per-user counterpart to the laptop's NixOS module
 					agenix.homeManagerModules.default
 					# Host-specific identity, provisioned outside this configuration.
 					{ age.identityPaths = [ "/nix/secret/nova-devbox.key" ]; }
-					./system/aspect/secret.hm.nix
+					./aspect/secret.hm.nix
 
 					# Devbox-specific config lives inline here
 					({ pkgs, ... }: {

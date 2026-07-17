@@ -7,7 +7,7 @@
 		./aspect/desktop.hm.nix
 		./aspect/key-management.hm.nix
 
-		../package/home-manager.nix
+		./package/home-manager.nix
 	];
 
 	home.stateVersion = "25.05";

@@ -1,5 +1,5 @@
 # Shell configuration shared between the laptop and rootless devboxes
-# (imported by system/home-manager.devbox.nix, which the laptop entry also
+# (imported by home-manager.devbox.nix, which the laptop entry also
 # imports). Keep this file devbox-safe: no desktop, dconf, or NixOS-module
 # assumptions.
 { config, pkgs, lib, ... }: {
@@ -23,7 +23,7 @@
 	# there breaks Claude Code's bwrap sandbox (it cannot bind onto symlinks).
 	# Disable home-manager's copy and materialize the same one-liner as a real
 	# writable file instead (same pattern as the writable settings.json in
-	# ../../package/home-manager.devbox.nix). The sweep also drops $HOME/.zshrc
+	# ../package/home-manager.devbox.nix). The sweep also drops $HOME/.zshrc
 	# and .zprofile left behind by pre-dotDir generations or by the old claude
 	# wrapper's EXIT trap; once ZDOTDIR is set nothing reads them.
 	home.file.".zshenv".enable = false;

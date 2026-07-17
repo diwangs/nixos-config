@@ -6,7 +6,7 @@
 # in index.pre.js (not index.js). Anchor verified present exactly once in the
 # official build (1.17377.1).
 #
-# Standalone overlay: import after ./overlay.nix in ../../../system/nixos.nix;
+# Standalone overlay: import after ./overlay.nix in ../../../../nixos.nix;
 # order vs other patches is irrelevant (per-fragment extract/repack — see
 # ./lib.nix). Each patch adds `asar` to nativeBuildInputs itself so it works no
 # matter which subset of patches is imported.

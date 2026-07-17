@@ -8,7 +8,7 @@
 	# DNS also doesn't seem to work
 	services.printing.drivers = [ pkgs.hplip ];
 
-	# URI is a secret (see system/aspect/secret.nix): decrypted to
+	# URI is a secret (see aspect/secret.nix): decrypted to
 	# /run/agenix/network/malone-360-printer-uri at activation and read when this
 	# service starts. Replaces hardware.printers.ensurePrinters, whose
 	# deviceUri is eval-time and leaks into the world-readable nix store.

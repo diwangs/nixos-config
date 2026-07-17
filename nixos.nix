@@ -16,33 +16,33 @@
 		./aspect/virtualisation.nix
 		./aspect/secret.nix
 
-		../package/nixos.nix
+		./package/nixos.nix
 	];
 
 	nixpkgs.overlays = [
-		(import ../package/overlay/kernel/kernel.nix args).linuxKernel_7_1_3_hardenedOverlay
-		(import ../package/overlay/fwupd/fwupd-pcrlock.nix)
+		(import ./package/overlay/kernel/kernel.nix args).linuxKernel_7_1_3_hardenedOverlay
+		(import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 		
 		self.inputs.nix-vscode-extensions.overlays.default
-		(import ../package/overlay/claude-code.nix)
+		(import ./package/overlay/claude-code.nix)
 
 		# Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
 		# Migrated off patrickjaja's `claude-desktop-bin` (base + 9 patches); those
-		# files remain under ../package/overlay/claude-desktop-bin/ for reference/
+		# files remain under ./package/overlay/claude-desktop-bin/ for reference/
 		# rollback but are no longer imported. Re-applied here: the OpenRouter/3p
 		# patches (model-id, thinking-flag, titlegen, chat-effort) + debug-port +
 		# the Cowork-VM path patch. Patrickjaja's Computer-Use/screenshot/ydotool
 		# patches (05/08/10/11) are NOT migrated. Each patch runs its own
 		# extract/repack or loose-file edit (see patch/lib.nix), so order is
 		# irrelevant.
-		(import ../package/overlay/claude-desktop/overlay.nix)
-		(import ../package/overlay/claude-desktop/patch/debug-port-guard.nix)
-		(import ../package/overlay/claude-desktop/patch/vm-path.nix)
-		(import ../package/overlay/claude-desktop/patch/cli-path.nix)
-		# (import ../package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
-		# (import ../package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
-		# (import ../package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
-		# (import ../package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
+		(import ./package/overlay/claude-desktop/overlay.nix)
+		(import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
+		(import ./package/overlay/claude-desktop/patch/vm-path.nix)
+		(import ./package/overlay/claude-desktop/patch/cli-path.nix)
+		# (import ./package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
+		# (import ./package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
+		# (import ./package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
+		# (import ./package/overlay/claude-desktop/patch/3p/chat-effort-toggle.nix)
 
 	];
 
@@ -55,7 +55,7 @@
 	# Replace stdenv with Clang/LLVM and compile with NixOS' hardening
 	# This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
 	boot.kernelPackages = pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_1 (old: {
-		stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] (import ../package/overlay/bintools.nix args).llvm;
+		stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] (import ./package/overlay/bintools.nix args).llvm;
 		# stdenv = pkgs.withCFlags [ "-Wno-unused-command-line-argument" ] pkgs.llvmPackages.stdenv;
 
 		extraMakeFlags = [ "LLVM=1" ];	# Use all LLVM bintools instead of just Clang

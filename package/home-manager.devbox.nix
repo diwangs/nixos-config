@@ -1,5 +1,5 @@
 # Home packages and programs shared between the laptop and rootless devboxes
-# (imported by package/home-manager.nix and system/home-manager.devbox.nix).
+# (imported by package/home-manager.nix and home-manager.devbox.nix).
 # Keep this list headless: no desktop, dconf, Flatpak, or system-service
 # assumptions — and no laptop-only specialArgs (`secrets`, `pkgs-stable`).
 { config, pkgs, lib, ... }:

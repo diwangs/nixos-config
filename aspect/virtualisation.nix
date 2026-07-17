@@ -4,7 +4,7 @@
 # micro-VM with OVMF firmware + a virtiofsd share. This aspect supplies the two
 # pieces the app resolves at the SYSTEM level; the two hardcoded FHS binary
 # paths (OVMF, virtiofsd) are redirected into the Nix store by the package patch
-# overlay ../../package/overlay/claude-desktop/patch/01-cowork-vm-fhs-paths.nix.
+# overlay ../package/overlay/claude-desktop/patch/01-cowork-vm-fhs-paths.nix.
 #
 # The app's startup probe (app.asar) checks:
 #   - qemu-system-x86_64 on $PATH                    -> on the claude-desktop wrapper PATH

@@ -1,6 +1,6 @@
 { config, pkgs, lib, ... }: {
 	imports = [
-    ../package/flatpak.nix
+    ./package/flatpak.nix
   ];
   
   services.flatpak = {

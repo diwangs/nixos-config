@@ -46,7 +46,7 @@
 		};
 	};
 
-	# Shell: see aspect/shell.devbox.hm.nix (shared with devboxes)
+	# Shell: see aspect/shell.hm.nix (shared with devboxes)
 
 	# Nautilus video properties (https://github.com/NixOS/nixpkgs/issues/195936):
 	# This is set per-user via systemd.user.sessionVariables instead of 
