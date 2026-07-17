@@ -51,8 +51,8 @@
 				"usb_storage" 
 				"sd_mod" 
 			];
-			secrets."/run/fde/fido2-fde-salt.luks" = 
-      	"/run/agenix/paladin-iii/measured-boot/fido2-fde-salt.luks";
+			secrets."/var/lib/measured-boot/fido2-fde-salt.luks" =
+				"/run/agenix/paladin-iii/measured-boot/fido2-fde-salt.luks";
 		};
 		kernelParams = [
 			"quiet"

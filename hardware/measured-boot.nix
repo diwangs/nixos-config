@@ -2,9 +2,9 @@
  * Measured boot feature that unlocks a LUKS image containing FIDO2 salt
  * 
  * Flow:
- *  1. At build, embed `/run/fde/fido2-fde-salt.luks` to initrd from agenix
+ *  1. At build, embed initrd with `/var/lib/measured-boot/fido2-fde-salt.luks`
  *  2. At stage 1, TPM dm-crypt to `/dev/mapper/fido2-fde-salt`
- *  3. systemd strips and prepare salt to `/run/fde/fido2-fde-salt` (no .luks)
+ *  3. systemd strips and prepare salt to `/run/measured-boot/fido2-fde-salt`
  */
 
 { config, lib, pkgs, secrets, ... }: {
@@ -27,7 +27,7 @@
     availableKernelModules = [ "loop" ];
 
     luks.devices."fido2-fde-salt" = {
-      device = "/run/fde/fido2-fde-salt.luks";
+      device = "/var/lib/measured-boot/fido2-fde-salt.luks";
       crypttabExtraOpts = [
         "headless=true"
         "noauto"
@@ -55,18 +55,19 @@
           RemainAfterExit = true;
         };
         script = ''
-          mkdir -p /run/fde
+          mkdir -p /run/measured-boot
           umask 0077
           if [ -e /dev/mapper/fido2-fde-salt ] \
-            && dd if=/dev/mapper/fido2-fde-salt of=/run/fde/fido2-fde-salt \
+            && dd if=/dev/mapper/fido2-fde-salt \
+              of=/run/measured-boot/fido2-fde-salt \
               bs=32 count=1 status=none; then
             echo "Salt unlock success" > /dev/console
           else
             echo "Salt unlock fail" > /dev/console
-            dd if=/dev/urandom of=/run/fde/fido2-fde-salt \
+            dd if=/dev/urandom of=/run/measured-boot/fido2-fde-salt \
               bs=32 count=1 status=none
           fi
-          chmod 0400 /run/fde/fido2-fde-salt
+          chmod 0400 /run/measured-boot/fido2-fde-salt
         '';
       };
     };
@@ -86,8 +87,7 @@
       unitConfig.DefaultDependencies = "no";
       serviceConfig.Type = "oneshot";
       script = ''
-        rm -f /run/fde/fido2-fde-salt
-        rm -f /run/fde/fido2-fde-salt.luks
+        rm -f /run/measured-boot/fido2-fde-salt
         if [ -e /dev/mapper/fido2-fde-salt ]; then
           systemd-cryptsetup detach fido2-fde-salt
         fi
