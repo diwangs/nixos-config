@@ -11,6 +11,7 @@
 
 		# Little tools
 		jq										# JSON parser
+		awscli2
 
 		# Claude Code sandboxed Bash tool (Linux): bubblewrap enforces the
 		# filesystem/network boundary, socat relays traffic through the proxy.
