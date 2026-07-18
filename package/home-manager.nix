@@ -36,6 +36,7 @@ in rec {
 		ansible
 		sshpass
 		ansible-lint
+		nixd                  # Nix LSP
 
 		# Agentic
 		claude-desktop
@@ -220,6 +221,9 @@ in rec {
 					};
 				};
 			};
+			languages.Nix.language_servers = [ "nixd" "!nil" ];
+			lsp.nixd.settings.nixd.options.nixos.expr =
+				"(builtins.getFlake \"/etc/nixos\").nixosConfigurations.paladin-iii.options";
 		};
 	};
 

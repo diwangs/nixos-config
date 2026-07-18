@@ -19,7 +19,6 @@
   # - Machine (unattended decrypt at boot): dedicated host key, configured in
   #   flake.nix, NOT in git, no sshd involved. Back it up offline.
   # - Human (agenix -e): YubiKey PIV P-256 via age-plugin-yubikey.
-  # systemd.tmpfiles.rules = [ "d /nix/secret 0700 root root -" ];
 
   # Use rage (Rust) instead of Go age, for both boot-time decryption and the
   # editing CLI. Same format + plugin protocol, so .age files are unaffected.
@@ -36,5 +35,8 @@
 
   # Unlike HM, this doesn't depend on UID
   # Make sure it resides in a mountpoint that is `neededForBoot`
+  # If it is ever changed, be sure to switch twice for measured boot
   age.identityPaths = [ "/nix/secret/.age-identity" ];
+  # Is this needed?
+  # systemd.tmpfiles.rules = [ "d /nix/secret 0700 root root -" ];
 }
