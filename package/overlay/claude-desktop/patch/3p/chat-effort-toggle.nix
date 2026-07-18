@@ -35,16 +35,19 @@ let
 in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkLoosePatch {
-      label = "chat effort/thinking toggle (ion-dist, loose file)";
-      body = ''
-        for ionBundle in "$asarRoot/ion-dist/assets/v1/"index-*.js; do
-          substituteInPlace "$ionBundle" \
-            --replace-warn \
-              'We=Le.considerEnabledForNonUI&&(F||S&&!Te||te||se)&&!ae,Ge=$e&&We' \
-              'We=!0,Ge=$e&&We'
-        done
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkLoosePatch {
+        label = "chat effort/thinking toggle (ion-dist, loose file)";
+        body = ''
+          for ionBundle in "$asarRoot/ion-dist/assets/v1/"index-*.js; do
+            substituteInPlace "$ionBundle" \
+              --replace-warn \
+                'We=Le.considerEnabledForNonUI&&(F||S&&!Te||te||se)&&!ae,Ge=$e&&We' \
+                'We=!0,Ge=$e&&We'
+          done
+        '';
+      };
   });
 }

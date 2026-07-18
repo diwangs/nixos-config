@@ -27,5 +27,5 @@
   ];
 
   age.identityPaths = [ "/nix/secret/nova-devbox.key" ];
-	age.secrets."token/bedrock".file = age-secrets.token.bedrock;
+  age.secrets."token/bedrock".file = age-secrets.token.bedrock;
 }

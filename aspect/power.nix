@@ -17,24 +17,24 @@
 # Hibernation is disabled due to security issues (ability to replace kernel)
 
 { ... }: {
-	# Disable BT on boot
-	hardware.bluetooth.powerOnBoot = false;
+  # Disable BT on boot
+  hardware.bluetooth.powerOnBoot = false;
 
-	powerManagement.enable = true;
-	services.thermald.enable = true;
+  powerManagement.enable = true;
+  services.thermald.enable = true;
 
-	# TLP (TLP PD replaces PPD)
-	services.tlp = {
-		enable = true;
-		settings = {
-			DEVICES_TO_DISABLE_ON_STARTUP = "wifi"; # Delayed, but no biggie
-		};
-	};
-	services.tlp.pd.enable = true;
-	services.power-profiles-daemon.enable = false; # Enabled in nixos-hardware
+  # TLP (TLP PD replaces PPD)
+  services.tlp = {
+    enable = true;
+    settings = {
+      DEVICES_TO_DISABLE_ON_STARTUP = "wifi"; # Delayed, but no biggie
+    };
+  };
+  services.tlp.pd.enable = true;
+  services.power-profiles-daemon.enable = false; # Enabled in nixos-hardware
 
-	# powerManagement.powertop.enable = true; # TODO: how to disable USB suspension?
-	# boot.initrd.kernelModules = [ "cpufreq_stats" ]; # Load this at boot so powertop could do its job
+  # powerManagement.powertop.enable = true; # TODO: how to disable USB suspension?
+  # boot.initrd.kernelModules = [ "cpufreq_stats" ]; # Load this at boot so powertop could do its job
 
-	# services.xserver.displayManager.setupCommands = "${pkgs.brightnessctl}/bin/brightnessctl set 30% -d intel_backlight";
+  # services.xserver.displayManager.setupCommands = "${pkgs.brightnessctl}/bin/brightnessctl set 30% -d intel_backlight";
 }

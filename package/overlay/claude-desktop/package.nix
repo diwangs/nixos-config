@@ -37,61 +37,62 @@
 # the two UPDATE MARKER lines by hand.
 #
 # Last updated: 010726
-{ lib
-, stdenv
-, fetchurl
-, dpkg
-, autoPatchelfHook
-, makeWrapper
-, wrapGAppsHook3
-, addDriverRunpath  # .driverLink = /run/opengl-driver (HW GL/Vulkan driver path)
-, # runtime libs — from the .deb's `Depends` mapped to nixpkgs, plus the usual
+{
+  lib,
+  stdenv,
+  fetchurl,
+  dpkg,
+  autoPatchelfHook,
+  makeWrapper,
+  wrapGAppsHook3,
+  addDriverRunpath, # .driverLink = /run/opengl-driver (HW GL/Vulkan driver path)
+  # runtime libs — from the .deb's `Depends` mapped to nixpkgs, plus the usual
   # Electron/Chromium shared-object closure that autoPatchelfHook resolves.
-  glib
-, gtk3
-, nss
-, nspr
-, at-spi2-atk
-, at-spi2-core
-, atk
-, cairo
-, pango
-, gdk-pixbuf
-, expat
-, dbus
-, cups
-, libdrm
-, libgbm
-, mesa
-, libGL
-, libglvnd
-, libsecret
-, libnotify
-, libuuid
-, libxkbcommon
-, alsa-lib
-, systemd     # libudev (autoPatchelf), and libsystemd
-, libseccomp  # bundled virtiofsd (Cowork VM helper)
-, libcap_ng   # bundled virtiofsd (Cowork VM helper)
-, xdg-utils   # runtime: xdg-open for external links / claude:// scheme
-, python3     # runtime: interpreter for Python-based Desktop Extensions (MCP)
-, nodejs      # runtime: interpreter for Node-based Desktop Extensions (has a built-in fallback)
-, claude-code # runtime: shared patched CLI for the Code surface and PATH users
-, qemu_kvm    # runtime: qemu-system-x86_64 for Cowork's micro-VM PATH scan (host-cpu-only)
+  glib,
+  gtk3,
+  nss,
+  nspr,
+  at-spi2-atk,
+  at-spi2-core,
+  atk,
+  cairo,
+  pango,
+  gdk-pixbuf,
+  expat,
+  dbus,
+  cups,
+  libdrm,
+  libgbm,
+  mesa,
+  libGL,
+  libglvnd,
+  libsecret,
+  libnotify,
+  libuuid,
+  libxkbcommon,
+  alsa-lib,
+  systemd, # libudev (autoPatchelf), and libsystemd
+  libseccomp, # bundled virtiofsd (Cowork VM helper)
+  libcap_ng, # bundled virtiofsd (Cowork VM helper)
+  xdg-utils, # runtime: xdg-open for external links / claude:// scheme
+  python3, # runtime: interpreter for Python-based Desktop Extensions (MCP)
+  nodejs, # runtime: interpreter for Node-based Desktop Extensions (has a built-in fallback)
+  claude-code, # runtime: shared patched CLI for the Code surface and PATH users
+  qemu_kvm, # runtime: qemu-system-x86_64 for Cowork's micro-VM PATH scan (host-cpu-only)
 
-# X11
-, libx11
-, libxcb
-, libxcomposite
-, libxdamage
-, libxext
-, libxfixes
-, libxrandr
-, libxrender
-, libxtst
-, libxi
-, libxscrnsaver
-, libxshmfence
+  # X11
+  libx11,
+  libxcb,
+  libxcomposite,
+  libxdamage,
+  libxext,
+  libxfixes,
+  libxrandr,
+  libxrender,
+  libxtst,
+  libxi,
+  libxscrnsaver,
+  libxshmfence,
 }:
 
 stdenv.mkDerivation (finalAttrs: {
@@ -195,16 +196,20 @@ stdenv.mkDerivation (finalAttrs: {
     makeWrapper $out/lib/claude-desktop/claude-desktop $out/bin/claude-desktop \
       "''${gappsWrapperArgs[@]}" \
       --set CLAUDE_CODE_LOCAL_BINARY ${lib.getExe claude-code} \
-      --prefix PATH : ${lib.makeBinPath [
-        qemu_kvm    # For Cowork (host arch only, much smaller than `qemu`)
-        nodejs      # Node-based Desktop extensions runtime
-        python3     # Python-based Desktop extensions runtime
-        xdg-utils   # For deeplink
-      ]} \
-      --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath [
-        libglvnd    # For hw acceleration (see header comment)
-        libsecret   # For signin persistence (1p only)
-      ]}:${addDriverRunpath.driverLink}/lib"
+      --prefix PATH : ${
+        lib.makeBinPath [
+          qemu_kvm # For Cowork (host arch only, much smaller than `qemu`)
+          nodejs # Node-based Desktop extensions runtime
+          python3 # Python-based Desktop extensions runtime
+          xdg-utils # For deeplink
+        ]
+      } \
+      --prefix LD_LIBRARY_PATH : "${
+        lib.makeLibraryPath [
+          libglvnd # For hw acceleration (see header comment)
+          libsecret # For signin persistence (1p only)
+        ]
+      }:${addDriverRunpath.driverLink}/lib"
 
     substituteInPlace $out/share/applications/claude-desktop.desktop \
       --replace-warn 'Exec=claude-desktop' "Exec=$out/bin/claude-desktop"

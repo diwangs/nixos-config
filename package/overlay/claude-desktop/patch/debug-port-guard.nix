@@ -17,14 +17,17 @@ in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkAsarPatch {
-      label = "debug-port guard";
-      body = ''
-        substituteInPlace "$work/contents/.vite/build/index.pre.js" \
-          --replace-warn \
-            '&&process.exit(1)' \
-            '&&void 0'
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkAsarPatch {
+        label = "debug-port guard";
+        body = ''
+          substituteInPlace "$work/contents/.vite/build/index.pre.js" \
+            --replace-warn \
+              '&&process.exit(1)' \
+              '&&void 0'
+        '';
+      };
   });
 }

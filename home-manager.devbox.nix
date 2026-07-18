@@ -3,14 +3,14 @@
 # entry for rootless devboxes (flake.nix homeConfigurations). Devbox-specific
 # config (genericLinux glue, headless extras, username) lives in flake.nix.
 { agenix, ... }: {
-	imports = [
-		agenix.homeManagerModules.default
-		./aspect/shell.hm.nix
+  imports = [
+    agenix.homeManagerModules.default
+    ./aspect/shell.hm.nix
 
-		./package/home-manager.devbox.nix
-	];
+    ./package/home-manager.devbox.nix
+  ];
 
-	programs.home-manager.enable = true;
+  programs.home-manager.enable = true;
 
-	home.enableNixpkgsReleaseCheck = false;
+  home.enableNixpkgsReleaseCheck = false;
 }

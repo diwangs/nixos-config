@@ -49,7 +49,13 @@ in
       makeWrapper ${lib.getExe final.electron_40} "$out/bin/t3code-desktop" \
         --add-flags "$desktop" \
         --inherit-argv0 \
-        --prefix PATH : ${lib.makeBinPath [ final.codex final.gh final.git ]}
+        --prefix PATH : ${
+          lib.makeBinPath [
+            final.codex
+            final.gh
+            final.git
+          ]
+        }
     '';
   });
 }

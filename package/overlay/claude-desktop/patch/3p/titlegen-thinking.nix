@@ -21,17 +21,20 @@ in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkAsarPatch {
-      label = "title-gen thinking disable (MAX_THINKING_TOKENS=0)";
-      body = ''
-        substituteInPlace "$work/contents/.vite/build/index.js" \
-          --replace-warn \
-            'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
-            'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}' \
-          --replace-warn \
-            '.overrides,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
-            '.overrides,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}'
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkAsarPatch {
+        label = "title-gen thinking disable (MAX_THINKING_TOKENS=0)";
+        body = ''
+          substituteInPlace "$work/contents/.vite/build/index.js" \
+            --replace-warn \
+              'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
+              'NODE_USE_SYSTEM_CA:"1",CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}' \
+            --replace-warn \
+              '.overrides,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1"}' \
+              '.overrides,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:"1",MAX_THINKING_TOKENS:"0"}'
+        '';
+      };
   });
 }

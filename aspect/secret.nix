@@ -1,8 +1,8 @@
 { pkgs, agenix, ... }: {
   # Key management (GNOME)
   # gcr is introduced in 25.11
-  services.gnome.gcr-ssh-agent.enable = false;  # For SSH, use gpg-agent
-  services.gnome.gnome-keyring.enable = true;   # For non-SSH, use keyring
+  services.gnome.gcr-ssh-agent.enable = false; # For SSH, use gpg-agent
+  services.gnome.gnome-keyring.enable = true; # For non-SSH, use keyring
 
   # Export SSH_ASKPASS (GNOME sets askPassword to seahorse's helper, but the
   # export defaults to services.xserver.enable, which is off on Wayland-only).

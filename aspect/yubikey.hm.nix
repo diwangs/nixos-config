@@ -17,13 +17,14 @@
   sshAuthSock.systemd.socketProviderUnit = lib.mkForce "yubikey-agent.service";
   systemd.user.sockets.yubikey-agent = lib.mkForce { };
   home.activation.stopBrokenYubikeySocket =
-    lib.hm.dag.entryBetween [ "reloadSystemd" ] [ "linkGeneration" ] ''
-      run ${pkgs.systemd}/bin/systemctl --user stop yubikey-agent.socket || true
-      socketLink="$HOME/.config/systemd/user/sockets.target.wants/yubikey-agent.socket"
-      if [ -L "$socketLink" ]; then
-        run rm -f "$socketLink"
-      fi
-    '';
+    lib.hm.dag.entryBetween [ "reloadSystemd" ] [ "linkGeneration" ]
+      ''
+        run ${pkgs.systemd}/bin/systemctl --user stop yubikey-agent.socket || true
+        socketLink="$HOME/.config/systemd/user/sockets.target.wants/yubikey-agent.socket"
+        if [ -L "$socketLink" ]; then
+          run rm -f "$socketLink"
+        fi
+      '';
   systemd.user.services.yubikey-agent = {
     Unit = {
       Requires = lib.mkForce [ ];
@@ -32,8 +33,9 @@
     };
     Service = {
       # The binary execs plain `pinentry` from PATH (package isn't wrapped).
-      Environment =
-        "PATH=${lib.makeBinPath [ pkgs.pinentry-gnome3 ]}:/run/current-system/sw/bin";
+      Environment = "PATH=${
+        lib.makeBinPath [ pkgs.pinentry-gnome3 ]
+      }:/run/current-system/sw/bin";
       RuntimeDirectory = "yubikey-agent";
     };
     Install.WantedBy = [ "default.target" ];

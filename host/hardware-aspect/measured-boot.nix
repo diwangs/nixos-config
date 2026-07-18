@@ -1,26 +1,26 @@
 /*
- * Measured boot feature that unlocks a LUKS image containing FIDO2 salt
- * 
- * Flow:
- *  1. At build, embed initrd with `/var/lib/measured-boot/fido2-fde-salt.luks`
- *  2. At stage 1, TPM dm-crypt to `/dev/mapper/fido2-fde-salt`
- *  3. systemd strips and prepare salt to `/run/measured-boot/fido2-fde-salt`
- */
+  Measured boot feature that unlocks a LUKS image containing FIDO2 salt
+
+  Flow:
+   1. At build, embed initrd with `/var/lib/measured-boot/fido2-fde-salt.luks`
+   2. At stage 1, TPM dm-crypt to `/dev/mapper/fido2-fde-salt`
+   3. systemd strips and prepare salt to `/run/measured-boot/fido2-fde-salt`
+*/
 
 { lib, ... }: {
   # Managed systemd-pcrlock policy to unlock `/dev/mapper/fido2-fde-salt`
   boot.lanzaboote.measuredBoot = {
     enable = true;
-    pcrs = [ 
-      0 		# platform-code (firmware version)
-      4 		# boot-loader-code (lanzaboote stub)
-      7 		# secure-boot-policy (PK, KEK, db, status)
+    pcrs = [
+      0 # platform-code (firmware version)
+      4 # boot-loader-code (lanzaboote stub)
+      7 # secure-boot-policy (PK, KEK, db, status)
     ];
     # Define explicitly because of impermanence
     pcrlockDirectory = "/var/lib/pcrlock.d";
     pcrlockPolicy = "/var/lib/pcrlock.d/policy.json";
   };
-  
+
   boot.initrd = {
     # systemd-cryptsetup attaches the regular-file LUKS image through a loop
     # device. Include the module in stage 1 so that automatic setup can work.
@@ -93,12 +93,16 @@
         fi
       '';
     };
-  } // lib.genAttrs [
-    "systemd-pcrlock-firmware-code"
-    "systemd-pcrlock-secureboot-policy"
-    "systemd-pcrlock-secureboot-authority"
-    "systemd-pcrlock-make-policy"
-  ] (_: {
-    unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
-  });
+  }
+  //
+    lib.genAttrs
+      [
+        "systemd-pcrlock-firmware-code"
+        "systemd-pcrlock-secureboot-policy"
+        "systemd-pcrlock-secureboot-authority"
+        "systemd-pcrlock-make-policy"
+      ]
+      (_: {
+        unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
+      });
 }

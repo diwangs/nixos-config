@@ -35,10 +35,11 @@ let
   # hash algorithm doesn't change). Verified against known pairs:
   # yukon_silver=574905726, yukon_silver_thinking=1658632017,
   # model_selector_enabled=4108768567.
-  mul31 = name: builtins.foldl'
-    (acc: c: lib.mod (acc * 31 + lib.strings.charToInt c) 4294967296)
-    0
-    (lib.stringToCharacters name);
+  mul31 =
+    name:
+    builtins.foldl' (
+      acc: c: lib.mod (acc * 31 + lib.strings.charToInt c) 4294967296
+    ) 0 (lib.stringToCharacters name);
 in
 {
   inherit unpackGlob mul31;

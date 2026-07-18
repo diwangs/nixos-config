@@ -1,7 +1,7 @@
 { age-secrets, ... }: {
-	home.username = "diwangs";
+  home.username = "diwangs";
   home.stateVersion = "25.05";
-  
+
   age.identityPaths = [
     "/home/diwangs/.config/home-manager/.age-identity"
   ];

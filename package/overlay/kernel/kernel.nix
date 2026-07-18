@@ -26,158 +26,185 @@ let
   # Inlined from nixpkgs pkgs/os-specific/linux/kernel/hardened/config.nix
   # Removed in nixpkgs commit 2879caafcf3fe36048fe25f99f32b91002128ca6
   # Based on https://kspp.github.io/Recommended_Settings and https://wiki.gentoo.org/wiki/Hardened/Hardened_Kernel_Project
-  hardenedConfig = { stdenv, lib, version }: with lib.kernel; with (lib.kernel.whenHelpers version);
+  hardenedConfig =
+    {
+      stdenv,
+      lib,
+      version,
+    }:
+    with lib.kernel;
+    with (lib.kernel.whenHelpers version);
     assert (lib.versionAtLeast version "4.9");
     {
-      SECURITY_SELINUX_DISABLE             = whenOlder "6.4" no;
-      SECURITY_WRITABLE_HOOKS              = whenOlder "6.4" no;
+      SECURITY_SELINUX_DISABLE = whenOlder "6.4" no;
+      SECURITY_WRITABLE_HOOKS = whenOlder "6.4" no;
 
-      DEBUG_CREDENTIALS                    = whenOlder "6.6" yes;
-      DEBUG_NOTIFIERS                      = yes;
-      DEBUG_PI_LIST                        = whenOlder "5.2" yes;
-      DEBUG_PLIST                          = whenAtLeast "5.2" yes;
-      DEBUG_SG                             = yes;
-      DEBUG_VIRTUAL                        = yes;
-      SCHED_STACK_END_CHECK                = yes;
+      DEBUG_CREDENTIALS = whenOlder "6.6" yes;
+      DEBUG_NOTIFIERS = yes;
+      DEBUG_PI_LIST = whenOlder "5.2" yes;
+      DEBUG_PLIST = whenAtLeast "5.2" yes;
+      DEBUG_SG = yes;
+      DEBUG_VIRTUAL = yes;
+      SCHED_STACK_END_CHECK = yes;
 
-      REFCOUNT_FULL                        = whenOlder "5.4.208" yes;
-      RESET_ATTACK_MITIGATION              = yes;
-      CONFIG_LDISC_AUTOLOAD                = option no;
+      REFCOUNT_FULL = whenOlder "5.4.208" yes;
+      RESET_ATTACK_MITIGATION = yes;
+      CONFIG_LDISC_AUTOLOAD = option no;
 
-      PAGE_POISONING_NO_SANITY             = whenOlder "5.11" yes;
-      PAGE_POISONING_ZERO                  = whenOlder "5.11" yes;
-      INIT_ON_FREE_DEFAULT_ON              = whenAtLeast "5.3" yes;
-      INIT_STACK_ALL_ZERO                  = yes;
-      ZERO_CALL_USED_REGS                  = whenAtLeast "5.15" yes;
+      PAGE_POISONING_NO_SANITY = whenOlder "5.11" yes;
+      PAGE_POISONING_ZERO = whenOlder "5.11" yes;
+      INIT_ON_FREE_DEFAULT_ON = whenAtLeast "5.3" yes;
+      INIT_STACK_ALL_ZERO = yes;
+      ZERO_CALL_USED_REGS = whenAtLeast "5.15" yes;
 
-      SECURITY_SAFESETID                   = whenAtLeast "5.1" yes;
-      PANIC_TIMEOUT                        = freeform "-1";
+      SECURITY_SAFESETID = whenAtLeast "5.1" yes;
+      PANIC_TIMEOUT = freeform "-1";
 
-      GCC_PLUGINS                          = yes;
-      GCC_PLUGIN_STACKLEAK                 = whenAtLeast "4.20" yes;
-      GCC_PLUGIN_RANDSTRUCT                = whenOlder "5.19" yes;
-      GCC_PLUGIN_RANDSTRUCT_PERFORMANCE    = whenOlder "5.19" yes;
+      GCC_PLUGINS = yes;
+      GCC_PLUGIN_STACKLEAK = whenAtLeast "4.20" yes;
+      GCC_PLUGIN_RANDSTRUCT = whenOlder "5.19" yes;
+      GCC_PLUGIN_RANDSTRUCT_PERFORMANCE = whenOlder "5.19" yes;
 
-      UBSAN                                = yes;
-      UBSAN_TRAP                           = whenAtLeast "5.7" yes;
-      UBSAN_BOUNDS                         = whenAtLeast "5.7" yes;
-      UBSAN_SANITIZE_ALL                   = whenOlder "6.9" yes;
-      UBSAN_LOCAL_BOUNDS                   = option yes;
-      CFI_CLANG                            = option yes;
+      UBSAN = yes;
+      UBSAN_TRAP = whenAtLeast "5.7" yes;
+      UBSAN_BOUNDS = whenAtLeast "5.7" yes;
+      UBSAN_SANITIZE_ALL = whenOlder "6.9" yes;
+      UBSAN_LOCAL_BOUNDS = option yes;
+      CFI_CLANG = option yes;
 
-      ACPI_CUSTOM_METHOD                   = whenOlder "6.9" no;
-      PROC_KCORE                           = no;
-      INET_DIAG                            = no;
-      INET_DIAG_DESTROY                    = option no;
-      INET_RAW_DIAG                        = option no;
-      INET_TCP_DIAG                        = option no;
-      INET_UDP_DIAG                        = option no;
-      INET_MPTCP_DIAG                      = option no;
+      ACPI_CUSTOM_METHOD = whenOlder "6.9" no;
+      PROC_KCORE = no;
+      INET_DIAG = no;
+      INET_DIAG_DESTROY = option no;
+      INET_RAW_DIAG = option no;
+      INET_TCP_DIAG = option no;
+      INET_UDP_DIAG = option no;
+      INET_MPTCP_DIAG = option no;
 
-      CC_STACKPROTECTOR_REGULAR            = lib.mkForce (whenOlder "4.18" no);
-      CC_STACKPROTECTOR_STRONG             = whenOlder "4.18" yes;
+      CC_STACKPROTECTOR_REGULAR = lib.mkForce (whenOlder "4.18" no);
+      CC_STACKPROTECTOR_STRONG = whenOlder "4.18" yes;
 
-      STRICT_DEVMEM                        = option no;
-      IO_STRICT_DEVMEM                     = option no;
+      STRICT_DEVMEM = option no;
+      IO_STRICT_DEVMEM = option no;
 
-      IOMMU_DEFAULT_DMA_STRICT             = option yes;
-      IOMMU_DEFAULT_DMA_LAZY               = option no;
+      IOMMU_DEFAULT_DMA_STRICT = option yes;
+      IOMMU_DEFAULT_DMA_LAZY = option no;
 
-      LEGACY_VSYSCALL_NONE                 = lib.mkIf stdenv.hostPlatform.isx86 yes;
+      LEGACY_VSYSCALL_NONE = lib.mkIf stdenv.hostPlatform.isx86 yes;
     };
 
   # Re-implementation of linuxKernel.hardenedKernelFor, removed alongside hardenedLinuxPackagesFor
-  makeHardenedKernelFor = { fetchurl, linuxKernel, lib }: kernel': overrides:
+  makeHardenedKernelFor =
+    {
+      fetchurl,
+      linuxKernel,
+      lib,
+    }:
+    kernel': overrides:
     let
-      kernel       = kernel'.override overrides;
-      patch        = linuxKernel.kernelPatches.hardened.${kernel.meta.branch};
-      version      = patch.version;
-      major        = lib.versions.major version;
+      kernel = kernel'.override overrides;
+      patch = linuxKernel.kernelPatches.hardened.${kernel.meta.branch};
+      version = patch.version;
+      major = lib.versions.major version;
       # The kernel's module directory uses the full 3-component release, so a
       # ".0" line like 7.1 builds as 7.1.0. Pad here to match what the kernel
       # Makefile reports (else: "modDirVersion ... is wrong, should be 7.1.0-...").
       modDirVersion' = lib.versions.pad 3 version;
-    in kernel.override {
+    in
+    kernel.override {
       structuredExtraConfig = hardenedConfig {
-        stdenv  = kernel.stdenv;
+        stdenv = kernel.stdenv;
         inherit lib version;
       };
       argsOverride = {
         inherit version;
-        pname        = "linux-hardened";
+        pname = "linux-hardened";
         modDirVersion = modDirVersion' + patch.extra;
         src = fetchurl {
-          url    = "mirror://kernel/linux/kernel/v${major}.x/linux-${version}.tar.xz";
+          url = "mirror://kernel/linux/kernel/v${major}.x/linux-${version}.tar.xz";
           sha256 = patch.sha256;
         };
-        extraMeta = { broken = kernel.meta.broken; };
+        extraMeta = {
+          broken = kernel.meta.broken;
+        };
       };
       kernelPatches = kernel.kernelPatches ++ [ patch ];
-      isHardened    = true;
+      isHardened = true;
     };
 
-in {
+in
+{
 
   # Latest stable from anthraxx
-  linuxKernel_7_1_3_hardenedOverlay = (final: prev: {
-    linuxKernel = prev.linuxKernel // {
-      kernelPatches = prev.linuxKernel.kernelPatches // {
-        hardened = (prev.linuxKernel.kernelPatches.hardened or {}) // {
-          "7.1" = {
-            version = "7.1.3";
-            extra   = "-hardened1";
-            sha256  = "1p6iknvzmd04alrf49zn8mxw863v0yzgznyckfhl4llgx1lc0hdy";		# Hash of the pre-patch kernel
-            name    = "linux-hardened-7.1.3-hardened1";
-            patch   = final.fetchurl {
-              name   = "linux-hardened-v7.1.3-hardened1.patch";
-              url    = "https://github.com/anthraxx/linux-hardened/releases/download/v7.1.3-hardened1/linux-hardened-v7.1.3-hardened1.patch";
-              sha256 = "02xsgq9v6wlicqpqrxpfy2aai8jsfvh7005aga0is816bp0na3zq";	# Hash of the patch itself
+  linuxKernel_7_1_3_hardenedOverlay = (
+    final: prev: {
+      linuxKernel = prev.linuxKernel // {
+        kernelPatches = prev.linuxKernel.kernelPatches // {
+          hardened = (prev.linuxKernel.kernelPatches.hardened or { }) // {
+            "7.1" = {
+              version = "7.1.3";
+              extra = "-hardened1";
+              sha256 = "1p6iknvzmd04alrf49zn8mxw863v0yzgznyckfhl4llgx1lc0hdy"; # Hash of the pre-patch kernel
+              name = "linux-hardened-7.1.3-hardened1";
+              patch = final.fetchurl {
+                name = "linux-hardened-v7.1.3-hardened1.patch";
+                url = "https://github.com/anthraxx/linux-hardened/releases/download/v7.1.3-hardened1/linux-hardened-v7.1.3-hardened1.patch";
+                sha256 = "02xsgq9v6wlicqpqrxpfy2aai8jsfvh7005aga0is816bp0na3zq"; # Hash of the patch itself
+              };
             };
           };
         };
+
+        hardenedKernelFor = makeHardenedKernelFor {
+          inherit (final) fetchurl;
+          linuxKernel = final.linuxKernel;
+          lib = prev.lib;
+        };
+        hardenedPackagesFor =
+          kernel: overrides:
+          final.linuxKernel.packagesFor (
+            final.linuxKernel.hardenedKernelFor kernel overrides
+          );
       };
 
-      hardenedKernelFor   = makeHardenedKernelFor {
-        inherit (final) fetchurl;
-        linuxKernel = final.linuxKernel;
-        lib         = prev.lib;
-      };
-      hardenedPackagesFor = kernel: overrides:
-        final.linuxKernel.packagesFor (final.linuxKernel.hardenedKernelFor kernel overrides);
-    };
-
-    # Re-export matching the old pkgs.hardenedLinuxPackagesFor alias
-    hardenedLinuxPackagesFor = final.linuxKernel.hardenedPackagesFor;
-  });
+      # Re-export matching the old pkgs.hardenedLinuxPackagesFor alias
+      hardenedLinuxPackagesFor = final.linuxKernel.hardenedPackagesFor;
+    }
+  );
 
   # Backup: Latest LTS (6.x)
-  linuxKernel_6_18_38_hardenedOverlay = (final: prev: {
-    linuxKernel = prev.linuxKernel // {
-      kernelPatches = prev.linuxKernel.kernelPatches // {
-        hardened = (prev.linuxKernel.kernelPatches.hardened or {}) // {
-          "6.18" = {
-            version = "6.18.38";
-            extra   = "-hardened1";
-            sha256  = "0igh9xy1lk2hv2jni00dqyy27j4zqh86waw7i65ryvnmmc4fa9mc";		# Hash of the pre-patch kernel
-            name    = "linux-hardened-6.18.38-hardened1";
-            patch   = final.fetchurl {
-              name   = "linux-hardened-v6.18.38-hardened1.patch";
-              url    = "https://github.com/anthraxx/linux-hardened/releases/download/v6.18.38-hardened1/linux-hardened-v6.18.38-hardened1.patch";
-              sha256 = "0q49ba4p05ibqxgznvai9109lqy3mh77kisbyks8z6xr1jr13drr";	# Hash of the patch itself
+  linuxKernel_6_18_38_hardenedOverlay = (
+    final: prev: {
+      linuxKernel = prev.linuxKernel // {
+        kernelPatches = prev.linuxKernel.kernelPatches // {
+          hardened = (prev.linuxKernel.kernelPatches.hardened or { }) // {
+            "6.18" = {
+              version = "6.18.38";
+              extra = "-hardened1";
+              sha256 = "0igh9xy1lk2hv2jni00dqyy27j4zqh86waw7i65ryvnmmc4fa9mc"; # Hash of the pre-patch kernel
+              name = "linux-hardened-6.18.38-hardened1";
+              patch = final.fetchurl {
+                name = "linux-hardened-v6.18.38-hardened1.patch";
+                url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.18.38-hardened1/linux-hardened-v6.18.38-hardened1.patch";
+                sha256 = "0q49ba4p05ibqxgznvai9109lqy3mh77kisbyks8z6xr1jr13drr"; # Hash of the patch itself
+              };
             };
           };
         };
+
+        hardenedKernelFor = makeHardenedKernelFor {
+          inherit (final) fetchurl;
+          linuxKernel = final.linuxKernel;
+          lib = prev.lib;
+        };
+        hardenedPackagesFor =
+          kernel: overrides:
+          final.linuxKernel.packagesFor (
+            final.linuxKernel.hardenedKernelFor kernel overrides
+          );
       };
 
-      hardenedKernelFor   = makeHardenedKernelFor {
-        inherit (final) fetchurl;
-        linuxKernel = final.linuxKernel;
-        lib         = prev.lib;
-      };
-      hardenedPackagesFor = kernel: overrides:
-        final.linuxKernel.packagesFor (final.linuxKernel.hardenedKernelFor kernel overrides);
-    };
-
-    hardenedLinuxPackagesFor = final.linuxKernel.hardenedPackagesFor;
-  });
+      hardenedLinuxPackagesFor = final.linuxKernel.hardenedPackagesFor;
+    }
+  );
 }

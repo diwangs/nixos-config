@@ -17,17 +17,20 @@ in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkAsarPatch {
-      label = "model-id normalization";
-      body = ''
-        substituteInPlace "$work/contents/.vite/build/index.js" \
-          --replace-warn \
-            '.replace(/^(?:[a-z][a-z0-9-]*\.)?anthropic\./,"")' \
-            '.replace(/^(?:[a-z][a-z0-9-]*[./])?anthropic[./]/,"")' \
-          --replace-warn \
-            '.replace(/-\d{8}$/,"")}' \
-            '.replace(/-\d{8}$/,"").replace(/(\d)\.(\d)/g,"$1-$2")}'
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkAsarPatch {
+        label = "model-id normalization";
+        body = ''
+          substituteInPlace "$work/contents/.vite/build/index.js" \
+            --replace-warn \
+              '.replace(/^(?:[a-z][a-z0-9-]*\.)?anthropic\./,"")' \
+              '.replace(/^(?:[a-z][a-z0-9-]*[./])?anthropic[./]/,"")' \
+            --replace-warn \
+              '.replace(/-\d{8}$/,"")}' \
+              '.replace(/-\d{8}$/,"").replace(/(\d)\.(\d)/g,"$1-$2")}'
+        '';
+      };
   });
 }

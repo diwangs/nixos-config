@@ -18,14 +18,17 @@ in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkAsarPatch {
-      label = "thinking-toggle flag (yukon_silver_thinking)";
-      body = ''
-        substituteInPlace "$work/contents/.vite/build/index.js" \
-          --replace-warn \
-            'return{${toString (mul31 "yukon_silver")}:' \
-            'return{"${toString (mul31 "yukon_silver_thinking")}":{defaultValue:!0},${toString (mul31 "yukon_silver")}:'
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkAsarPatch {
+        label = "thinking-toggle flag (yukon_silver_thinking)";
+        body = ''
+          substituteInPlace "$work/contents/.vite/build/index.js" \
+            --replace-warn \
+              'return{${toString (mul31 "yukon_silver")}:' \
+              'return{"${toString (mul31 "yukon_silver_thinking")}":{defaultValue:!0},${toString (mul31 "yukon_silver")}:'
+        '';
+      };
   });
 }

@@ -34,24 +34,27 @@
 final: prev:
 let
   helpers = import ./lib.nix { inherit (final) lib; };
-  ovmfCode = "${final.OVMF.fd}/FV/OVMF_CODE.fd";  # $out/FV/{OVMF_CODE,OVMF_VARS}.fd
+  ovmfCode = "${final.OVMF.fd}/FV/OVMF_CODE.fd"; # $out/FV/{OVMF_CODE,OVMF_VARS}.fd
   virtiofsd = "${final.virtiofsd}/bin/virtiofsd";
 in
 {
   claude-desktop = prev.claude-desktop.overrideAttrs (old: {
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
 
-    postInstall = (old.postInstall or "") + "\n" + helpers.mkAsarPatch {
-      label = "cowork-vm FHS paths (OVMF + virtiofsd)";
-      body = ''
-        substituteInPlace "$work/contents/.vite/build/index.js" \
-          --replace-warn \
-            '["/usr/share/OVMF/OVMF_CODE_4M.fd","/usr/share/OVMF/OVMF_CODE.fd"]' \
-            '["${ovmfCode}"]' \
-          --replace-warn \
-            '["/usr/libexec/virtiofsd","/usr/bin/virtiofsd"]' \
-            '["${virtiofsd}"]'
-      '';
-    };
+    postInstall =
+      (old.postInstall or "")
+      + "\n"
+      + helpers.mkAsarPatch {
+        label = "cowork-vm FHS paths (OVMF + virtiofsd)";
+        body = ''
+          substituteInPlace "$work/contents/.vite/build/index.js" \
+            --replace-warn \
+              '["/usr/share/OVMF/OVMF_CODE_4M.fd","/usr/share/OVMF/OVMF_CODE.fd"]' \
+              '["${ovmfCode}"]' \
+            --replace-warn \
+              '["/usr/libexec/virtiofsd","/usr/bin/virtiofsd"]' \
+              '["${virtiofsd}"]'
+        '';
+      };
   });
 }
