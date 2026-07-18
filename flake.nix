@@ -62,7 +62,6 @@
 		nixpkgs-stable, 
 		home-manager, 
 		nix-flatpak, 
-		nix-vscode-extensions,
 		cua,
 		agenix,
 		age-secrets,
@@ -87,12 +86,12 @@
 			"trezor-suite"
 			"wootility"
 		];
-	in rec {
+	in {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
 			inherit system;
 			# For nixos, but also passed to HM
-			specialArgs = rec {
+			specialArgs = {
 				inherit self;
 				inherit cua;
 				inherit agenix; # for the CLI package in aspect/secret.nix

@@ -1,5 +1,5 @@
 # For Framework 13 (for Chromebook and 7040 boards)
-{ config, lib, pkgs, age-secrets, lanzaboote, nixos-hardware, ... }: {
+{ lib, age-secrets, lanzaboote, nixos-hardware, ... }: {
 	imports = [ 
 		# Laptop hardware
 		# Semi-portable configs

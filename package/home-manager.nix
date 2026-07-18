@@ -15,11 +15,11 @@
 # it is reproducible in the synchronization sense, since the data are
 # snapshoted
 
-{ config, lib, pkgs, pkgs-stable, secrets, ... }:
+{ config, lib, pkgs, pkgs-stable, ... }:
 let
 	# YubiKey PIV slot 9a public key (SSH auth + git signing identity)
 	pivSshPubKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAlqJuT2Lkccq5Q3Jkc8msxn9FQ1tvtP4i/fvTIpBrjUAB/RayymoXWLQUly3o9ytPcJK1PDI/EuxbdjmxKEaSI=";
-in rec {
+in {
 	imports = [
 		# Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
 		# TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
@@ -62,6 +62,14 @@ in rec {
 				2> >(grep -v "is not in the list of known options, but still passed to Electron/Chromium" >&2)
 		'')
 	];
+
+	# OpenCode starts a language server when it opens a matching file. Include
+	# nixd in its wrapped PATH so Nix diagnostics work from Zed's ACP server too.
+	programs.opencode = {
+		enable = true;
+		extraPackages = [ pkgs.nixd ];
+		settings.lsp = true;
+	};
 
 	# Dev (direnv and gh live in home-manager.devbox.nix)
 	programs.java = { # Aside from installing jdk (latest LTS), this sets JAVA_HOME
@@ -176,34 +184,19 @@ in rec {
 		mutableUserSettings = false;
 		extensions = [ "nix" ];
 		userSettings = {
-			# Feed each project's direnv (.envrc) into the env Zed computes for the
-			# terminal and language servers. NB: this path does NOT reach the ACP
-			# agent processes below — Zed resolves the "project environment" in
-			# several disjoint code paths and the custom agent_servers command is
-			# not one of them (zed-industries/zed#56099) — so the agents load direnv
-			# themselves via the `direnv exec .` wrapper.
+			# Feed each project's direnv (.envrc) into the environment Zed computes
+			# for terminals, language servers, and external ACP agent servers.
 			load_direnv = "direct";
 			# External agents speak ACP over stdio. Each entry below is a custom
 			# command server (Zed requires `command`); we pin both the adapter and
 			# the underlying CLI to the Nix store — instead of Zed's runtime,
 			# registry-downloaded adapters — so the overlay-applied native CLIs are
 			# always the ones that run.
-			#
-			# `direnv exec .` wraps every agent: it loads the project's .envrc
-			# (walking up from Zed's project-root cwd; nix-direnv `use flake` works
-			# via ~/.config/direnv/direnvrc) and execs the adapter with that env
-			# merged in, so per-project Bedrock config (AWS_REGION, AWS_PROFILE,
-			# AWS_BEARER_TOKEN_BEDROCK, CLAUDE_CODE_USE_BEDROCK, model pins) reaches
-			# the agent. The `env` entries below are set on the `direnv` process and
-			# pass straight through. Requires the project's .envrc to be
-			# `direnv allow`ed; direnv's diagnostics go to stderr, so they don't
-			# corrupt the ACP JSON-RPC stream on stdout.
 			agent_servers = {
 				# Use the native Codex app server so model metadata and Bedrock
 				# support stay in sync with the installed Codex CLI.
 				"codex-acp" = {
-					command = lib.getExe pkgs.direnv;
-					args = [ "exec" "." (lib.getExe pkgs.codex-acp) ];
+					command = lib.getExe pkgs.codex-acp;
 					env = {
 						CODEX_PATH = lib.getExe pkgs.codex;
 					};
@@ -214,11 +207,17 @@ in rec {
 				# the overlaid `claude` through callPackage; we set it explicitly to
 				# mirror the Codex pattern and keep the intent visible.
 				"claude-code-acp" = {
-					command = lib.getExe pkgs.direnv;
-					args = [ "exec" "." (lib.getExe pkgs.claude-agent-acp) ];
+					command = lib.getExe pkgs.claude-agent-acp;
 					env = {
 						CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
 					};
+				};
+				# opencode speaks ACP natively via its own `acp` subcommand, unlike
+				# Codex/Claude Code which need a separate adapter binary.
+				"opencode" = {
+					command = lib.getExe pkgs.opencode;
+					args = [ "acp" ];
+					env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
 				};
 			};
 			languages.Nix.language_servers = [ "nixd" "!nil" ];

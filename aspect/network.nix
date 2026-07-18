@@ -11,7 +11,7 @@
 #		it falls back to the DHCP DNS setting (for gateways, e.g., airports)
 #		
 
-{ config, lib, pkgs, ... }: {
+{ lib, ... }: {
 	# Bluetooth
 	hardware.bluetooth.enable = true;
 	

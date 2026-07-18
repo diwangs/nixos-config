@@ -3,7 +3,7 @@
 # - Radeon 7800XT
 # Static switching: sacrifice hot-plugging for performance
 
-{ config, lib, pkgs, ... }:
+{ pkgs, ... }:
 
 {
 	specialisation = {

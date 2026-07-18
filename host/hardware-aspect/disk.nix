@@ -1,4 +1,4 @@
-{ config, lib, pkgs, secrets, ... }: 
+{ ... }:
 let
 	# Mount options that is applied to all mounts
   defaultMountOptions = [

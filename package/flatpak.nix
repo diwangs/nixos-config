@@ -1,7 +1,7 @@
 # Flatpak packages: synchronized in cloud, or official version of packages that
 # supposed to be in home-manager
 
-{ config, pkgs, lib, ... }: {
+{ lib, ... }: {
 	services.flatpak = {
 		packages = [
 			# Cloud
@@ -22,7 +22,7 @@
 			"md.obsidian.Obsidian"              # Official!
 		];
 
-		overrides = lib.recursiveUpdate (lib.listToAttrs (builtins.map (pkg: {
+		overrides = lib.recursiveUpdate (lib.listToAttrs (map (pkg: {
 			name = pkg;
 			value = { Context.sockets = [ "wayland" "x11" ]; };
 		}) [

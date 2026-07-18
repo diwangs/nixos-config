@@ -20,7 +20,7 @@
 # We re-implement them here so the overlay remains self-contained.
 
 # Last updated: 110726
-{ config, pkgs, lib, ... }:
+{ ... }:
 
 let
   # Inlined from nixpkgs pkgs/os-specific/linux/kernel/hardened/config.nix

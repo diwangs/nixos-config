@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }: {
+{ config, pkgs, ... }: {
   # Printing
 	services.printing.enable = true;
 	# No Avahi

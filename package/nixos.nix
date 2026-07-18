@@ -1,4 +1,4 @@
-{ config, pkgs, lib, cua, ... }: let
+{ config, pkgs, cua, ... }: let
 	# cua-driver 0.7's GNOME Shell helper. Exposes org.cua.WinRects on the session
 	# bus so cua-driver can read window frame rects (Mutter's only privileged
 	# vantage point) and reconstruct GTK4 widget screen coords on Wayland, where

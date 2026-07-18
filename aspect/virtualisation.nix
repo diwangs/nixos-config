@@ -21,7 +21,7 @@
 # it. We therefore only need: vhost_vsock loaded at boot. No libvirtd (Cowork
 # doesn't use it), and no kvm-group membership (the device is already world-
 # accessible; revisit if udev perms are ever tightened).
-{ config, pkgs, lib, ... }: {
+{ ... }: {
   # vhost_vsock backs /dev/vhost-vsock (host<->guest sockets); the device node
   # exists but the module is unloaded by default. Load it at boot so the app's
   # vsock gate passes. (kvm_amd is already autoloaded by the CPU microcode/KVM

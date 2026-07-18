@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }: {
+{ pkgs, ... }: {
   # For Yubikey
   services.pcscd.enable = true; # conflicts with gpg's scdaemon
   services.udev.packages = [ pkgs.yubikey-personalization ];

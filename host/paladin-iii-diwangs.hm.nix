@@ -1,4 +1,4 @@
-{ config, lib, pkgs, age-secrets, ... }: {
+{ age-secrets, ... }: {
 	home.username = "diwangs";
   home.stateVersion = "25.05";
   

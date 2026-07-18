@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }: {
+{ lib, ... }: {
   # Timezone
 	time.timeZone = lib.mkDefault "America/New_York";
 

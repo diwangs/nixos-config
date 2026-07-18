@@ -1,5 +1,5 @@
 # {
-{ config, pkgs, lib, ... }: {
+{ pkgs, lib, ... }: {
 	# Enable the GNOME DM and DE.
 	services.displayManager.gdm.enable = true;
 	services.desktopManager.gnome.enable = true;
@@ -22,4 +22,3 @@
 	# Fonts: nerd-fonts
 	fonts.packages = builtins.filter lib.attrsets.isDerivation (builtins.attrValues pkgs.nerd-fonts);
 }
-

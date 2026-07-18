@@ -1,4 +1,4 @@
-{ age-secrets, ... }: {
+{ pkgs, ... }: {
 	# TODO: disable GPG entirely
   programs.gpg.enable = true;
   services.gpg-agent = {

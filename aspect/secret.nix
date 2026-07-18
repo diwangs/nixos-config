@@ -1,4 +1,4 @@
-{ pkgs, agenix, age-secrets, ... }: {
+{ pkgs, agenix, ... }: {
   # Key management (GNOME)
   # gcr is introduced in 25.11
   services.gnome.gcr-ssh-agent.enable = false;  # For SSH, use gpg-agent

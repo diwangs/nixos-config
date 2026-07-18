@@ -16,7 +16,7 @@
 
 # Hibernation is disabled due to security issues (ability to replace kernel)
 
-{ config, lib, pkgs, ... }: {
+{ ... }: {
 	# Disable BT on boot
 	hardware.bluetooth.powerOnBoot = false;
 

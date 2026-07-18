@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }: {
+{ config, pkgs, ... }: {
 	users.mutableUsers = false;
 
 	# Root (Generate with `mkpasswd`)

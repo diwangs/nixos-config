@@ -12,7 +12,7 @@
 # 
 # TODO: instead of doing this, try overriding buildPackages? Like linux_5_4
 
-{ config, lib, pkgs, ... } : {
+{ pkgs, ... } : {
   # LLVM 21.1.2, fails due to missing __kcfi_typeid_clear_page_rep symbol?
 	llvm = pkgs.overrideCC pkgs.llvmPackages.stdenv (
 		pkgs.llvmPackages.stdenv.cc.override {

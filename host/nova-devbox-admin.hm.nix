@@ -1,5 +1,5 @@
-{ config, lib, pkgs, age-secrets, ... }: {
-  home.username = admin;
+{ pkgs, age-secrets, ... }: {
+  home.username = "admin";
   home.homeDirectory = "/home/admin";
   home.stateVersion = "25.05";
 

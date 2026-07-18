@@ -7,7 +7,7 @@
  *  3. systemd strips and prepare salt to `/run/measured-boot/fido2-fde-salt`
  */
 
-{ config, lib, pkgs, secrets, ... }: {
+{ lib, ... }: {
   # Managed systemd-pcrlock policy to unlock `/dev/mapper/fido2-fde-salt`
   boot.lanzaboote.measuredBoot = {
     enable = true;

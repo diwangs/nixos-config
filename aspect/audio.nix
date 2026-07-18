@@ -1,4 +1,4 @@
-{ config, lib, pkgs, ... }: {
+{ ... }: {
 	# Pipewire
 	services.pipewire = {
 		enable = true;

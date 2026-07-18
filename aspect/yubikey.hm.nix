@@ -1,4 +1,4 @@
-{ config, pkgs, lib, secrets, ... }: {
+{ pkgs, lib, ... }: {
   # SSH: uses YubiKey to store the secret key. We use PIV-based for balance
   # of app compatibility (i.e., pinentry-support, card-agent exclusivity):
   # - FIDO2 is buggy in some GUI frontend (e.g., Claude Desktop interprets
