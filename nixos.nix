@@ -2,21 +2,24 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
-{ self, config, lib, pkgs, allowedUnfree, cua, ... }@args: {
+{ self, config, lib, pkgs, agenix, allowedUnfree, cua, nix-flatpak, ... }@args: {
 	imports = [
+		agenix.nixosModules.default
+		cua.nixosModules.cua-driver
+		nix-flatpak.nixosModules.nix-flatpak
+
 		./aspect/audio.nix
 		./aspect/locale.nix
 		./aspect/network.nix
-		# ./aspect/performance.nix
 		./aspect/power.nix
-		# ./aspect/security.nix
 		./aspect/user.nix
 		./aspect/desktop.nix
-		./aspect/key-management.nix
 		./aspect/virtualisation.nix
 		./aspect/secret.nix
+		./aspect/yubikey.nix
 
 		./package/nixos.nix
+    ./package/flatpak.nix
 	];
 
 	nixpkgs.overlays = [
@@ -74,7 +77,7 @@
 				SECURITY_LOCKDOWN_LSM = lib.mkForce yes; 	# Get kernel ready for lockdown mode
 				
 				MODULE_SIG = lib.mkForce yes;							# Generate key, sign module, dump the private part
-				# MODULE_SIG_FORCE?
+				# TODO: MODULE_SIG_FORCE?
 				DEVMEM = lib.mkForce no; # /dev/mem: disable, not needed for 7040
 				# Options for BIOS access for Chromebook
 				# STRICT_DEVMEM = lib.mkForce yes;
@@ -115,6 +118,14 @@
 		enable = true;
 		package = cua.packages.${pkgs.stdenv.hostPlatform.system}.cua-driver;
 	};
+
+	services.flatpak = {
+		enable = true;
+		uninstallUnmanaged = true;
+		overrides.global = {
+			Context.sockets = [ "wayland" "!x11" "!fallback-x11" ];
+		};
+  };
 
 	# Configure keymap in X11
 	# services.xserver.xkb.layout = "us";

@@ -1,5 +1,5 @@
 {
-	description = "NixOS configuration for paladin-iii";
+	description = "diwangs' NixOS and Home Manager config for various machines";
 
 	inputs = {
  		# nixos-hardware
@@ -87,9 +87,6 @@
 			"trezor-suite"
 			"wootility"
 		];
-		# Wraps `claude` to canonicalize PATH for the bwrap Bash sandbox. Static
-		# env (SHELL etc.) is set via settings.json in home-manager.devbox.nix.
-		claudeCodeSandboxPathOverlay = import ./package/overlay/claude-code.nix;
 	in rec {
 		# nixos-rebuild switch --flake path#hostname
 		nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
@@ -100,10 +97,10 @@
 				inherit cua;
 				inherit agenix; # for the CLI package in aspect/secret.nix
 				inherit age-secrets; # .age file paths in aspect/secret.nix
+				inherit lanzaboote;
+				inherit nixos-hardware;
+				inherit nix-flatpak;
 				inherit allowedUnfree;
-
-				# Eval-time secrets (TOML), from the private agenix-secrets input
-				# secrets = agenix-secrets.lib.toml;
 
 				# Modify `allowUnfreePredicate` of `pkgs-stable`
 				# We don't similarly modify `pkgs` here to retain the ability of 
@@ -120,21 +117,11 @@
 				# uses the global `pkgs`. So, define pkgs-modifying overlays on nixos 
 				# even if it is used on home-manager, for consistency.
       };
-			modules = [
-				# Hardware (not portable)
-				nixos-hardware.nixosModules.framework-13-7040-amd
-				lanzaboote.nixosModules.lanzaboote
-				./hardware/hardware-configuration.nix
+			modules = [				
+				./host/paladin-iii.nix # Host-specific config (not portable)
+				./nixos.nix # Portable configs
 
-				# System (packages included)
-				# agenix (secrets configured in aspect/secret.nix)
-				agenix.nixosModules.default
-				# Host-specific agenix identity; the secret aspect is reusable.
-				{ age.identityPaths = [ "/nix/secret/host.key" ]; }
-				cua.nixosModules.cua-driver
-				./nixos.nix
-
-				# Home Manager (packages included)
+				# Home Manager
 				home-manager.nixosModules.home-manager {
 					# To use `pkgs` derived from nixos `nixpkgs` instead of hm specific
 					home-manager.useGlobalPkgs = true;
@@ -142,13 +129,15 @@
 					home-manager.useUserPackages = true;	
 					home-manager.backupFileExtension = "bak";
 					home-manager.extraSpecialArgs = specialArgs; # rec
-					# Home packages are imported inside `home-manager.nix`
-					home-manager.users.diwangs = import ./home-manager.nix;
+					# Home packages and agenix's Home Manager module are imported
+					# inside `home-manager.nix`.
+					home-manager.users.diwangs = {
+						imports = [ 
+							./host/paladin-iii-diwangs.hm.nix				# User-specific
+							./home-manager.nix 											# Portable (desktop)
+						];
+					};
 				}
-
-				# Flatpak (packages included)
-				nix-flatpak.nixosModules.nix-flatpak
-				./flatpak.nix
 			];
 		};
 
@@ -164,7 +153,7 @@
 				pkgs = import nixpkgs {
 					inherit system;
 					overlays = [
-						claudeCodeSandboxPathOverlay
+						(import ./package/overlay/claude-code.nix)
 					];
 					config.allowUnfreePredicate = pkg:
 						builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
@@ -173,45 +162,8 @@
 				# modules must not reference them.
 				extraSpecialArgs = { inherit self allowedUnfree agenix age-secrets; };
 				modules = [
-					# Shared subset of the laptop config
-					./home-manager.devbox.nix
-
-					# agenix (secrets configured in aspect/secret.hm.nix): the
-					# rootless, per-user counterpart to the laptop's NixOS module
-					agenix.homeManagerModules.default
-					# Host-specific identity, provisioned outside this configuration.
-					{ age.identityPaths = [ "/nix/secret/nova-devbox.key" ]; }
-					./aspect/secret.hm.nix
-
-					# Devbox-specific config lives inline here
-					({ pkgs, ... }: {
-						home.username = username;
-						home.homeDirectory = "/home/${username}";
-						home.stateVersion = "25.05";
-
-						# Non-NixOS Linux hosts need profile/session glue that NixOS
-						# normally provides.
-						targets.genericLinux.enable = true;
-						xdg.enable = true;
-						manual.manpages.enable = true;
-
-						home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
-						home.sessionPath = [ "$HOME/.local/bin" ];
-
-						# Headless tools that NixOS provides system-wide on the laptop
-						home.packages = with pkgs; [
-							nano
-							ripgrep
-							tree
-							htop
-							tmux
-							wget
-							curl
-							unzip
-							zip
-							rsync
-						];
-					})
+					./host/nova-devbox-admin.hm.nix							# User-specific
+					./home-manager.devbox.nix										# Portable (devbox)
 				];
 			});
 	};
