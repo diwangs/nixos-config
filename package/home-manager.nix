@@ -1,19 +1,19 @@
-# Home packages are user packages that lacks integrated synchronization 
-# mechanism. User packages that have one (usually account-based), is 
-# preferred to use flatpak instead. To achieve reproducibility, its data is 
+# Home packages are user packages that lacks integrated synchronization
+# mechanism. User packages that have one (usually account-based), is
+# preferred to use flatpak instead. To achieve reproducibility, its data is
 # snapshoted.
-# 
+#
 # Example of home packages: vscodium, starship, zsh, obs
 # Example of flatpak packages: steam, brave browser
-# 
+#
 # Few advantages of this approach:
 # 1. Doesn't snapshot some authentication token
-# 2. This kind of packages are usually closed-source, so we avoid unfree 
+# 2. This kind of packages are usually closed-source, so we avoid unfree
 # 		packages in Nix
-# 
+#
 # While this approach is not perfectly reproducible in hash sense
-# it is reproducible in the synchronization sense, since the data are 
-# snapshoted 
+# it is reproducible in the synchronization sense, since the data are
+# snapshoted
 
 { config, lib, pkgs, pkgs-stable, secrets, ... }:
 let
@@ -61,7 +61,7 @@ in rec {
 				2> >(grep -v "is not in the list of known options, but still passed to Electron/Chromium" >&2)
 		'')
 	];
-	
+
 	# Dev (direnv and gh live in home-manager.devbox.nix)
 	programs.java = { # Aside from installing jdk (latest LTS), this sets JAVA_HOME
 		enable = true;
@@ -107,7 +107,7 @@ in rec {
 				# DevEx
 				mkhl.direnv
 				ms-vscode-remote.remote-ssh			# Unfree
-				
+
 				# Language support
 				bbenoist.nix
 				unifiedjs.vscode-mdx
@@ -169,7 +169,59 @@ in rec {
 		};
 	};
 
-	# CLI-based agents (Claude Code, Codex): home-manager.devbox.nix
+	# IDE: Zed
+	programs.zed-editor = {
+		enable = true;
+		mutableUserSettings = false;
+		extensions = [ "nix" ];
+		userSettings = {
+			# Feed each project's direnv (.envrc) into the env Zed computes for the
+			# terminal and language servers. NB: this path does NOT reach the ACP
+			# agent processes below — Zed resolves the "project environment" in
+			# several disjoint code paths and the custom agent_servers command is
+			# not one of them (zed-industries/zed#56099) — so the agents load direnv
+			# themselves via the `direnv exec .` wrapper.
+			load_direnv = "direct";
+			# External agents speak ACP over stdio. Each entry below is a custom
+			# command server (Zed requires `command`); we pin both the adapter and
+			# the underlying CLI to the Nix store — instead of Zed's runtime,
+			# registry-downloaded adapters — so the overlay-applied native CLIs are
+			# always the ones that run.
+			#
+			# `direnv exec .` wraps every agent: it loads the project's .envrc
+			# (walking up from Zed's project-root cwd; nix-direnv `use flake` works
+			# via ~/.config/direnv/direnvrc) and execs the adapter with that env
+			# merged in, so per-project Bedrock config (AWS_REGION, AWS_PROFILE,
+			# AWS_BEARER_TOKEN_BEDROCK, CLAUDE_CODE_USE_BEDROCK, model pins) reaches
+			# the agent. The `env` entries below are set on the `direnv` process and
+			# pass straight through. Requires the project's .envrc to be
+			# `direnv allow`ed; direnv's diagnostics go to stderr, so they don't
+			# corrupt the ACP JSON-RPC stream on stdout.
+			agent_servers = {
+				# Use the native Codex app server so model metadata and Bedrock
+				# support stay in sync with the installed Codex CLI.
+				"codex-acp" = {
+					command = lib.getExe pkgs.direnv;
+					args = [ "exec" "." (lib.getExe pkgs.codex-acp) ];
+					env = {
+						CODEX_PATH = lib.getExe pkgs.codex;
+					};
+				};
+				# claude-agent-acp starts the ACP server on stdio (no args) and
+				# drives Claude Code via CLAUDE_CODE_EXECUTABLE (auth handled by the
+				# claude CLI itself). pkgs.claude-agent-acp already defaults this to
+				# the overlaid `claude` through callPackage; we set it explicitly to
+				# mirror the Codex pattern and keep the intent visible.
+				"claude-code-acp" = {
+					command = lib.getExe pkgs.direnv;
+					args = [ "exec" "." (lib.getExe pkgs.claude-agent-acp) ];
+					env = {
+						CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
+					};
+				};
+			};
+		};
+	};
 
 	# CLI-based agent orchestrator
 	programs.t3code = {

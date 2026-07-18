@@ -184,6 +184,7 @@ exit 0
 		run rm -f "$dst"
 		run install -Dm600 ${(pkgs.formats.toml { }).generate "codex-config.toml" {
 			model_provider = "amazon-bedrock";
+			model_providers."amazon-bedrock".aws.region = "us-east-1";
 			approval_policy = "on-request";
 			approvals_reviewer = "auto_review";
 			model = "openai.gpt-5.6-terra";
