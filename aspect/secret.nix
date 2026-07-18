@@ -35,5 +35,6 @@
   ];
 
   # Unlike HM, this doesn't depend on UID
-  age.identityPaths = [ "/etc/nixos/.age-identity" ];
+  # Make sure it resides in a mountpoint that is `neededForBoot`
+  age.identityPaths = [ "/nix/secret/.age-identity" ];
 }
