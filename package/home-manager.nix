@@ -45,7 +45,6 @@ in
       ansible
       sshpass
       ansible-lint
-      nixd # Nix LSP
 
       # Agentic
       claude-desktop
@@ -79,6 +78,7 @@ in
     enable = true;
     package = pkgs.jdk25; # Latest LTS
   };
+
   programs.git = {
     enable = true;
     lfs.enable = true;
@@ -99,6 +99,28 @@ in
     };
   };
   xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
+
+  # GUI IDE: Zed
+  programs.zed-editor = {
+    package = lib.mkForce pkgs.zed-editor; # force, since in devbox it's empty
+    installRemoteServer = lib.mkForce false; # GUI needs no server symlink
+    userSettings = {
+      # Keep this client-specific
+      # Right dock width of 250p fit 80-columned code perfectly on 1080p width
+      project_panel.default_width = 250;
+      git_panel.default_width = 250;
+      collaboration_panel.default_width = 250;
+      outline_panel.default_width = 250;
+
+      # agent.default_width = 1080;
+
+      ssh_connections = [
+        {
+          host = "nova-devbox";
+        }
+      ];
+    };
+  };
 
   # IDE: VSCode official
   programs.vscode = {
@@ -182,65 +204,6 @@ in
         "codeQL.githubDatabase.download" = "never";
         "codeQL.runningQueries.memory" = 8192;
       };
-    };
-  };
-
-  # IDE: Zed
-  programs.zed-editor = {
-    enable = true;
-    mutableUserSettings = false;
-    extensions = [ "nix" ];
-    userSettings = {
-      # Right dock width of 250p fit 80-columned code perfectly on 1080p width
-      project_panel.default_width = 250;
-      git_panel.default_width = 250;
-      collaboration_panel.default_width = 250;
-      outline_panel.default_width = 250;
-
-      # agent.default_width = 1080;
-
-      # Feed each project's direnv (.envrc) into the environment Zed computes
-      # for terminals, language servers, and external ACP agent servers.
-      load_direnv = "direct";
-      # External agents speak ACP over stdio. Each entry below is a custom
-      # command server (Zed requires `command`); we pin both the adapter and
-      # the underlying CLI to the Nix store — instead of Zed's runtime,
-      # registry-downloaded adapters — so the overlay-applied native CLIs are
-      # always the ones that run.
-      agent_servers = {
-        # Use the native Codex app server so model metadata and Bedrock
-        # support stay in sync with the installed Codex CLI.
-        "codex-acp" = {
-          command = lib.getExe pkgs.codex-acp;
-          env = {
-            CODEX_PATH = lib.getExe pkgs.codex;
-          };
-        };
-        # claude-agent-acp starts the ACP server on stdio (no args) and
-        # drives Claude Code via CLAUDE_CODE_EXECUTABLE (auth handled by the
-        # claude CLI itself). pkgs.claude-agent-acp already defaults this to
-        # the overlaid `claude` through callPackage; we set it explicitly to
-        # mirror the Codex pattern and keep the intent visible.
-        "claude-code-acp" = {
-          command = lib.getExe pkgs.claude-agent-acp;
-          env = {
-            CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
-          };
-        };
-        # opencode speaks ACP natively via its own `acp` subcommand, unlike
-        # Codex/Claude Code which need a separate adapter binary.
-        "opencode" = {
-          command = lib.getExe pkgs.opencode;
-          args = [ "acp" ];
-          env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
-        };
-      };
-      languages.Nix.language_servers = [
-        "nixd"
-        "!nil"
-      ];
-      lsp.nixd.settings.nixd.options.nixos.expr =
-        "(builtins.getFlake \"/etc/nixos\").nixosConfigurations.paladin-iii.options";
     };
   };
 

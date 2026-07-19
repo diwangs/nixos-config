@@ -17,6 +17,7 @@
     # Little tools
     jq # JSON parser
     awscli2
+    nixd # Nix LSP for Zed and ACP agents
 
     # Claude Code sandboxed Bash tool (Linux): bubblewrap enforces the
     # filesystem/network boundary, socat relays traffic through the proxy.
@@ -34,8 +35,49 @@
   };
   programs.gh.enable = true;
 
-  # OpenCode starts a language server when it opens a matching file. Include
-  # nixd in its wrapped PATH so Nix diagnostics work from Zed's ACP server too.
+  # Zed server
+  programs.zed-editor = {
+    enable = true;
+    # Deliberately-empty package — only its `remote_server` passthru matters —
+    # so the module's own installRemoteServer logic (package ? remote_server)
+    # symlinks the matching server binary without installing the full GUI.
+    package = pkgs.emptyDirectory.overrideAttrs (old: {
+      passthru = (old.passthru or { }) // {
+        inherit (pkgs.zed-editor) remote_server remoteServerExecutableName;
+      };
+    });
+    installRemoteServer = true;
+    mutableUserSettings = false;
+    extensions = [ "nix" ];
+    userSettings = {
+      # Feed each project's direnv (.envrc) into the environment Zed computes
+      # for terminals, language servers, and external ACP agent servers.
+      load_direnv = "direct";
+      # External agents speak ACP over stdio. Pin each executable to the Nix
+      # store rather than relying on Zed's runtime-downloaded adapters.
+      agent_servers = {
+        "codex-acp" = {
+          command = lib.getExe pkgs.codex-acp;
+          env.CODEX_PATH = lib.getExe pkgs.codex;
+        };
+        "claude-code-acp" = {
+          command = lib.getExe pkgs.claude-agent-acp;
+          env.CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
+        };
+        "opencode" = {
+          command = lib.getExe pkgs.opencode;
+          args = [ "acp" ];
+          env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
+        };
+      };
+      languages.Nix.language_servers = [
+        "nixd"
+        "!nil"
+      ];
+    };
+  };
+
+  # CLI Agent: OpenCode
   programs.opencode = {
     enable = true;
     extraPackages = [ pkgs.nixd ];
@@ -43,7 +85,7 @@
       lsp = true;
       plugin = [ "opencode-landstrip" ];
       permission = {
-        "*" = "allow";  # TODO: copy the bash policy to other tools
+        "*" = "allow"; # TODO: copy the bash policy to other tools
       };
     };
     tui.plugin = [ "opencode-landstrip/tui" ];
@@ -108,7 +150,7 @@
     };
   };
 
-  # CLI-based agent: Claude Code
+  # CLI agent: Claude Code
   # NOTE: `settings` is intentionally left empty. home-manager writes
   # settings.json as a read-only /nix/store symlink, which makes Claude Code's
   # own runtime writes (e.g. adjusting the effort level) fail with EROFS. We
@@ -266,7 +308,7 @@
       } "$dst"
     	'';
 
-  # CLI-based agent: Codex
+  # CLI agent: Codex
   programs.codex = {
     enable = true;
     settings = { }; # Intentionally empty to allow mutability (e.g., dir trust)
