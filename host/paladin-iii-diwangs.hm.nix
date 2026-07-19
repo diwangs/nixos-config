@@ -3,7 +3,7 @@
   home.stateVersion = "25.05";
 
   age.identityPaths = [
-    "/home/diwangs/.config/home-manager/.age-identity"
+    "/home/diwangs/.local/state/nix/secret/.age-identity"
   ];
 
   # Decrypt files to `/run/user/$UID/agenix/`
