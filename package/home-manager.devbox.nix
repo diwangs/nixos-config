@@ -85,7 +85,33 @@
       lsp = true;
       plugin = [ "opencode-landstrip" ];
       permission = {
-        "*" = "allow"; # TODO: copy the bash policy to other tools
+        "*" = "allow";
+        # Mirrors the bash sandbox below (xdg.configFile "opencode/sandbox.json"):
+        # deny the whole home directory by default and re-allow only the same
+        # few safe subtrees, rather than a short blocklist of specific secret
+        # dirs. External paths (this is the only place they're gated: it's
+        # checked, with the absolute path, before and independently of
+        # `read`/`edit` — whose own patterns are worktree-relative and never
+        # observe an absolute path at all).
+        #
+        # Granularity note: every query here is "immediate children of some
+        # directory D", and a configured pattern's `*`/`**` both expand to the
+        # same unbounded regex wildcard (no single- vs. multi-segment
+        # distinction) — so, unlike the bash sandbox, a lone top-level dotfile
+        # can't be carved out of the deny without reopening all of home's top
+        # level to listing. The bash sandbox's `~/.gitconfig` exception is
+        # therefore intentionally dropped here: it stays denied.
+        external_directory = {
+          "*" = "allow";
+          "~/**" = "deny";
+          "~/.config/**" = "allow";
+          "~/.local/share/**" = "allow";
+          "~/.local/share/opencode/**" = "deny"; # antipattern: secrets in `share`
+          "~/.cache/**" = "allow";
+          "/nix/secret/**" = "deny"; # agenix host key
+          "/run/agenix/**" = "deny"; # decrypted agenix secrets (nixos module)
+          "/run/user/*/agenix/**" = "deny"; # decrypted agenix secrets (home-manager module)
+        };
       };
     };
     tui.plugin = [ "opencode-landstrip/tui" ];
