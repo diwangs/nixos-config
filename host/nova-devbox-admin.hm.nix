@@ -9,10 +9,12 @@
   xdg.enable = true;
   manual.manpages.enable = true;
 
-  home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
-  home.sessionPath = [ "$HOME/.local/bin" ];
+  # Secrets it can decrypt
+  age.secrets."token/bedrock".file = age-secrets.token.bedrock;
 
   # Headless tools that NixOS provides system-wide on the laptop
+  home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
+  home.sessionPath = [ "$HOME/.local/bin" ];
   home.packages = with pkgs; [
     nano
     ripgrep
@@ -25,7 +27,4 @@
     zip
     rsync
   ];
-
-  age.identityPaths = [ "/nix/secret/nova-devbox.key" ];
-  age.secrets."token/bedrock".file = age-secrets.token.bedrock;
 }

@@ -20,6 +20,11 @@
   #   flake.nix, NOT in git, no sshd involved. Back it up offline.
   # - Human (agenix -e): YubiKey PIV P-256 via age-plugin-yubikey.
 
+  # Unlike HM, this doesn't depend on UID
+  # Make sure it resides in a mountpoint that is `neededForBoot`
+  # If it is ever changed, be sure to switch twice for measured boot
+  age.identityPaths = [ "/nix/secret/.age-identity" ];
+
   # Use rage (Rust) instead of Go age, for both boot-time decryption and the
   # editing CLI. Same format + plugin protocol, so .age files are unaffected.
   age.ageBin = "${pkgs.rage}/bin/rage";
@@ -32,11 +37,4 @@
     pkgs.rage # for manual decrypt/inspect (matches what boot activation runs)
     pkgs.age-plugin-yubikey
   ];
-
-  # Unlike HM, this doesn't depend on UID
-  # Make sure it resides in a mountpoint that is `neededForBoot`
-  # If it is ever changed, be sure to switch twice for measured boot
-  age.identityPaths = [ "/nix/secret/.age-identity" ];
-  # Is this needed?
-  # systemd.tmpfiles.rules = [ "d /nix/secret 0700 root root -" ];
 }

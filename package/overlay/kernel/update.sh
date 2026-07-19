@@ -14,6 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KERNEL_NIX="$SCRIPT_DIR/kernel.nix"
+NIXOS_NIX="$SCRIPT_DIR/../../../nixos.nix"
 
 err()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
@@ -27,6 +28,7 @@ for cmd in curl jq nix-prefetch-url sed awk grep; do
   command -v "$cmd" >/dev/null || err "missing required command: $cmd"
 done
 [[ -f "$KERNEL_NIX" ]] || err "kernel.nix not found at $KERNEL_NIX"
+[[ -f "$NIXOS_NIX" ]] || err "nixos.nix not found at $NIXOS_NIX"
 
 info "Fetching releases from anthraxx/linux-hardened..."
 all_tags=$(
@@ -99,10 +101,12 @@ update_block() {
   local new_mm; new_mm="$(mm_of "$new_version")"             # "7.0" / "7.1"
   local new_ver_under="${new_version//./_}"                  # "7_0_10" / "7_1"
 
-  local start end
+  local start end block_indent
   start=$(grep -nE "$marker_re" "$KERNEL_NIX" | head -n1 | cut -d: -f1)
   [[ -n "$start" ]] || err "could not locate $kind block marker (/$marker_re/)"
-  end=$(awk -v s="$start" 'NR>=s && /^  \}\);/ {print NR; exit}' "$KERNEL_NIX")
+  block_indent=$(sed -n "$((start + 1))s/[^[:space:]].*$//p" "$KERNEL_NIX")
+  end=$(awk -v s="$start" -v closing="${block_indent});" \
+    'NR >= s && $0 == closing { print NR; exit }' "$KERNEL_NIX")
   [[ -n "$end" ]] || err "could not locate end of $kind block"
 
   local block cur_version cur_extra cur_full cur_mm cur_ver_under
@@ -117,9 +121,11 @@ update_block() {
   cur_mm="$(mm_of "$cur_version")"
   cur_ver_under="${cur_version//./_}"
 
-  local cur_kernel_sha cur_patch_sha
-  mapfile -t shas < <(echo "$block" | grep -oE 'sha256 *= *"[^"]+"' \
-                      | sed -E 's/.*"([^"]+)"$/\1/')
+  local cur_kernel_sha cur_patch_sha sha_lines
+  local -a shas
+  sha_lines=$(echo "$block" | grep -oE 'sha256 *= *"[^"]+"' \
+              | sed -E 's/.*"([^"]+)"$/\1/')
+  mapfile -t shas <<< "$sha_lines"
   cur_kernel_sha="${shas[0]:-}"
   cur_patch_sha="${shas[1]:-}"
   [[ -n "$cur_kernel_sha" && -n "$cur_patch_sha" ]] \
@@ -145,6 +151,16 @@ update_block() {
   }" "$KERNEL_NIX"
 }
 
+update_stable_overlay_reference() {
+  local version="${1%-hardened*}"
+  local version_under="${version//./_}"
+  local pattern='^[[:space:]]*\.linuxKernel_[0-9_]+_hardenedOverlay$'
+
+  grep -qE "$pattern" "$NIXOS_NIX" \
+    || err "could not locate stable kernel overlay reference in $NIXOS_NIX"
+  sed -i -E "s|^([[:space:]]*)\.linuxKernel_[0-9_]+_hardenedOverlay$|\\1.linuxKernel_${version_under}_hardenedOverlay|" "$NIXOS_NIX"
+}
+
 info "Hashing stable ($latest_stable)..."
 stable_version="${latest_stable%-hardened*}"
 stable_kernel_sha=$(prefetch_kernel "$stable_version")
@@ -161,6 +177,7 @@ lts_patch_sha=$(prefetch_patch  "$latest_lts")
 
 update_block stable '# Latest stable from anthraxx' \
   "$latest_stable" "$stable_kernel_sha" "$stable_patch_sha"
+update_stable_overlay_reference "$latest_stable"
 
 update_block lts '# Backup: Latest LTS' \
   "$latest_lts" "$lts_kernel_sha" "$lts_patch_sha"

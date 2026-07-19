@@ -5,6 +5,7 @@
 { agenix, ... }: {
   imports = [
     agenix.homeManagerModules.default
+    ./aspect/secret.hm.nix
     ./aspect/shell.hm.nix
 
     ./package/home-manager.devbox.nix
