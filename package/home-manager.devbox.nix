@@ -34,6 +34,80 @@
   };
   programs.gh.enable = true;
 
+  # OpenCode starts a language server when it opens a matching file. Include
+  # nixd in its wrapped PATH so Nix diagnostics work from Zed's ACP server too.
+  programs.opencode = {
+    enable = true;
+    extraPackages = [ pkgs.nixd ];
+    settings = {
+      lsp = true;
+      plugin = [ "opencode-landstrip" ];
+      permission = {
+        "*" = "allow";  # TODO: copy the bash policy to other tools
+      };
+    };
+    tui.plugin = [ "opencode-landstrip/tui" ];
+  };
+
+  # Config for bash tool landstrip sandbox
+  # NOTE: at this current version, there is a bypass intended to make session-
+  # level exception by doing the syscall twice. Re-check in the future if there
+  # is a more user-dependent authorization flow.
+  xdg.configFile."opencode/sandbox.json".text = builtins.toJSON {
+    enabled = true;
+    network = {
+      # AF_UNIX
+      allowAllUnixSockets = false;
+      allowUnixSockets = [
+        "/nix/var/nix/daemon-socket/socket"
+      ];
+      # AF_INET: denied by default, re-deny if ancestor got allowed
+      allowNetwork = false;
+      allowLocalBinding = true;
+      allowedDomains = [ "*" ];
+      deniedDomains = [ ];
+    };
+    filesystem = {
+      # fs read: allowed by default, re-allow if ancestor got denied
+      denyRead = [
+        "/nix/secret"
+        "/run/agenix"
+        "/run/user/*/agenix"
+        # user agenix key is stored at `~/.local/state`, which is covered below
+
+        "~"
+        "~/.local/share/opencode/auth.json" # antipattern: secrets in `share`
+      ];
+      allowRead = [
+        "~/.gitconfig"
+        "~/.config"
+        "~/.local/share"
+        "~/.cache"
+
+        "."
+      ];
+      # fs write: denied by default, re-deny if ancestor got allowed
+      allowWrite = [
+        "/dev/null"
+        "/tmp"
+
+        "~/.local/state"
+        "~/.local/share"
+        "~/.cache"
+
+        "."
+      ];
+      denyWrite = [
+        "~/.config/opencode/sandbox.json"
+        ".opencode/sandbox.json"
+        "**/.env"
+        "**/.env.*"
+        "**/*.pem"
+        "**/*.key"
+      ];
+    };
+  };
+
   # CLI-based agent: Claude Code
   # NOTE: `settings` is intentionally left empty. home-manager writes
   # settings.json as a read-only /nix/store symlink, which makes Claude Code's

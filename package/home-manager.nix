@@ -73,15 +73,7 @@ in
         		'')
     ];
 
-  # OpenCode starts a language server when it opens a matching file. Include
-  # nixd in its wrapped PATH so Nix diagnostics work from Zed's ACP server too.
-  programs.opencode = {
-    enable = true;
-    extraPackages = [ pkgs.nixd ];
-    settings.lsp = true;
-  };
-
-  # Dev (direnv and gh live in home-manager.devbox.nix)
+  # Dev (OpenCode, direnv, and gh live in home-manager.devbox.nix)
   programs.java = {
     # Aside from installing jdk (latest LTS), this sets JAVA_HOME
     enable = true;
@@ -199,6 +191,14 @@ in
     mutableUserSettings = false;
     extensions = [ "nix" ];
     userSettings = {
+      # Right dock width of 250p fit 80-columned code perfectly on 1080p width
+      project_panel.default_width = 250;
+      git_panel.default_width = 250;
+      collaboration_panel.default_width = 250;
+      outline_panel.default_width = 250;
+
+      # agent.default_width = 1080;
+
       # Feed each project's direnv (.envrc) into the environment Zed computes
       # for terminals, language servers, and external ACP agent servers.
       load_direnv = "direct";
