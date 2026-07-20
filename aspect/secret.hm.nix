@@ -50,17 +50,20 @@
         "/nix/secret" # age identity key (root)
         config.home.homeDirectory # age identity key (user), okay apps secrets
 
-        # Current directory
-        ".env" # .envrc is fine since we `cat` from agenix
+        "${config.xdg.configHome}/zsh/.zsh_history"
+
+        "**/.env*" # .envrc is fine since we `cat` from agenix
       ];
       allowRead = [
         config.xdg.configHome
         config.xdg.dataHome
         config.xdg.stateHome
         config.xdg.cacheHome
-
         "${config.home.homeDirectory}/.bash_profile" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
+        # Agent settings
+        "${config.home.homeDirectory}/.claude/settings.json"
+        "${config.home.homeDirectory}/.claude/settings.local.json"
 
         "."
       ];
@@ -77,8 +80,13 @@
         "."
       ];
       denyWrite = [
-        ".envrc"
-        ".git/commondir" # CVE-2026-?
+        # Agent local settings (may disable sandbox next session)
+        ".claude/settings.json"
+        ".claude/settings.local.json"
+
+        # rc-style script (except shell since they source from nix store)
+        "**/.git/commondir" # CVE-2026-?
+        "**/.envrc"
       ];
     };
   };

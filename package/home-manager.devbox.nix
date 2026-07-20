@@ -81,50 +81,6 @@
   programs.claude-code = {
     enable = true;
     settings = { };
-
-    # Custom auto-deny classifier for the Bash tool: an additive hard-block layer
-    # on top of landstrip (the OS enforcement floor) and the auto-mode classifier.
-    # It inspects the ORIGINAL command (landstrip wrapping happens transparently
-    # inside $CLAUDE_CODE_SHELL, so the command string Claude sees is untouched)
-    # and denies known sandbox-escape / secret-exfil patterns. Fail-open by
-    # design — any internal error falls through to exit 0, since landstrip still
-    # contains whatever ultimately runs. Extend the pattern list as needed.
-    hooks."claude-landstrip-deny" = ''
-      #!${pkgs.runtimeShell}
-      # Read the PreToolUse payload; bail out (allow) on any parsing trouble.
-      input="$(cat)" || exit 0
-      cmd="$(printf '%s' "$input" | ${pkgs.jq}/bin/jq -r '.tool_input.command // empty' 2>/dev/null)" || exit 0
-      [ -n "$cmd" ] || exit 0
-
-      deny() {
-        ${pkgs.jq}/bin/jq -cn --arg r "$1" \
-          '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}' 2>/dev/null
-        exit 0
-      }
-      m() { printf '%s' "$cmd" | ${pkgs.gnugrep}/bin/grep -Eiq -- "$1"; }
-
-      # --- privilege escalation / sandbox tooling ---
-      m '(^|[^[:alnum:]_])(sudo|doas|pkexec)([^[:alnum:]_]|$)' \
-        && deny "privilege escalation (sudo/doas/pkexec) is blocked in the sandbox"
-      m '(^|[^[:alnum:]_])(bwrap|bubblewrap|unshare)([^[:alnum:]_]|$)' \
-        && deny "invoking namespace/sandbox tooling is blocked"
-      m 'CLAUDE_CODE_SHELL' \
-        && deny "tampering with CLAUDE_CODE_SHELL is blocked"
-
-      # --- config / rc tampering (would alter the sandbox or shell on next run) ---
-      m '\.claude/settings(\.local)?\.json' \
-        && deny "editing Claude Code settings.json is blocked"
-      m '>[[:space:]>]*([^[:space:];|&]*/)?\.(bashrc|bash_profile|profile|zshrc|zprofile|zshenv)([^[:alnum:]]|$)' \
-        && deny "writing shell rc files is blocked"
-
-      # --- network exfiltration heuristics (landstrip runs with open network) ---
-      m '(curl|wget)[^|;&]*[|][[:space:]]*(sudo[[:space:]]+)?(ba)?sh([^[:alnum:]]|$)' \
-        && deny "piping a network download into a shell is blocked"
-      m '(id_ed25519|id_rsa|\.age-identity|/\.ssh/|/\.aws/|/\.gnupg/|credentials)[^|;&]*[|][^|]*(curl|wget|nc|ncat|netcat|socat|scp)' \
-        && deny "piping secret material to the network is blocked"
-
-      exit 0
-    '';
   };
 
   # Copy settings.json into place as a real, writable file so Claude Code can
@@ -155,7 +111,7 @@
               is flat deny -> ask -> allow path. Landstrip's home policy can't
               be applied directly to Claude Code. We therefore turn the home
               directory from deny to allow, and create a new explicit denylist
-              to restrict sensitive directory under home.
+              to restrict sensitive directory (okay and bad apps) under home.
             */
             landstripReadDenyGlobs = lib.concatMap toClaudeGlobs (
               builtins.filter (
@@ -165,7 +121,8 @@
             landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
 
             homeSecretGlobs = [
-              "~/*" # Direct children only
+              "~/*" # Direct children files
+              "~/.*" # Direct children dotfiles
 
               "~/.aws/**"
               "~/.ssh/**"
@@ -179,17 +136,26 @@
               "~/Pictures/**"
               "~/Videos/**"
             ];
+
+            # Read-only: readable (not in Read deny), but not directly editable.
+            homeReadOnlyGlobs = [
+              "~/.claude/settings.json"
+              "~/.claude/settings.local.json"
+            ];
           in
           {
             "$schema" = "https://json.schemastore.org/claude-code-settings.json";
             defaultMode = "auto";
-            # tui = "default"; # Prevent spammy ctrl+g
+            tui = "fullscreen";
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
               CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
               # Route Bash tool through landstrip, but keep ! unsandboxed
+              # NOTE: Landstrip has a --trap-fd mechanism to allow session
+              # level exception. For now this is disabled entirely.
               SHELL = "${pkgs.bashInteractive}/bin/bash";
               CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
+                unset $(compgen -A export | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|API_KEY|PASSWORD)')
                 exec ${lib.getExe pkgs.landstrip} -p ${
                   (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
                     landstripPolicyBase
@@ -200,7 +166,10 @@
             permissions.deny =
               (map (g: "Read(${g})") (landstripReadDenyGlobs ++ homeSecretGlobs))
               ++ (map (g: "Edit(${g})") (
-                landstripReadDenyGlobs ++ landstripWriteDenyGlobs ++ homeSecretGlobs
+                landstripReadDenyGlobs
+                ++ landstripWriteDenyGlobs
+                ++ homeSecretGlobs
+                ++ homeReadOnlyGlobs
               ))
               # Mirrors landstripPolicyBase's network policy for the Bash
               # tool (deniedDomains is currently empty, so this is a no-op
@@ -211,20 +180,6 @@
               # lists aren't documented anywhere in this repo or upstream.
               ++ (map (d: "WebFetch(domain:${d})") landstripPolicyBase.network.deniedDomains);
             sandbox.enabled = false;
-            # Run the custom auto-deny classifier before every Bash command.
-            # landstrip is the OS enforcement floor; this hard-blocks a few
-            # escape/exfil patterns before the command ever reaches landstrip.
-            hooks.PreToolUse = [
-              {
-                matcher = "Bash";
-                hooks = [
-                  {
-                    type = "command";
-                    command = "${config.programs.claude-code.configDir}/hooks/claude-landstrip-deny";
-                  }
-                ];
-              }
-            ];
           }
         )
       } "$dst"
