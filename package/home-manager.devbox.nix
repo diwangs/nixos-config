@@ -165,19 +165,19 @@
             landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
 
             homeSecretGlobs = [
-              "~/.zsh_history"
-              "~/.age-identity" # agenix identity key
+              "~/*" # Direct children only
+
               "~/.aws/**"
               "~/.ssh/**"
               "~/.gnupg/**"
               "~/.claude/.credentials.json" # Claude Code OAuth token
 
-              "~/Desktop"
-              "~/Documents"
-              "~/Downloads"
-              "~/Music"
-              "~/Pictures"
-              "~/Videos"
+              "~/Desktop/**"
+              "~/Documents/**"
+              "~/Downloads/**"
+              "~/Music/**"
+              "~/Pictures/**"
+              "~/Videos/**"
             ];
           in
           {
@@ -186,7 +186,7 @@
             # tui = "default"; # Prevent spammy ctrl+g
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
-              CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0";
+              CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
               # Route Bash tool through landstrip, but keep ! unsandboxed
               SHELL = "${pkgs.bashInteractive}/bin/bash";
               CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
