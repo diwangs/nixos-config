@@ -38,7 +38,7 @@
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     self.inputs.nix-vscode-extensions.overlays.default
-    (import ./package/overlay/claude-code.nix)
+    (import ./package/overlay/landstrip.nix)
     # (import ./package/overlay/codex-acp.nix)
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
@@ -70,6 +70,13 @@
   # Define here instead of flake.nix to avoid replacing the whole pkgs
   nixpkgs.config.allowUnfreePredicate =
     pkg: builtins.elem (lib.getName pkg) allowedUnfree;
+
+  # Project-local `/sandbox` choices override user settings. Managed settings
+  # have higher precedence, keeping Claude's bubblewrap sandbox disabled in
+  # favor of the Landstrip wrapper configured in home-manager.devbox.nix.
+  environment.etc."claude-code/managed-settings.json".text = builtins.toJSON {
+    sandbox.enabled = false;
+  };
 
   # Replace stdenv with Clang/LLVM and compile with NixOS' hardening
   # This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)

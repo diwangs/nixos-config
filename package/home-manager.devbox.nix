@@ -6,6 +6,7 @@
   config,
   pkgs,
   lib,
+  landstripPolicyBase, # shared sandbox policy, defined in aspect/secret.hm.nix
   ...
 }:
 {
@@ -14,18 +15,13 @@
     fnm # Node.js version manager 					(eval $(fnm env))
     uv # Python environment manager
 
+    # DevEx
+    nixd # Nix LSP for Zed and ACP agents
+    tmux
+
     # Little tools
     jq # JSON parser
     awscli2
-    nixd # Nix LSP for Zed and ACP agents
-
-    # Claude Code sandboxed Bash tool (Linux): bubblewrap enforces the
-    # filesystem/network boundary, socat relays traffic through the proxy.
-    # The optional seccomp helper (@anthropic-ai/sandbox-runtime, npm-global)
-    # is intentionally skipped: without it Unix-socket blocking is absent,
-    # which keeps ssh-agent reachable for `git push` from sandboxed Bash.
-    bubblewrap
-    socat
   ];
 
   # Dev
@@ -77,11 +73,169 @@
     };
   };
 
+  # CLI agent: Claude Code
+  # NOTE: `settings` is intentionally left empty. home-manager writes
+  # settings.json as a read-only /nix/store symlink, which makes Claude Code's
+  # own runtime writes (e.g. adjusting the effort level) fail with EROFS. We
+  # instead materialize a writable copy in the activation script below.
+  programs.claude-code = {
+    enable = true;
+    settings = { };
+
+    # Custom auto-deny classifier for the Bash tool: an additive hard-block layer
+    # on top of landstrip (the OS enforcement floor) and the auto-mode classifier.
+    # It inspects the ORIGINAL command (landstrip wrapping happens transparently
+    # inside $CLAUDE_CODE_SHELL, so the command string Claude sees is untouched)
+    # and denies known sandbox-escape / secret-exfil patterns. Fail-open by
+    # design — any internal error falls through to exit 0, since landstrip still
+    # contains whatever ultimately runs. Extend the pattern list as needed.
+    hooks."claude-landstrip-deny" = ''
+      #!${pkgs.runtimeShell}
+      # Read the PreToolUse payload; bail out (allow) on any parsing trouble.
+      input="$(cat)" || exit 0
+      cmd="$(printf '%s' "$input" | ${pkgs.jq}/bin/jq -r '.tool_input.command // empty' 2>/dev/null)" || exit 0
+      [ -n "$cmd" ] || exit 0
+
+      deny() {
+        ${pkgs.jq}/bin/jq -cn --arg r "$1" \
+          '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}' 2>/dev/null
+        exit 0
+      }
+      m() { printf '%s' "$cmd" | ${pkgs.gnugrep}/bin/grep -Eiq -- "$1"; }
+
+      # --- privilege escalation / sandbox tooling ---
+      m '(^|[^[:alnum:]_])(sudo|doas|pkexec)([^[:alnum:]_]|$)' \
+        && deny "privilege escalation (sudo/doas/pkexec) is blocked in the sandbox"
+      m '(^|[^[:alnum:]_])(bwrap|bubblewrap|unshare)([^[:alnum:]_]|$)' \
+        && deny "invoking namespace/sandbox tooling is blocked"
+      m 'CLAUDE_CODE_SHELL' \
+        && deny "tampering with CLAUDE_CODE_SHELL is blocked"
+
+      # --- config / rc tampering (would alter the sandbox or shell on next run) ---
+      m '\.claude/settings(\.local)?\.json' \
+        && deny "editing Claude Code settings.json is blocked"
+      m '>[[:space:]>]*([^[:space:];|&]*/)?\.(bashrc|bash_profile|profile|zshrc|zprofile|zshenv)([^[:alnum:]]|$)' \
+        && deny "writing shell rc files is blocked"
+
+      # --- network exfiltration heuristics (landstrip runs with open network) ---
+      m '(curl|wget)[^|;&]*[|][[:space:]]*(sudo[[:space:]]+)?(ba)?sh([^[:alnum:]]|$)' \
+        && deny "piping a network download into a shell is blocked"
+      m '(id_ed25519|id_rsa|\.age-identity|/\.ssh/|/\.aws/|/\.gnupg/|credentials)[^|;&]*[|][^|]*(curl|wget|nc|ncat|netcat|socat|scp)' \
+        && deny "piping secret material to the network is blocked"
+
+      exit 0
+    '';
+  };
+
+  # Copy settings.json into place as a real, writable file so Claude Code can
+  # persist runtime changes (effort level, etc.). Runs unconditionally on
+  # every switch and every boot, so any runtime edits are reset to these
+  # declarative defaults on the next activation.
+  home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    		dst="$HOME/.claude/settings.json"
+    		run rm -f "$dst"
+    		run install -Dm600 ${
+        (pkgs.formats.json { }).generate "claude-code-settings.json" (
+          let
+            # Landstrip to Claude Code policy translation
+            toClaudeGlobs =
+              path:
+              let
+                anchored = if lib.hasPrefix "/" path then "/${path}" else path;
+              in
+              [
+                anchored
+                "${anchored}/**"
+              ];
+
+            /*
+              Special handling for home directory
+
+              Landstrip policy is specificity-centric. Claude Code policy
+              is flat deny -> ask -> allow path. Landstrip's home policy can't
+              be applied directly to Claude Code. We therefore turn the home
+              directory from deny to allow, and create a new explicit denylist
+              to restrict sensitive directory under home.
+            */
+            landstripReadDenyGlobs = lib.concatMap toClaudeGlobs (
+              builtins.filter (
+                p: p != config.home.homeDirectory
+              ) landstripPolicyBase.filesystem.denyRead
+            );
+            landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
+
+            homeSecretGlobs = [
+              "~/.zsh_history"
+              "~/.age-identity" # agenix identity key
+              "~/.aws/**"
+              "~/.ssh/**"
+              "~/.gnupg/**"
+              "~/.claude/.credentials.json" # Claude Code OAuth token
+
+              "~/Desktop"
+              "~/Documents"
+              "~/Downloads"
+              "~/Music"
+              "~/Pictures"
+              "~/Videos"
+            ];
+          in
+          {
+            "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+            defaultMode = "auto";
+            # tui = "default"; # Prevent spammy ctrl+g
+            env = {
+              CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
+              CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0";
+              # Route Bash tool through landstrip, but keep ! unsandboxed
+              SHELL = "${pkgs.bashInteractive}/bin/bash";
+              CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
+                exec ${lib.getExe pkgs.landstrip} -p ${
+                  (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
+                    landstripPolicyBase
+                } -- ${pkgs.bashInteractive}/bin/bash "$@"
+              ''}/bin/bash";
+              CLAUDE_BASH_NO_LOGIN = "1";
+            };
+            permissions.deny =
+              (map (g: "Read(${g})") (landstripReadDenyGlobs ++ homeSecretGlobs))
+              ++ (map (g: "Edit(${g})") (
+                landstripReadDenyGlobs ++ landstripWriteDenyGlobs ++ homeSecretGlobs
+              ))
+              # Mirrors landstripPolicyBase's network policy for the Bash
+              # tool (deniedDomains is currently empty, so this is a no-op
+              # today but tracks future changes automatically). allowedDomains
+              # and the allowNetwork bool are intentionally not derived:
+              # Claude Code has no deny-all-except-these-domains primitive for
+              # WebFetch, and allowNetwork's semantics relative to the domain
+              # lists aren't documented anywhere in this repo or upstream.
+              ++ (map (d: "WebFetch(domain:${d})") landstripPolicyBase.network.deniedDomains);
+            sandbox.enabled = false;
+            # Run the custom auto-deny classifier before every Bash command.
+            # landstrip is the OS enforcement floor; this hard-blocks a few
+            # escape/exfil patterns before the command ever reaches landstrip.
+            hooks.PreToolUse = [
+              {
+                matcher = "Bash";
+                hooks = [
+                  {
+                    type = "command";
+                    command = "${config.programs.claude-code.configDir}/hooks/claude-landstrip-deny";
+                  }
+                ];
+              }
+            ];
+          }
+        )
+      } "$dst"
+     	'';
+
   # CLI Agent: OpenCode
   programs.opencode = {
     enable = true;
     extraPackages = [ pkgs.nixd ];
     settings = {
+      autoupdate = false;
       lsp = true;
       plugin = [ "opencode-landstrip" ];
       permission = {
@@ -117,222 +271,31 @@
     tui.plugin = [ "opencode-landstrip/tui" ];
   };
 
-  # Config for bash tool landstrip sandbox
+  # Config for bash tool landstrip sandbox. Derived from the shared base policy
+  # in aspect/secret.hm.nix (single source of truth) with OpenCode's deltas:
+  # direct network is denied by default (the opencode-landstrip plugin runs an
+  # in-process proxy for per-domain filtering) and unix sockets are restricted to
+  # the nix daemon; it also protects its own config + auth token from writes.
+  # The list orderings below are chosen to keep the emitted JSON byte-equivalent
+  # to the previous inline definition.
+  #
   # NOTE: at this current version, there is a bypass intended to make session-
   # level exception by doing the syscall twice. Re-check in the future if there
   # is a more user-dependent authorization flow.
-  xdg.configFile."opencode/sandbox.json".text = builtins.toJSON {
-    enabled = true;
-    network = {
-      # AF_UNIX
-      allowAllUnixSockets = false;
-      allowUnixSockets = [
-        "/nix/var/nix/daemon-socket/socket"
-      ];
-      # AF_INET: denied by default, re-deny if ancestor got allowed
-      allowNetwork = false;
-      allowLocalBinding = true;
-      allowedDomains = [ "*" ];
-      deniedDomains = [ ];
-    };
-    filesystem = {
-      # fs read: allowed by default, re-allow if ancestor got denied
-      denyRead = [
-        "/nix/secret"
-        "/run/agenix"
-        "/run/user/*/agenix"
-        # user agenix key is stored at `~/.local/state`, which is covered below
-
-        "~"
+  xdg.configFile."opencode/sandbox.json".text = builtins.toJSON (
+    lib.recursiveUpdate landstripPolicyBase {
+      network.allowNetwork = false; # plugin proxy handles per-domain filtering
+      network.allowAllUnixSockets = false;
+      filesystem.denyRead = landstripPolicyBase.filesystem.denyRead ++ [
         "~/.local/share/opencode/auth.json" # antipattern: secrets in `share`
       ];
-      allowRead = [
-        "~/.gitconfig"
-        "~/.config"
-        "~/.local/share"
-        "~/.cache"
-
-        "."
-      ];
-      # fs write: denied by default, re-deny if ancestor got allowed
-      allowWrite = [
-        "/dev/null"
-        "/tmp"
-
-        "~/.local/state"
-        "~/.local/share"
-        "~/.cache"
-
-        "."
-      ];
-      denyWrite = [
+      filesystem.denyWrite = [
         "~/.config/opencode/sandbox.json"
         ".opencode/sandbox.json"
-        "**/.env"
-        "**/.env.*"
-        "**/*.pem"
-        "**/*.key"
-      ];
-    };
-  };
-
-  # CLI agent: Claude Code
-  # NOTE: `settings` is intentionally left empty. home-manager writes
-  # settings.json as a read-only /nix/store symlink, which makes Claude Code's
-  # own runtime writes (e.g. adjusting the effort level) fail with EROFS. We
-  # instead materialize a writable copy in the activation script below.
-  programs.claude-code = {
-    enable = true;
-    settings = { };
-
-    # Minimal rm-only sweep of the mount-point files bwrap leaves on the real
-    # working dir when it deny-binds a path that doesn't exist yet. The bwrap
-    # shim (../overlay/claude-code.nix) now contains the *mounts*
-    # in a private-propagation namespace so they no longer leak and stick as
-    # unremovable char-devices — but the mount-point *files* themselves are
-    # writes through the rw cwd bind and persist on disk. No umount needed
-    # anymore (nothing stays mounted), no worktreeConfig handling.
-    #
-    # The general list is matched by exact name *and* emptiness, so a file
-    # that ever gains real content (e.g. an actual package.json) is never
-    # touched. `.git/commondir` is special-cased: in a main worktree (`.git`
-    # is a directory) git resolves the common dir to `.git` itself and a
-    # `commondir` file must NOT exist — any leftover (empty from the shim's
-    # bind, or a stray "." from an earlier run) makes libgit2/nixos-rebuild
-    # reject the repo — so remove it regardless of content. Linked worktrees
-    # have a `.git` *file*, not a directory, so this never touches theirs.
-    hooks."claude-clean-sandbox-debris" = ''
-      #!${pkgs.runtimeShell}
-      set -eu
-
-      cwd="$(${pkgs.jq}/bin/jq -r '.cwd // empty')"
-      [ -n "$cwd" ] && cd "$cwd" 2>/dev/null || exit 0
-
-      for name in .zshrc .zprofile; do
-      	path="$HOME/$name"
-      	if [ -L "$path" ] || { [ -f "$path" ] && [ ! -s "$path" ]; }; then
-      		rm -f -- "$path" || true
-      	fi
-      done
-
-      for name in \
-      	.bashrc .bash_profile .zshrc .zprofile .profile .gitconfig .mcp.json \
-      	.idea .vscode .github .ripgreprc scripts \
-      	.env .env.local .env.development .env.development.local \
-      	.env.test .env.test.local .env.production .env.production.local .envrc \
-      	.npmrc .yarnrc .yarnrc.yml package.json package-lock.json \
-      	pnpm-lock.yaml yarn.lock bunfig.toml .gitmodules; do
-      	[ -e "$name" ] || [ -L "$name" ] || continue
-      	if [ -c "$name" ]; then
-      		rm -f -- "$name" || true
-      	elif [ -f "$name" ] && [ ! -s "$name" ]; then
-      		rm -f -- "$name" || true
-      	elif [ -d "$name" ] && [ -z "$(ls -A "$name" 2>/dev/null)" ]; then
-      		rmdir -- "$name" 2>/dev/null || true
-      	fi
-      done
-
-      if [ -d .git ] && { [ -e .git/commondir ] || [ -L .git/commondir ]; } \
-      		&& [ ! -d .git/commondir ]; then
-      	rm -f -- .git/commondir || true
-      fi
-
-      # bwrap leaves an empty-file/dir skeleton under node_modules when it deny-binds
-      # nested paths there. Prune the empties bottom-up (files first, then the dirs
-      # they leave behind); a populated node_modules is untouched since -empty skips
-      # anything with real content.
-      if [ -d node_modules ]; then
-      	${pkgs.findutils}/bin/find node_modules -depth -type f -empty -delete 2>/dev/null || true
-      	${pkgs.findutils}/bin/find node_modules -depth -type d -empty -delete 2>/dev/null || true
-      fi
-
-      exit 0
-    '';
-  };
-
-  # Copy settings.json into place as a real, writable file so Claude Code can
-  # persist runtime changes (effort level, etc.). Runs unconditionally on
-  # every switch and every boot, so any runtime edits are reset to these
-  # declarative defaults on the next activation.
-  home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    		dst="$HOME/.claude/settings.json"
-    		run rm -f "$dst"
-    		run install -Dm600 ${
-        (pkgs.formats.json { }).generate "claude-code-settings.json" (
-          let
-            # Path where agents should not access
-            secretGlobs = [
-              "~/.ssh/**"
-              "~/.aws/**"
-              "~/.gnupg/**"
-              "~/.claude/.credentials.json" # Claude Code OAuth token
-              "//nix/secret/**" # agenix host key
-              "//run/agenix.d/**" # decrypted agenix secrets (nixos module)
-              "//run/user/**" # decrypted agenix secrets (home-manager module)
-            ];
-            # Tools to restrict: Grep and Glob follows Read, Write follows Edit
-            secretTools = [
-              "Read"
-              "Edit"
-            ];
-          in
-          {
-            "$schema" = "https://json.schemastore.org/claude-code-settings.json";
-            defaultMode = "auto";
-            tui = "default"; # Prevent spammy ctrl+g
-            env = {
-              CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
-              CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "1";
-              SHELL = "${pkgs.bashInteractive}/bin/bash";
-              CLAUDE_CODE_SHELL = "${pkgs.bashInteractive}/bin/bash";
-              CLAUDE_BASH_NO_LOGIN = "1";
-            };
-            permissions.deny = lib.concatMap (
-              p: map (t: "${t}(${p})") secretTools
-            ) secretGlobs;
-            # Bash tool restriction: sandboxing (restricting at the mount level)
-            # - Write allowlist -> allow cwd, tmpdir, and a few /dev (null, etc.) + Edit permission
-            # - Read denylist -> allow all + deny known creds path + Read permission
-            sandbox = {
-              enabled = true; # NB: real schema key is `enabled`, not `enable`.
-              failIfUnavailable = true; # Never silently run unsandboxed (incl. devboxes).
-              allowUnsandboxedCommands = false; # Disallow fallback
-              network = {
-                allowedDomains = [ "*" ]; # Unrestricted network, no per-domain prompts.
-                allowLocalBinding = true; # Let dev servers bind localhost inside the sandbox.
-                # allowAllUnixSockets = true; # Enable for nix-project only
-              };
-            };
-            # Sweep bwrap's 0-byte deny-mount leftover files after every sandboxed
-            # Bash call (the common case) and once at session start (belt-and-
-            # suspenders for anything a crashed previous session left behind).
-            hooks = {
-              PostToolUse = [
-                {
-                  matcher = "Bash";
-                  hooks = [
-                    {
-                      type = "command";
-                      command = "${config.programs.claude-code.configDir}/hooks/claude-clean-sandbox-debris";
-                    }
-                  ];
-                }
-              ];
-              SessionStart = [
-                {
-                  hooks = [
-                    {
-                      type = "command";
-                      command = "${config.programs.claude-code.configDir}/hooks/claude-clean-sandbox-debris";
-                    }
-                  ];
-                }
-              ];
-            };
-          }
-        )
-      } "$dst"
-    	'';
+      ]
+      ++ landstripPolicyBase.filesystem.denyWrite;
+    }
+  );
 
   # CLI agent: Codex
   programs.codex = {

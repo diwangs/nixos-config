@@ -20,7 +20,6 @@
     ripgrep
     tree
     htop
-    tmux
     wget
     curl
     unzip
