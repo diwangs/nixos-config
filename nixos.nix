@@ -38,6 +38,7 @@
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     self.inputs.nix-vscode-extensions.overlays.default
+    self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip.nix)
     # (import ./package/overlay/codex-acp.nix)
 

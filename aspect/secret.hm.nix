@@ -52,6 +52,7 @@
         config.home.homeDirectory # age identity key (user), okay apps secrets
 
         "${config.xdg.configHome}/zsh/.zsh_history"
+        "${config.home.homeDirectory}/.claude/.credentials.json"
 
         "**/.env*" # .envrc is fine since we `cat` from agenix
       ];
@@ -65,8 +66,7 @@
         "${config.home.homeDirectory}/.bashrc" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
         # Agent settings
-        "${config.home.homeDirectory}/.claude/settings.json"
-        "${config.home.homeDirectory}/.claude/settings.local.json"
+        "${config.home.homeDirectory}/.claude"
 
         "."
       ];
@@ -75,6 +75,7 @@
         "/dev/null"
         "/tmp"
 
+        "${config.home.homeDirectory}/.claude"
         config.xdg.configHome
         config.xdg.dataHome
         config.xdg.stateHome

@@ -31,6 +31,12 @@
       inputs.nixpkgs.follows = "home-manager"; # vscode is defined by hm
     };
 
+    # nix-zed-extensions: Nix-built (not auto-downloaded) Zed extensions
+    nix-zed-extensions = {
+      url = "github:DuskSystems/nix-zed-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # trycua's computer-use driver flake (package + nixosModule).
     # Follow nixpkgs-stable (also 26.05) so the driver is built against the
     # same baseline upstream tests, without a duplicate nixpkgs in the closure.
@@ -70,6 +76,7 @@
       treefmt-nix,
       home-manager,
       nix-flatpak,
+      nix-zed-extensions,
       cua,
       agenix,
       age-secrets,
@@ -115,6 +122,7 @@
         specialArgs = {
           inherit self;
           inherit cua;
+          inherit nix-zed-extensions;
           inherit agenix; # for the CLI package in aspect/secret.nix
           inherit age-secrets; # .age file paths in aspect/secret.nix
           inherit lanzaboote;

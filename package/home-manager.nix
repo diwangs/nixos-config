@@ -112,7 +112,7 @@ in
       collaboration_panel.default_width = 250;
       outline_panel.default_width = 250;
 
-      # agent.default_width = 1080;
+      agent.default_width = 1080;
 
       ssh_connections = [
         {
@@ -120,6 +120,16 @@ in
         }
       ];
     };
+  };
+
+  # Nix-built (not auto-downloaded) Zed extensions. Also reaches nova-devbox:
+  # remote_extensions on the SSH remote is a live mirror of this client's
+  # extensions/installed, pushed on every connect.
+  programs.zed-editor-extensions = {
+    enable = true;
+    packages = with pkgs.zed-extensions; [
+      nix
+    ];
   };
 
   # IDE: VSCode official

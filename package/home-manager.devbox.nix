@@ -44,7 +44,7 @@
     });
     installRemoteServer = true;
     mutableUserSettings = false;
-    extensions = [ "nix" ];
+    # extensions = [ "nix" ]; # Techninally client-side, but it auto-uploads
     userSettings = {
       # Feed each project's direnv (.envrc) into the environment Zed computes
       # for terminals, language servers, and external ACP agent servers.
@@ -127,7 +127,6 @@
               "~/.aws/**"
               "~/.ssh/**"
               "~/.gnupg/**"
-              "~/.claude/.credentials.json" # Claude Code OAuth token
 
               "~/Desktop/**"
               "~/Documents/**"
