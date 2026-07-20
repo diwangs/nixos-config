@@ -121,9 +121,7 @@
             landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
 
             homeSecretGlobs = [
-              "~/*" # Direct children files
-              "~/.*" # Direct children dotfiles
-
+              "~/.age-identity" # Direct children dotfiles
               "~/.aws/**"
               "~/.ssh/**"
               "~/.gnupg/**"

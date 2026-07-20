@@ -28,10 +28,7 @@
       allowUnixSockets = [
         "/nix/var/nix/daemon-socket/socket" # nix build/eval
       ];
-      # AF_INET: landstrip has no domain-filtering primitive (Landlock/seccomp
-      # can't see hostnames/SNI), so this is a blanket on/off. Direct access
-      # for Claude; OpenCode denies this and routes through its proxy plugin
-      # instead (see xdg.configFile "opencode/sandbox.json" below).
+      # AF_INET: binary toggle, setup proxy if filtering is wanted
       allowNetwork = true;
       allowLocalBinding = true; # dev servers may bind/connect loopback
     };
@@ -75,11 +72,11 @@
         "/dev/null"
         "/tmp"
 
-        "${config.home.homeDirectory}/.claude"
         config.xdg.configHome
         config.xdg.dataHome
         config.xdg.stateHome
         config.xdg.cacheHome
+        "${config.home.homeDirectory}/.claude"
 
         "."
       ];
