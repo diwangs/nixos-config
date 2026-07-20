@@ -170,15 +170,7 @@
                 ++ landstripWriteDenyGlobs
                 ++ homeSecretGlobs
                 ++ homeReadOnlyGlobs
-              ))
-              # Mirrors landstripPolicyBase's network policy for the Bash
-              # tool (deniedDomains is currently empty, so this is a no-op
-              # today but tracks future changes automatically). allowedDomains
-              # and the allowNetwork bool are intentionally not derived:
-              # Claude Code has no deny-all-except-these-domains primitive for
-              # WebFetch, and allowNetwork's semantics relative to the domain
-              # lists aren't documented anywhere in this repo or upstream.
-              ++ (map (d: "WebFetch(domain:${d})") landstripPolicyBase.network.deniedDomains);
+              ));
             sandbox.enabled = false;
           }
         )

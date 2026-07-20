@@ -28,11 +28,12 @@
       allowUnixSockets = [
         "/nix/var/nix/daemon-socket/socket" # nix build/eval
       ];
-      # AF_INET: denied by default, re-deny if ancestor is allowed
-      allowNetwork = false;
+      # AF_INET: landstrip has no domain-filtering primitive (Landlock/seccomp
+      # can't see hostnames/SNI), so this is a blanket on/off. Direct access
+      # for Claude; OpenCode denies this and routes through its proxy plugin
+      # instead (see xdg.configFile "opencode/sandbox.json" below).
+      allowNetwork = true;
       allowLocalBinding = true; # dev servers may bind/connect loopback
-      allowedDomains = [ "*" ];
-      deniedDomains = [ ];
     };
     filesystem = {
       /*
