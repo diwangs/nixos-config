@@ -155,7 +155,7 @@
               # level exception. For now this is disabled entirely.
               SHELL = "${pkgs.bashInteractive}/bin/bash";
               CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
-                unset $(compgen -A export | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|API_KEY|PASSWORD)')
+                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|API_KEY|PASSWORD)')
                 exec ${lib.getExe pkgs.landstrip} -p ${
                   (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
                     landstripPolicyBase
