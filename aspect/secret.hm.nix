@@ -59,6 +59,7 @@
         config.xdg.dataHome
         config.xdg.stateHome
         config.xdg.cacheHome
+        "${config.home.homeDirectory}/.profile" # For `bash` warning
         "${config.home.homeDirectory}/.bash_profile" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
         # Agent settings
