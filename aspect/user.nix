@@ -17,7 +17,7 @@
       "plugdev" # HackRF
     ];
     hashedPasswordFile = config.age.secrets."paladin-iii/hashed-password".path; # Enable for GDM to detect it?
-    # NOTE: The same password is used for Gnome keyring, but is not synced
+    # NOTE: The same password is used for the oo7 keyring, but is not synced
     shell = pkgs.zsh; # Enable here but manage at package/home-manager.nix
     ignoreShellProgramCheck = true;
   };

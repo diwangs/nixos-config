@@ -51,7 +51,7 @@
             # Permission to check power state
             "System Bus Policy"."org.freedesktop.UPower" = "talk";
 
-            # Permission to reach gnome-keyring
+            # Permission to reach the secret service (oo7)
             "Session Bus Policy"."org.freedesktop.secrets" = "talk";
           };
         };

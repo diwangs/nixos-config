@@ -1,24 +1,21 @@
 { pkgs, agenix, ... }: {
-  # Key management (GNOME)
-  # gcr is introduced in 25.11
-  services.gnome.gcr-ssh-agent.enable = false; # For SSH, use gpg-agent
-  services.gnome.gnome-keyring.enable = true; # For non-SSH, use keyring
+  # oo7: Secret Portal and Secret Service
+  services.oo7.enable = true;
+  services.gnome.gnome-keyring.enable = false;
 
-  # Export SSH_ASKPASS (GNOME sets askPassword to seahorse's helper, but the
-  # export defaults to services.xserver.enable, which is off on Wayland-only).
-  # Without it, GUI apps (no TTY) can't do FIDO2 PIN entry or touch prompts.
-  # enableAskPassword only covers login shells; sessionVariables goes through
-  # PAM so it also reaches the systemd user manager (= GNOME-launched apps).
-  programs.ssh.enableAskPassword = true;
+  # Drop-in to oo7-daemon to enable auto-unlock via agenix at login
+  systemd.user.services.oo7-daemon = {
+    after = [ "agenix.service" ];
+    wants = [ "agenix.service" ];
+    serviceConfig.ImportCredential = ""; # reset the systemd-creds credstore import
+    environment.CREDENTIALS_DIRECTORY = "/run/user/1000/agenix/paladin-iii";
+  };
 
-  # Secret management (agenix)
-  # Runtime-only: secrets decrypt at activation into /run/agenix/*. Eval-time
-  # values (partition UUIDs, hostnames, keygrips, ...) stay in secret.toml.
-  #
-  # Every .age file is encrypted to both identities (secrets/secret.nix):
-  # - Machine (unattended decrypt at boot): dedicated host key, configured in
-  #   flake.nix, NOT in git, no sshd involved. Back it up offline.
-  # - Human (agenix -e): YubiKey PIV P-256 via age-plugin-yubikey.
+  # SSH: we use yubikey-agent
+  programs.ssh.enableAskPassword = true; # export SSH_ASKPASS
+  services.gnome.gcr-ssh-agent.enable = false; # disable GCR SSH agent (25.11)
+
+  # agenix: general secret management
 
   # Unlike HM, this doesn't depend on UID
   # Make sure it resides in a mountpoint that is `neededForBoot`

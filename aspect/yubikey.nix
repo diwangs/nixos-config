@@ -17,7 +17,6 @@
     sudo.unixAuth = false;
 
     gdm.fprintAuth = false;
-    gdm.enableGnomeKeyring = true;
   };
   # passwd_tries 2 so that message appears
   security.sudo.extraConfig = ''
