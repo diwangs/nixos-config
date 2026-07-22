@@ -34,7 +34,8 @@
     };
     filesystem = {
       /*
-        Best linux apps store their secrets with `libsecret` (GNOME Keyring)
+        Best linux apps store their secrets with portal (sandboxed apps only)
+        Better linux apps store their secrets with service (oo7 secret service)
         Good linux apps read secrets from env (hence the need of `agenix`)
         Okay linux apps store their secrets in top-level ~ (e.g., `~/.aws`)
         Bad linux apps store their secrets in XDG base dirs (e.g., OC /connect)
@@ -44,16 +45,21 @@
       # read: allowed by default, re-allow if ancestor is denied
       denyRead = [
         "/run/agenix.d" # decrypted agenix secrets (root)
-        "/run/user/*/agenix.d" # decrypted agenix secrets (user)
         "/nix/secret" # age identity key (root)
+        # /run/user/$UID/agenix.d is moved for dynamic generation
         config.home.homeDirectory # age identity key (user), okay apps secrets
 
         "${config.xdg.configHome}/zsh/.zsh_history"
+        # Long-term access key
+        # "${config.home.homeDirectory}/.aws/login"
+        # "${config.home.homeDirectory}/.aws/credentials"
         "${config.home.homeDirectory}/.claude/.credentials.json"
 
         "**/.env*" # .envrc is fine since we `cat` from agenix
       ];
       allowRead = [
+        "/" # Somehow this needs to be explicit?
+
         config.xdg.configHome
         config.xdg.dataHome
         config.xdg.stateHome
@@ -62,7 +68,8 @@
         "${config.home.homeDirectory}/.bash_profile" # For `bash` warning
         "${config.home.homeDirectory}/.bashrc" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
-        # Agent settings
+
+        "${config.home.homeDirectory}/.aws" # Access to STS but not access key
         "${config.home.homeDirectory}/.claude"
 
         "."

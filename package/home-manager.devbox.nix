@@ -21,15 +21,14 @@
 
     # Little tools
     jq # JSON parser
-    awscli2
   ];
 
   # Dev
+  programs.gh.enable = true;
   programs.direnv = {
     enable = true; # Add direnv package and sets the shell hook
     nix-direnv.enable = true; # Cached nix-shell/nix develop environments
   };
-  programs.gh.enable = true;
 
   # Zed server
   programs.zed-editor = {
@@ -44,10 +43,7 @@
     });
     installRemoteServer = true;
     mutableUserSettings = false;
-    # extensions = [ "nix" ]; # Techninally client-side, but it auto-uploads
     userSettings = {
-      # Feed each project's direnv (.envrc) into the environment Zed computes
-      # for terminals, language servers, and external ACP agent servers.
       load_direnv = "direct";
       # External agents speak ACP over stdio. Pin each executable to the Nix
       # store rather than relying on Zed's runtime-downloaded adapters.
@@ -74,25 +70,36 @@
   };
 
   # CLI agent: Claude Code
-  # NOTE: `settings` is intentionally left empty. home-manager writes
-  # settings.json as a read-only /nix/store symlink, which makes Claude Code's
-  # own runtime writes (e.g. adjusting the effort level) fail with EROFS. We
-  # instead materialize a writable copy in the activation script below.
   programs.claude-code = {
     enable = true;
-    settings = { };
+    settings = { }; # Defined below to make it writable
   };
 
-  # Copy settings.json into place as a real, writable file so Claude Code can
-  # persist runtime changes (effort level, etc.). Runs unconditionally on
-  # every switch and every boot, so any runtime edits are reset to these
-  # declarative defaults on the next activation.
   home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     		dst="$HOME/.claude/settings.json"
     		run rm -f "$dst"
     		run install -Dm600 ${
         (pkgs.formats.json { }).generate "claude-code-settings.json" (
           let
+            # Materialized landstrip policy, embedded into the Bash-tool
+            # wrapping hook below (see hooks.PreToolUse).
+            landstripPolicyFile =
+              (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
+                landstripPolicyBase;
+
+            # The static policy cannot name $XDG_RUNTIME_DIR portably. Add the
+            # current user's agenix directory immediately before sandboxing,
+            # rather than using Landstrip's eagerly-expanded /run/user/* glob.
+            landstripRunner = pkgs.writeShellScript "claude-bash-landstrip-run" ''
+              runtimeAgenixDir="/run/user/$(${pkgs.coreutils}/bin/id -u)/agenix.d"
+              policy="$(${lib.getExe pkgs.jq} -c --arg runtimeAgenixDir "$runtimeAgenixDir" \
+                '.filesystem.denyRead += [$runtimeAgenixDir]' \
+                ${landstripPolicyFile})" || exit 1
+              [ -n "$policy" ] || exit 1
+              printf '%s\n' "$policy" | exec ${lib.getExe pkgs.landstrip} -- \
+                ${pkgs.bashInteractive}/bin/bash -c "$1"
+            '';
+
             # Landstrip to Claude Code policy translation
             toClaudeGlobs =
               path:
@@ -118,11 +125,11 @@
                 p: p != config.home.homeDirectory
               ) landstripPolicyBase.filesystem.denyRead
             );
+            runtimeAgenixReadDenyGlobs = toClaudeGlobs "/run/user/*/agenix.d";
             landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
 
             homeSecretGlobs = [
               "~/.age-identity" # Direct children dotfiles
-              "~/.aws/**"
               "~/.ssh/**"
               "~/.gnupg/**"
 
@@ -144,31 +151,50 @@
             "$schema" = "https://json.schemastore.org/claude-code-settings.json";
             defaultMode = "auto";
             tui = "fullscreen";
+            sandbox.enabled = false;
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
               CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
-              # Route Bash tool through landstrip, but keep ! unsandboxed
-              # NOTE: Landstrip has a --trap-fd mechanism to allow session
-              # level exception. For now this is disabled entirely.
-              SHELL = "${pkgs.bashInteractive}/bin/bash";
               CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
-                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|API_KEY|PASSWORD)')
-                exec ${lib.getExe pkgs.landstrip} -p ${
-                  (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
-                    landstripPolicyBase
-                } -- ${pkgs.bashInteractive}/bin/bash "$@"
+                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|KEY|PASSWORD)')
+                exec ${pkgs.bashInteractive}/bin/bash "$@"
               ''}/bin/bash";
               CLAUDE_BASH_NO_LOGIN = "1";
             };
             permissions.deny =
-              (map (g: "Read(${g})") (landstripReadDenyGlobs ++ homeSecretGlobs))
+              (map (g: "Read(${g})") (
+                landstripReadDenyGlobs ++ runtimeAgenixReadDenyGlobs ++ homeSecretGlobs
+              ))
               ++ (map (g: "Edit(${g})") (
                 landstripReadDenyGlobs
+                ++ runtimeAgenixReadDenyGlobs
                 ++ landstripWriteDenyGlobs
                 ++ homeSecretGlobs
                 ++ homeReadOnlyGlobs
               ));
-            sandbox.enabled = false;
+
+            # Use landstrip for Bash tool but not for ! shell-mode. Any rewrite
+            # error denies the call rather than running it unsandboxed.
+            # Note: per-command nesting means a model `cd`/`export` does not
+            # persist across tool calls (chain within a single command instead)
+            hooks.PreToolUse = [
+              {
+                matcher = "Bash";
+                hooks = [
+                  {
+                    type = "command";
+                    command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
+                      result="$(${lib.getExe pkgs.jq} -c --arg prefix ${lib.escapeShellArg "${landstripRunner} "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
+                        printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
+                        exit 0
+                      }
+                      [ -n "$result" ] && printf '%s' "$result"
+                      exit 0
+                    ''}";
+                  }
+                ];
+              }
+            ];
           }
         )
       } "$dst"

@@ -40,6 +40,11 @@
     self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip.nix)
+    # aws-vault content-type fix for the oo7 secret-service backend. Laptop-only:
+    # aws-vault is installed only via package/home-manager.nix (not the shared
+    # devbox list), so this overlay never needs wiring into the devbox
+    # homeConfigurations in flake.nix.
+    (import ./package/overlay/aws-vault.nix)
     # (import ./package/overlay/codex-acp.nix)
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.

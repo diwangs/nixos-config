@@ -45,6 +45,11 @@ in
       ansible
       sshpass
       ansible-lint
+      # AWS credential broker: exposes STS keys while keeping the access key in
+      # the secret service. Laptop-only (not in the shared devbox list) because
+      # its content-type fix for the oo7 backend lives in an overlay wired into
+      # nixos.nix (see package/overlay/aws-vault.nix).
+      aws-vault # `aws-vault add --secret-service-collection='Login' ...`
 
       # Agentic
       claude-desktop
@@ -100,6 +105,31 @@ in
   };
   xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
 
+  # AWS CLI configuration
+  programs.awscli = {
+    enable = true;
+    settings = {
+      # Shim profile; don't use this ("nova" won't resolve)
+      "profile diwangs-mantle" = {
+        source_profile = "nova"; # Defined inside `aws-vault`
+        role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle";
+        region = "us-east-1";
+      };
+      "profile diwangs-mantle-tf" = {
+        source_profile = "nova";
+        role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-tf";
+        region = "us-east-2";
+      };
+      # Actual profile
+      "profile mantle" = {
+        credential_process = "aws-vault export --secret-service-collection='Login' --format=json diwangs-mantle";
+      };
+      "profile mantle-tf" = {
+        credential_process = "aws-vault export --secret-service-collection='Login' --format=json diwangs-mantle-tf";
+      };
+    };
+  };
+
   # GUI IDE: Zed
   programs.zed-editor = {
     package = lib.mkForce pkgs.zed-editor; # force, since in devbox it's empty
@@ -112,13 +142,13 @@ in
       collaboration_panel.default_width = 250;
       outline_panel.default_width = 250;
 
-      agent.default_width = 1080;
+      # agent.default_width = 1080;
 
-      ssh_connections = [
-        {
-          host = "nova-devbox";
-        }
-      ];
+      # ssh_connections = [
+      #   {
+      #     host = "nova-devbox";
+      #   }
+      # ];
     };
   };
 
