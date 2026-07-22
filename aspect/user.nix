@@ -1,5 +1,6 @@
 { config, pkgs, ... }: {
   users.mutableUsers = false;
+  programs.zsh.enable = true; # Add to /etc/shells; enables user in greeter
 
   # Root (Generate with `mkpasswd`)
   users.users.root.hashedPasswordFile =
@@ -16,9 +17,9 @@
       "adbusers" # Android debugging
       "plugdev" # HackRF
     ];
-    hashedPasswordFile = config.age.secrets."paladin-iii/hashed-password".path; # Enable for GDM to detect it?
-    # NOTE: The same password is used for the oo7 keyring, but is not synced
-    shell = pkgs.zsh; # Enable here but manage at package/home-manager.nix
-    ignoreShellProgramCheck = true;
+    # NOTE: GNOME Keyring traditionally uses the same password, but not synced
+    # We don't use it anymore, but just note it here for reference.
+    hashedPasswordFile = config.age.secrets."paladin-iii/hashed-password".path;
+    shell = pkgs.zsh; # Set default shell; further config goes to home-manager
   };
 }
