@@ -6,7 +6,8 @@
 # package.nix preserves the base as a 1:1 repackage of Anthropic's .deb.
 #
 # Why it's needed: Cowork can run tasks in a lightweight QEMU micro-VM. On
-# startup the app (app.asar `.vite/build/index.js`) resolves three deps and
+# startup the app (a content-hashed `.vite/build/index.chunk-*.js` — resolved at
+# build time via helpers.findChunk, see ./lib.nix) resolves three deps and
 # reports the feature "unsupported" if any is missing:
 #   - qemu-system-x86_64 : found via a $PATH scan → handled by the system
 #     (aspect/virtualisation.nix puts qemu on PATH). NOT patched here.
@@ -47,13 +48,18 @@ in
       + helpers.mkAsarPatch {
         label = "cowork-vm FHS paths (OVMF + virtiofsd)";
         body = ''
-          substituteInPlace "$work/contents/.vite/build/index.js" \
-            --replace-warn \
-              '["/usr/share/OVMF/OVMF_CODE_4M.fd","/usr/share/OVMF/OVMF_CODE.fd"]' \
-              '["${ovmfCode}"]' \
-            --replace-warn \
-              '["/usr/libexec/virtiofsd","/usr/bin/virtiofsd"]' \
-              '["${virtiofsd}"]'
+          target=${helpers.findChunk "/usr/libexec/virtiofsd"}
+          if [ -n "$target" ]; then
+            substituteInPlace "$target" \
+              --replace-warn \
+                '["/usr/share/OVMF/OVMF_CODE_4M.fd","/usr/share/OVMF/OVMF_CODE.fd"]' \
+                '["${ovmfCode}"]' \
+              --replace-warn \
+                '["/usr/libexec/virtiofsd","/usr/bin/virtiofsd"]' \
+                '["${virtiofsd}"]'
+          else
+            echo "[claude-desktop patch] cowork-vm: anchor chunk not found; skipping (feature degraded, per warn policy)"
+          fi
         '';
       };
   });

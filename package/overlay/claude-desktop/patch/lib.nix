@@ -40,9 +40,22 @@ let
     builtins.foldl' (
       acc: c: lib.mod (acc * 31 + lib.strings.charToInt c) 4294967296
     ) 0 (lib.stringToCharacters name);
+  # Since 1.24012.0 the main-process code no longer lives in one
+  # .vite/build/index.js: Vite splits it into content-hashed chunks
+  # (index.chunk-<hash>.js) whose names change every release, plus a tiny
+  # index.js loader and a index.pre.js. A patch that hardcodes the filename
+  # therefore silently drifts. `findChunk` resolves, at build time, the single
+  # .vite/build file that carries a given fixed-string anchor, so patches key off
+  # a stable code substring instead of the volatile chunk name. Emits a bash
+  # command substitution; the caller assigns it to a var and substituteInPlaces
+  # that path. (index.pre.js-resident anchors — e.g. the debug-port guard — don't
+  # need this: that file's name is stable.)
+  findChunk =
+    locator:
+    ''$(grep -rlF ${lib.escapeShellArg locator} "$work/contents/.vite/build")'';
 in
 {
-  inherit unpackGlob mul31;
+  inherit unpackGlob mul31 findChunk;
 
   # mkAsarPatch: wrap a fragment's substituteInPlace body in its own
   # extract → patch → repack cycle. `body` is a bash snippet that mutates files

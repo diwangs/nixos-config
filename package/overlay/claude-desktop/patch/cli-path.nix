@@ -15,7 +15,9 @@ in
       + helpers.mkAsarPatch {
         label = "Claude Code local binary";
         body = ''
-          substituteInPlace "$work/contents/.vite/build/index.js" \
+          target=${helpers.findChunk ",process.env.CLAUDE_CODE_LOCAL_BINARY}async initLocalBinary"}
+          test -n "$target" || { echo "cli-path: initLocalBinary anchor not found in any bundle chunk"; exit 1; }
+          substituteInPlace "$target" \
             --replace-fail \
               ',process.env.CLAUDE_CODE_LOCAL_BINARY}async initLocalBinary' \
               ',process.env.CLAUDE_CODE_LOCAL_BINARY&&(this.localBinaryInitPromise=this.initLocalBinary(process.env.CLAUDE_CODE_LOCAL_BINARY))}async initLocalBinary'

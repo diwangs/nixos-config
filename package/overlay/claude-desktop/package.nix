@@ -36,7 +36,7 @@
 # Version + hash are PINNED below and maintained by ./update.sh — do not edit
 # the two UPDATE MARKER lines by hand.
 #
-# Last updated: 010726
+# Last updated: 230726
 {
   lib,
   stdenv,
@@ -97,11 +97,11 @@
 
 stdenv.mkDerivation (finalAttrs: {
   pname = "claude-desktop";
-  version = "1.17377.1"; # UPDATE MARKER: version
+  version = "1.24012.0"; # UPDATE MARKER: version
 
   src = fetchurl {
     url = "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${finalAttrs.version}_amd64.deb";
-    hash = "sha256-9L14VFIAh3tZEXmDjeeteld99u0uhFlp3SVpDvxchcc="; # UPDATE MARKER: hash
+    hash = "sha256-EJaoBjlW+EMP2+UEuxxeAphfMdD0XQguSWbl0w6n46w="; # UPDATE MARKER: hash
   };
 
   nativeBuildInputs = [
@@ -152,7 +152,17 @@ stdenv.mkDerivation (finalAttrs: {
     libxshmfence
   ];
 
-  unpackCmd = "dpkg-deb -x $src .";
+  # `dpkg-deb -x` forces permission preservation (its internal tar restores the
+  # exact mode bits regardless of uid), so it tries to set chrome-sandbox's
+  # setuid bit — rejected with EPERM in the hardened-kernel build sandbox. tar
+  # then aborts, and since that member now sorts early in the archive, the later
+  # payload (the .desktop entry, icons) never lands. Piping through a plain tar
+  # is what fixes it: the builder runs as non-root (nixbld), and GNU tar's
+  # non-root default already skips the setuid/owner restore, so the failing
+  # chmod is never attempted. The explicit --no-same-* flags are redundant with
+  # that default but kept so extraction stays correct even if the build ever runs
+  # as root (e.g. sandbox disabled), where bare tar would revert to restoring.
+  unpackCmd = "dpkg-deb --fsys-tarfile $src | tar -x";
   sourceRoot = ".";
 
   dontConfigure = true;
@@ -176,8 +186,8 @@ stdenv.mkDerivation (finalAttrs: {
     # Icons + desktop entry.
     mkdir -p $out/share
     cp -r usr/share/icons $out/share/icons
-    install -Dm644 usr/share/applications/claude-desktop.desktop \
-      $out/share/applications/claude-desktop.desktop
+    install -Dm644 usr/share/applications/com.anthropic.Claude.desktop \
+      $out/share/applications/com.anthropic.Claude.desktop
 
     rm -f $out/lib/claude-desktop/chrome-sandbox
 
@@ -208,10 +218,11 @@ stdenv.mkDerivation (finalAttrs: {
         lib.makeLibraryPath [
           libglvnd # For hw acceleration (see header comment)
           libsecret # For signin persistence (1p only)
+          libnotify # dlopen'd (soname fallback) for native desktop notifications; NEEDED-less so autoPatchelf can't wire it
         ]
       }:${addDriverRunpath.driverLink}/lib"
 
-    substituteInPlace $out/share/applications/claude-desktop.desktop \
+    substituteInPlace $out/share/applications/com.anthropic.Claude.desktop \
       --replace-warn 'Exec=claude-desktop' "Exec=$out/bin/claude-desktop"
   '';
 

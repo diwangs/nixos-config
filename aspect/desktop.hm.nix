@@ -26,7 +26,7 @@
           # "code.desktop"
           # "t3code.desktop"
           "dev.zed.Zed.desktop"
-          "claude-desktop.desktop"
+          "com.anthropic.Claude.desktop"
           "md.obsidian.Obsidian.desktop"
           "app.zen_browser.zen.desktop"
           "com.bitwarden.desktop.desktop"

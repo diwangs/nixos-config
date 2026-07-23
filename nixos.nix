@@ -54,6 +54,7 @@
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
     (import ./package/overlay/claude-desktop/overlay.nix)
+    (import ./package/overlay/claude-desktop/patch/oo7.nix)
     (import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
     (import ./package/overlay/claude-desktop/patch/vm-path.nix)
     (import ./package/overlay/claude-desktop/patch/cli-path.nix)
