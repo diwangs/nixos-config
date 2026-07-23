@@ -123,7 +123,7 @@
   # Enabling LSM
   security.apparmor.enable = true;
   security.lsm = [ "lockdown" ];
-  boot.kernelParams = [ "lockdown=integrity" ]; # TODO: try confidentiality
+  boot.kernelParams = [ "lockdown=confidentiality" ];
 
   # Hardened profile doesn't allow this?
   services.logrotate.checkConfig = false;
