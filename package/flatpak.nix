@@ -1,7 +1,32 @@
 # Flatpak packages: synchronized in cloud, or official version of packages that
 # supposed to be in home-manager
 
-{ lib, ... }: {
+{ lib, ... }:
+let
+  # Apps that need the real X11 socket (not fallback-x11) to open.
+  # The global override (nixos.nix) is Wayland-only and drops x11, so re-grant
+  # it per-app here. This wins over the global `!x11` for these apps.
+  needsX11 = [
+    "com.bitwarden.desktop"
+    "com.spotify.Client" # Works, but ugly border
+    "com.valvesoftware.Steam"
+
+    "com.discordapp.Discord"
+    "com.slack.Slack"
+    "us.zoom.Zoom"
+  ];
+
+  # Apps that need the Secret Service (oo7) instead of the Secret Portal.
+  # The global override sets `org.freedesktop.secrets=none`, so re-grant `talk`
+  # per-app here.
+  needsSecretService = [
+    "im.riot.Riot"
+  ];
+
+  # Build `{ "<app>" = value; ... }` for every app in `apps`.
+  forApps = apps: value: lib.genAttrs apps (_: value);
+in
+{
   services.flatpak = {
     packages = [
       # Cloud
@@ -22,38 +47,21 @@
       "md.obsidian.Obsidian" # Official!
     ];
 
-    overrides =
-      lib.recursiveUpdate
-        (lib.listToAttrs (
-          map
-            (pkg: {
-              name = pkg;
-              value = {
-                Context.sockets = [
-                  "wayland"
-                  "x11"
-                ];
-              };
-            })
-            [
-              # Packages that need X11 socket (not fallback-x11) to open
-              "com.bitwarden.desktop"
-              "com.valvesoftware.Steam"
-              # "com.spotify.Client" # Works, but ugly border
+    # Per-app overrides, layered additively on top of the Wayland-only global
+    # override: each entry re-grants only what that app needs. `recursiveUpdate`
+    # is safe here because the categories touch disjoint keys (Context.sockets
+    # vs Session Bus Policy), so no leaf list is ever clobbered.
+    overrides = lib.foldl' lib.recursiveUpdate { } [
+      (forApps needsX11 { Context.sockets = [ "x11" ]; })
+      (forApps needsSecretService {
+        "Session Bus Policy"."org.freedesktop.secrets" = "talk";
+      })
 
-              "com.discordapp.Discord"
-              "us.zoom.Zoom"
-            ]
-        ))
-        {
-          # Misc specific overrides
-          "im.riot.Riot" = {
-            # Permission to check power state
-            "System Bus Policy"."org.freedesktop.UPower" = "talk";
-
-            # Permission to reach the secret service (oo7)
-            "Session Bus Policy"."org.freedesktop.secrets" = "talk";
-          };
-        };
+      # Misc one-off policies
+      {
+        # riot: permission to check power state
+        "im.riot.Riot"."System Bus Policy"."org.freedesktop.UPower" = "talk";
+      }
+    ];
   };
 }

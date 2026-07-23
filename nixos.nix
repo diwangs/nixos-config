@@ -154,15 +154,25 @@
     package = cua.packages.${pkgs.stdenv.hostPlatform.system}.cua-driver;
   };
 
+  # Flatpak
   services.flatpak = {
     enable = true;
     uninstallUnmanaged = true;
     overrides.global = {
       Context.sockets = [
+        # Wayland only
         "wayland"
         "!x11"
         "!fallback-x11"
+
+        # Force apps to use xdg-dbus-proxy
+        "!session-bus"
       ];
+      # xdg-dbus-proxy session bus policy
+      "Session Bus Policy" = {
+        # Disable Secret Service to force usage of Secret Portal
+        "org.freedesktop.secrets" = "none";
+      };
     };
   };
 
