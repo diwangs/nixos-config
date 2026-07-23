@@ -1,6 +1,5 @@
 { config, ... }: {
   users.mutableUsers = false;
-  programs.zsh.enable = true; # Add to /etc/shells; enables user in greeter
 
   # Root (Generate with `mkpasswd`)
   users.users.root.hashedPasswordFile =
