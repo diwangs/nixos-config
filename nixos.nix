@@ -41,11 +41,11 @@
     self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip.nix)
-    # aws-vault content-type fix for the oo7 secret-service backend. Laptop-only:
-    # aws-vault is installed only via package/home-manager.nix (not the shared
-    # devbox list), so this overlay never needs wiring into the devbox
-    # homeConfigurations in flake.nix.
-    (import ./package/overlay/aws-vault.nix)
+    # oo7 content-type fix: patch the Secret Service daemon (oo7-server) to
+    # stop rejecting spec-legal MIME content types, so clients like aws-vault
+    # (which label secrets "application/json") can store them. Replaces the
+    # older aws-vault-side relabel workaround. See package/overlay/oo7/json.nix.
+    (import ./package/overlay/oo7/json.nix)
     # (import ./package/overlay/codex-acp.nix)
 
     # key-rack version bump: nixpkgs has 0.4.0, upstream is ahead (0.6.0,

@@ -47,9 +47,9 @@ in
       sshpass
       ansible-lint
       # AWS credential broker: exposes STS keys while keeping the access key in
-      # the secret service. Laptop-only (not in the shared devbox list) because
-      # its content-type fix for the oo7 backend lives in an overlay wired into
-      # nixos.nix (see package/overlay/aws-vault.nix).
+      # the secret service. The content-type mismatch that broke `aws-vault add`
+      # against the oo7 backend is fixed daemon-side by an overlay wired into
+      # nixos.nix (see package/overlay/oo7/json.nix).
       aws-vault # `aws-vault add --secret-service-collection='Login' ...`
 
       # Agentic
