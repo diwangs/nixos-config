@@ -2,11 +2,7 @@
 # (imported by home-manager.devbox.nix, which the laptop entry also
 # imports). Keep this file devbox-safe: no desktop, dconf, or NixOS-module
 # assumptions.
-{
-  config,
-  ...
-}:
-{
+{ config, ... }: {
   # Shell
   programs.zsh = {
     enable = true; # also required by home-manager `sshAuthSock` to export SSH_AUTH_SOCK
@@ -17,7 +13,7 @@
     # is why this used to disable the symlink and materialize a real ~/.zshenv.
     # The Bash sandbox is landstrip (Landlock) now — no bind-mounts — so the
     # symlink is fine and that whole workaround is gone.
-    dotDir = "${config.xdg.configHome}/zsh";
+    dotDir = "${config.xdg.configHome}/zsh"; # As of state version 26.05
     historySubstringSearch.enable = true; # The only feature I need from OMZ
     autosuggestion.enable = true;
     enableCompletion = true;

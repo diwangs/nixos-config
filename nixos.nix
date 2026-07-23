@@ -26,6 +26,7 @@
     ./aspect/desktop.nix
     ./aspect/virtualisation.nix
     ./aspect/secret.nix
+    ./aspect/shell.nix
     ./aspect/yubikey.nix
 
     ./package/nixos.nix

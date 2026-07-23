@@ -1,4 +1,4 @@
-{ config, pkgs, ... }: {
+{ config, ... }: {
   users.mutableUsers = false;
   programs.zsh.enable = true; # Add to /etc/shells; enables user in greeter
 
@@ -17,9 +17,8 @@
       "adbusers" # Android debugging
       "plugdev" # HackRF
     ];
-    # NOTE: GNOME Keyring traditionally uses the same password, but not synced
+    # NOTE: GNOME Keyring traditionally uses the same password, but not synced.
     # We don't use it anymore, but just note it here for reference.
     hashedPasswordFile = config.age.secrets."paladin-iii/hashed-password".path;
-    shell = pkgs.zsh; # Set default shell; further config goes to home-manager
   };
 }
