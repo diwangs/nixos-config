@@ -1,0 +1,22 @@
+--- a/src/widgets/pages/overview_page.rs
++++ b/src/widgets/pages/overview_page.rs
+@@ -109,19 +109,13 @@
+                 let flatpak = o.downcast_ref::<KrFlatpak>().unwrap();
+                 !flatpak.is_installed()
+             });
+-            let not_empty_filter = gtk::CustomFilter::new(|o| {
+-                let flatpak = o.downcast_ref::<KrFlatpak>().unwrap();
+-                flatpak.n_total_items() != 0
+-            });
+ 
+             // Combine flatpak filters
+             let installed_everyfilter = gtk::EveryFilter::new();
+             installed_everyfilter.append(installed_filter);
+-            installed_everyfilter.append(not_empty_filter.clone());
+ 
+             let uninstalled_everyfilter = gtk::EveryFilter::new();
+             uninstalled_everyfilter.append(uninstalled_filter);
+-            uninstalled_everyfilter.append(not_empty_filter);
+ 
+             self.uninstalled_model
+                 .set_filter(Some(&uninstalled_everyfilter));

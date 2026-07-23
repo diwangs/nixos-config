@@ -39,6 +39,7 @@ in
       # System
       lm_sensors # Power and temperature monitoring
       crosspipe # Pipewire multimedia patchbay
+      key-rack
 
       # Runtime environment (or environment manager)
       conda # Python environment manager	  		(conda-shell)

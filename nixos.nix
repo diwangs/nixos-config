@@ -48,6 +48,10 @@
     (import ./package/overlay/aws-vault.nix)
     # (import ./package/overlay/codex-acp.nix)
 
+    # key-rack version bump: nixpkgs has 0.4.0, upstream is ahead (0.6.0,
+    # unreleased tag). See package/overlay/key-rack.nix for details.
+    (import ./package/overlay/key-rack.nix)
+
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
     (import ./package/overlay/claude-desktop/overlay.nix)
     (import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
