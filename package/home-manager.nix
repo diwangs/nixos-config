@@ -248,8 +248,4 @@ in
     };
   };
 
-  # CLI-based agent orchestrator
-  programs.t3code = {
-    enable = true;
-  };
 }

@@ -2,6 +2,10 @@
   # Enable the GNOME DM and DE.
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+  environment.gnome.excludePackages = with pkgs; [
+    # seahorse
+    epiphany # Web browser
+  ];
 
   # For Chromium-based program to use Wayland natively instead of XWayland
   # NOTE: this cause bugs, but so far it's bearable
