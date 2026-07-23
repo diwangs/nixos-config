@@ -2,12 +2,12 @@
   # oo7: Secret Portal and Secret Service
   services.oo7.enable = true;
   services.gnome.gnome-keyring.enable = false;
-
   # Drop-in to oo7-daemon to enable auto-unlock via agenix at login
   systemd.user.services.oo7-daemon = {
     after = [ "agenix.service" ];
     wants = [ "agenix.service" ];
-    serviceConfig.ImportCredential = ""; # reset the systemd-creds credstore import
+    serviceConfig.ImportCredential = ""; # Don't use systemd-creds
+    # Make sure there's a file called `oo7.keyring-encryption-password` here
     environment.CREDENTIALS_DIRECTORY = "/run/user/1000/agenix/paladin-iii";
   };
 

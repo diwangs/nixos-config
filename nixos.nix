@@ -49,14 +49,6 @@
     # (import ./package/overlay/codex-acp.nix)
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
-    # Migrated off patrickjaja's `claude-desktop-bin` (base + 9 patches); those
-    # files remain under ./package/overlay/claude-desktop-bin/ for reference/
-    # rollback but are no longer imported. Re-applied here: the OpenRouter/3p
-    # patches (model-id, thinking-flag, titlegen, chat-effort) + debug-port +
-    # the Cowork-VM path patch. Patrickjaja's Computer-Use/screenshot/ydotool
-    # patches (05/08/10/11) are NOT migrated. Each patch runs its own
-    # extract/repack or loose-file edit (see patch/lib.nix), so order is
-    # irrelevant.
     (import ./package/overlay/claude-desktop/overlay.nix)
     (import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
     (import ./package/overlay/claude-desktop/patch/vm-path.nix)
@@ -140,15 +132,7 @@
   # 	libusb1			# For firmware updates with SuzyQ
   # ];
 
-  # NOTE: the official Claude Desktop bundles and self-spawns its own Cowork
-  # backend (cowork-linux-helper, restart-backoff supervised, in-$HOME rpc.sock),
-  # so patrickjaja's external `services.claude-cowork` daemon was removed in the
-  # migration — it's no longer used.
-
   # Enable cua-driver (also sets CUA_DRIVER_BIN)
-  #
-  # NOTE: this does not start a daemon, since the intended design is to spawn
-  # on-demand for MCP.
   services.cua-driver = {
     enable = true;
     package = cua.packages.${pkgs.stdenv.hostPlatform.system}.cua-driver;
