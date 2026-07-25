@@ -40,23 +40,19 @@
 
     self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
-    (import ./package/overlay/landstrip.nix)
-    # oo7 content-type fix: patch the Secret Service daemon (oo7-server) to
-    # stop rejecting spec-legal MIME content types, so clients like aws-vault
-    # (which label secrets "application/json") can store them. Replaces the
-    # older aws-vault-side relabel workaround. See package/overlay/oo7/json.nix.
-    (import ./package/overlay/oo7/json.nix)
-    # oo7 Secret-portal fix: patch the vendored ashpd in oo7-portal so a
-    # digit-leading portal token no longer panics the RetrieveSecret handler,
-    # which hung Chromium/Electron (Claude Desktop) on startup. Supersedes the
-    # claude-desktop-side --disable-features=DbusSecretPortal workaround below
-    # (patch/oo7.nix, now disabled). See package/overlay/oo7/portal-token.nix.
-    (import ./package/overlay/oo7/portal-token.nix)
+    (import ./package/overlay/landstrip/overlay.nix)
+    # oo7 → git main. Both the content-type reject (aws-vault "application/json")
+    # and the digit-leading portal-token panic (hung Claude Desktop on startup)
+    # are now fixed upstream, so we build oo7 from a pinned main commit rather
+    # than hand-patching. Replaces the former oo7/json.nix + oo7/portal-token.nix
+    # overlays and supersedes the claude-desktop-side DbusSecretPortal workaround
+    # below (patch/oo7.nix, still disabled). See package/overlay/oo7.nix.
+    (import ./package/overlay/oo7.nix)
     # (import ./package/overlay/codex-acp.nix)
 
     # key-rack version bump: nixpkgs has 0.4.0, upstream is ahead (0.6.0,
-    # unreleased tag). See package/overlay/key-rack.nix for details.
-    (import ./package/overlay/key-rack.nix)
+    # unreleased tag). See package/overlay/key-rack/overlay.nix for details.
+    (import ./package/overlay/key-rack/overlay.nix)
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
     (import ./package/overlay/claude-desktop/overlay.nix)

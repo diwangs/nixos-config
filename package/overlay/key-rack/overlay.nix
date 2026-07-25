@@ -46,7 +46,7 @@ in
   key-rack = prev.key-rack.overrideAttrs (old: {
     inherit version src;
 
-    patches = [ ./key-rack/0001-show-empty-flatpak-portal-entries.patch ];
+    patches = [ ./0001-show-empty-flatpak-portal-entries.patch ];
 
     nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
       final.desktop-file-utils

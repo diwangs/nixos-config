@@ -184,7 +184,7 @@
           pkgs = import nixpkgs {
             inherit system;
             overlays = [
-              (import ./package/overlay/landstrip.nix)
+              (import ./package/overlay/landstrip/overlay.nix)
             ];
             config.allowUnfreePredicate =
               pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
