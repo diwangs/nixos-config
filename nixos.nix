@@ -113,14 +113,15 @@
         SECURITY_LOCKDOWN_LSM = lib.mkForce yes; # Get kernel ready for lockdown mode
 
         MODULE_SIG = lib.mkForce yes; # Generate key, sign module, dump the private part
-        # TODO: MODULE_SIG_FORCE?
+        MODULE_SIG_FORCE = lib.mkForce yes;
         DEVMEM = lib.mkForce no; # /dev/mem: disable, not needed for 7040
         # Options for BIOS access for Chromebook
         # STRICT_DEVMEM = lib.mkForce yes;
         # IO_STRICT_DEVMEM = no;
 
         # Compiler
-        LTO_CLANG_FULL = yes; # Enable full ClangLTO optimization (full). Note that since kCFI, this doesn't have any security benefit
+        LTO_CLANG_FULL = yes; # NOTE: since kCFI, this is only for performance
+        # NOTE: as on 7.1.5, this breaks `bpf-restrict-fs`
       };
     }
   ];

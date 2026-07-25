@@ -70,7 +70,10 @@ let
       UBSAN_BOUNDS = whenAtLeast "5.7" yes;
       UBSAN_SANITIZE_ALL = whenOlder "6.9" yes;
       UBSAN_LOCAL_BOUNDS = option yes;
-      CFI_CLANG = option yes;
+      # CFI_CLANG was renamed to the compiler-agnostic CFI in Linux 6.18
+      # (transitional shim aside, the live symbol on >=6.18 is CONFIG_CFI).
+      CFI_CLANG = whenOlder "6.18" (option yes);
+      CFI = whenAtLeast "6.18" (option yes);
 
       ACPI_CUSTOM_METHOD = whenOlder "6.9" no;
       PROC_KCORE = no;
