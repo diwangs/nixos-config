@@ -65,6 +65,14 @@
       port = 9050;
     };
   };
+  # Trezor Suite's external Tor integration uses IPv4 loopback.
+  services.tor.settings.SOCKSPort = lib.mkAfter [
+    {
+      IsolateDestAddr = true;
+      addr = "127.0.0.1";
+      port = 9050;
+    }
+  ];
 
   # ===========================================================================
   # Enable 464XLAT scheme for IPv6 only networks
