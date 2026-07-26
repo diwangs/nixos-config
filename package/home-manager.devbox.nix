@@ -130,6 +130,7 @@
 
             homeSecretGlobs = [
               "~/.age-identity" # Direct children dotfiles
+              "~/.aws/**"
               "~/.ssh/**"
               "~/.gnupg/**"
 

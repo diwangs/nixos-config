@@ -69,7 +69,7 @@
         "${config.home.homeDirectory}/.bashrc" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
 
-        "${config.home.homeDirectory}/.aws" # Access to STS but not access key
+        # "${config.home.homeDirectory}/.aws" # Access to STS but not access key
         "${config.home.homeDirectory}/.claude"
 
         "."

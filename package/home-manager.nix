@@ -46,11 +46,7 @@ in
       ansible
       sshpass
       ansible-lint
-      # AWS credential broker: exposes STS keys while keeping the access key in
-      # the secret service. The content-type mismatch that broke `aws-vault add`
-      # against the oo7 backend is fixed daemon-side by an overlay wired into
-      # nixos.nix (see package/overlay/oo7/json.nix).
-      aws-vault # `aws-vault add --secret-service-collection='Login' ...`
+      aws-vault # STS credential broker through ECS servers
 
       # Agentic
       claude-desktop
@@ -106,27 +102,26 @@ in
   };
   xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
 
-  # AWS CLI configuration
+  # AWS CLI and `aws-vault`
+  # Usage:
+  # `aws-vault exec --ecs-server --lazy <profile> -- codex`
+  home.sessionVariables.AWS_VAULT_SECRET_SERVICE_COLLECTION_NAME = "login";
   programs.awscli = {
     enable = true;
     settings = {
-      # Shim profile; don't use this ("nova" won't resolve)
-      "profile diwangs-mantle" = {
-        source_profile = "nova"; # Defined inside `aws-vault`
+      "profile nova" = {
+        credential_process = "/run/current-system/sw/bin/cat /run/user/1000/agenix/token/access-nova.json";
+      };
+      # Role profiles exported by aws-vault for the user-facing profiles below.
+      "profile mantle" = {
+        source_profile = "nova";
         role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle";
         region = "us-east-1";
       };
-      "profile diwangs-mantle-tf" = {
+      "profile mantle-tf" = {
         source_profile = "nova";
         role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-tf";
         region = "us-east-2";
-      };
-      # Actual profile
-      "profile mantle" = {
-        credential_process = "aws-vault export --secret-service-collection='Login' --format=json diwangs-mantle";
-      };
-      "profile mantle-tf" = {
-        credential_process = "aws-vault export --secret-service-collection='Login' --format=json diwangs-mantle-tf";
       };
     };
   };
@@ -142,14 +137,6 @@ in
       git_panel.default_width = 250;
       collaboration_panel.default_width = 250;
       outline_panel.default_width = 250;
-
-      # agent.default_width = 1080;
-
-      # ssh_connections = [
-      #   {
-      #     host = "nova-devbox";
-      #   }
-      # ];
     };
   };
 
