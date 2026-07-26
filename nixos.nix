@@ -129,7 +129,8 @@
   # Enabling LSM
   security.apparmor.enable = true;
   security.lsm = [ "lockdown" ];
-  boot.kernelParams = [ "lockdown=confidentiality" ];
+  # Confidentiality broke `bpf` due to `bpf_probe_read_kernel`
+  boot.kernelParams = [ "lockdown=integrity" ];
 
   # Hardened profile doesn't allow this?
   services.logrotate.checkConfig = false;
