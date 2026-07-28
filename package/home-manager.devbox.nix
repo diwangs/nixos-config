@@ -153,6 +153,7 @@
             defaultMode = "auto";
             tui = "fullscreen";
             sandbox.enabled = false;
+            autoMemoryEnabled = false;
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
               CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
