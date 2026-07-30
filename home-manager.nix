@@ -5,6 +5,7 @@
     ./home-manager.devbox.nix
 
     ./aspect/desktop.hm.nix
+    ./aspect/user.hm.nix
     ./aspect/yubikey.hm.nix
 
     nix-zed-extensions.homeManagerModules.default

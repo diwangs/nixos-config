@@ -16,16 +16,11 @@
 # snapshoted
 
 {
-  config,
   lib,
   pkgs,
   pkgs-stable,
   ...
 }:
-let
-  # YubiKey PIV slot 9a public key (SSH auth + git signing identity)
-  pivSshPubKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAlqJuT2Lkccq5Q3Jkc8msxn9FQ1tvtP4i/fvTIpBrjUAB/RayymoXWLQUly3o9ytPcJK1PDI/EuxbdjmxKEaSI=";
-in
 {
   imports = [
     # Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
@@ -84,23 +79,7 @@ in
   programs.git = {
     enable = true;
     lfs.enable = true;
-    signing = {
-      # SSH-based signing via the YubiKey PIV key served by yubikey-agent
-      # (ssh-keygen -Y sign goes through SSH_AUTH_SOCK; pinentry per session)
-      format = "ssh";
-      key = "key::${pivSshPubKey}";
-    };
-    settings = {
-      # Lets `git log --show-signature` verify our own signatures
-      gpg.ssh.allowedSignersFile = "${config.xdg.configHome}/git/allowed_signers";
-      # SSH_AUTH_SOCK is cached by the GNOME environment, restart if changed
-      # gpg.ssh.program = "${pkgs.writeShellScript "ssh-keygen-yubikey" ''
-      # 	export SSH_AUTH_SOCK="''${SSH_AUTH_SOCK:-''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/yubikey-agent/yubikey-agent.sock}"
-      # 	exec ${pkgs.openssh}/bin/ssh-keygen "$@"
-      # ''}";
-    };
   };
-  xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
 
   # AWS CLI and `aws-vault`
   # Usage:

@@ -49,9 +49,10 @@
     # below (patch/oo7.nix, still disabled). See package/overlay/oo7.nix.
     (import ./package/overlay/oo7.nix)
     # (import ./package/overlay/codex-acp.nix)
+    # Patches for YubiKey 5.7
+    (import ./package/overlay/yubikey-agent.nix)
+    (import ./package/overlay/age-plugin-yubikey/overlay.nix)
 
-    # key-rack version bump: nixpkgs has 0.4.0, upstream is ahead (0.6.0,
-    # unreleased tag). See package/overlay/key-rack/overlay.nix for details.
     (import ./package/overlay/key-rack/overlay.nix)
 
     # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
