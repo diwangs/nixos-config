@@ -1,6 +1,6 @@
 { config, ... }: {
   age.identityPaths = [
-    "${config.home.homeDirectory}/.age-identity"
+    "${config.home.homeDirectory}/.age-identity-pq"
   ];
 
   /*

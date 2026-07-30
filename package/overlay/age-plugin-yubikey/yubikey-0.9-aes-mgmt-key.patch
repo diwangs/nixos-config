@@ -1,0 +1,748 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index f00efb5..75cd7ed 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -9,7 +9,7 @@ keywords = ["age", "cli", "encryption", "yubikey"]
+ categories = ["command-line-utilities", "cryptography"]
+ license = "MIT OR Apache-2.0"
+ edition = "2021"
+-rust-version = "1.74" # MSRV
++rust-version = "1.85" # MSRV
+ 
+ [package.metadata.deb]
+ extended-description = """\
+@@ -26,9 +26,12 @@ age-core = "0.11"
+ age-plugin = "0.6"
+ base64 = "0.22"
+ bech32 = "0.11"
++chrono = "0.4"
+ console = { version = "0.15", default-features = false }
++const-oid = { version = "0.10", features = ["db"] }
+ dialoguer = { version = "0.11", default-features = false, features = ["password"] }
+ env_logger = "0.10"
++getrandom = { version = "0.4", features = ["sys_rng"] }
+ gumdrop = "0.8"
+ hex = "0.4"
+ hkdf = "0.12"
+@@ -36,15 +39,15 @@ hpke = { version = "0.12", default-features = false, features = ["alloc", "p256"
+ log = "0.4"
+ ml-kem = { version = "0.2", features = ["deterministic"] }
+ p256 = { version = "0.13", features = ["ecdh"] }
++p256_v0_14 = { package = "p256", version = "0.14", default-features = false, features = ["ecdsa"] }
+ pcsc = "2.4"
+ rand = "0.8"
+ sha2 = "0.10"
+ sha3 = "0.10"
+ typenum = "1"
+ which = "5"
+-x509 = "0.2"
+-x509-parser = "0.14"
+-yubikey = { version = "=0.8.0-pre.0", features = ["untested"] }
++x509-cert = "0.3"
++yubikey = { version = "=0.9.0-pre.0", features = ["untested"] }
+ 
+ # Translations
+ i18n-embed = { version = "0.15", features = ["desktop-requester", "fluent-system"] }
+diff --git a/i18n/en-US/age_plugin_yubikey.ftl b/i18n/en-US/age_plugin_yubikey.ftl
+index 1dc6f21..9d702e6 100644
+--- a/i18n/en-US/age_plugin_yubikey.ftl
++++ b/i18n/en-US/age_plugin_yubikey.ftl
+@@ -190,6 +190,8 @@ plugin-err-pin-required     = A PIN is required for {-yubikey} with serial {$yub
+ 
+ ## Errors
+ 
++err-build = Failed to build identity: {$err}
++
+ err-mgmt-key-auth = Failed to authenticate with the PIN-protected management key.
+ rec-mgmt-key-auth =
+     Check whether your management key is using the TDES algorithm.
+diff --git a/rust-toolchain.toml b/rust-toolchain.toml
+index 7737e53..e22c344 100644
+--- a/rust-toolchain.toml
++++ b/rust-toolchain.toml
+@@ -1,3 +1,3 @@
+ [toolchain]
+-channel = "1.74.0"
++channel = "1.85.0"
+ components = ["clippy", "rustfmt"]
+diff --git a/src/builder.rs b/src/builder.rs
+index b477bf8..04b4b74 100644
+--- a/src/builder.rs
++++ b/src/builder.rs
+@@ -2,10 +2,17 @@ use std::str::FromStr;
+ 
+ use age_core::secrecy::zeroize::Zeroize;
+ use dialoguer::Password;
+-use rand::{rngs::OsRng, Rng, RngCore};
+-use x509::RelativeDistinguishedName;
++use getrandom::{rand_core::UnwrapErr, SysRng};
++use rand::{rngs::OsRng, Rng};
++use x509_cert::{
++    der::{asn1::OctetString, referenced::OwnedToRef},
++    ext::Extension,
++    serial_number::SerialNumber,
++    spki::SubjectPublicKeyInfoRef,
++    time::Validity,
++};
+ use yubikey::{
+-    certificate::{Certificate, PublicKeyInfo},
++    certificate::Certificate,
+     piv::{generate as yubikey_generate, AlgorithmId, RetiredSlotId, SlotId},
+     Key, PinPolicy, TouchPolicy, YubiKey,
+ };
+@@ -112,15 +119,14 @@ impl IdentityBuilder {
+             touch_policy,
+         )?;
+ 
+-        let (pending_identity, recipient) = identity_type.recipient(&generated)?;
++        let (pending_identity, recipient) = identity_type.recipient(generated.owned_to_ref())?;
+         let stub = Stub::new(yubikey.serial(), slot, &recipient);
+ 
+         eprintln!();
+         eprintln!("{}", fl!("builder-gen-cert"));
+ 
+         // Pick a random serial for the new self-signed certificate.
+-        let mut serial = [0; 20];
+-        OsRng.fill_bytes(&mut serial);
++        let serial = SerialNumber::generate(&mut UnwrapErr(SysRng));
+ 
+         let name = self
+             .name
+@@ -143,29 +149,37 @@ impl IdentityBuilder {
+             eprintln!("{}", fl!("builder-touch-yk"));
+         }
+ 
+-        let cert = pending_identity.generate_certificate(
+-            x509::Extension::regular(
+-                POLICY_EXTENSION_OID,
+-                &[pin_policy.into(), touch_policy.into()],
+-            ),
+-            |extensions| {
+-                let cert = Certificate::generate_self_signed(
+-                    yubikey,
+-                    SlotId::Retired(slot),
+-                    serial,
+-                    None,
+-                    &[
+-                        RelativeDistinguishedName::organization(BINARY_NAME),
+-                        RelativeDistinguishedName::organizational_unit(env!("CARGO_PKG_VERSION")),
+-                        RelativeDistinguishedName::common_name(&name),
+-                    ],
+-                    generated,
+-                    extensions,
+-                )?;
++        let policy_extension = Extension {
++            extn_id: POLICY_EXTENSION_OID,
++            critical: false,
++            extn_value: OctetString::new(vec![pin_policy.into(), touch_policy.into()])
++                .expect("valid"),
++        };
+ 
+-                Ok(cert)
+-            },
+-        )?;
++        let cert = pending_identity.generate_certificate(policy_extension, |extensions| {
++            // TODO: https://github.com/iqlusioninc/yubikey.rs/issues/581
++            let cert = Certificate::generate_self_signed::<_, p256_v0_14::NistP256>(
++                yubikey,
++                SlotId::Retired(slot),
++                serial,
++                // The original certificate never expired; preserve that behaviour.
++                Validity::infinity().map_err(Error::Build)?,
++                // TODO: https://github.com/RustCrypto/formats/issues/1489
++                format!("O={BINARY_NAME},OU={},CN={name}", env!("CARGO_PKG_VERSION"))
++                    .parse()
++                    .map_err(Error::Build)?,
++                generated,
++                // TODO: https://github.com/iqlusioninc/yubikey.rs/issues/580
++                |builder| {
++                    for extension in extensions {
++                        builder.add_extension(extension)?;
++                    }
++                    Ok(())
++                },
++            )?;
++
++            Ok(cert)
++        })?;
+ 
+         let metadata = Metadata::extract(yubikey, slot, &cert, false).unwrap();
+ 
+@@ -207,7 +221,10 @@ impl IdentityType {
+         }
+     }
+ 
+-    fn recipient(self, spki: &PublicKeyInfo) -> Result<(PendingIdentity, Recipient), Error> {
++    fn recipient(
++        self,
++        spki: SubjectPublicKeyInfoRef<'_>,
++    ) -> Result<(PendingIdentity, Recipient), Error> {
+         match self {
+             Self::Tag => Ok((
+                 PendingIdentity::Tag,
+@@ -242,15 +259,15 @@ enum PendingIdentity {
+ impl PendingIdentity {
+     fn generate_certificate(
+         self,
+-        policy_extension: x509::Extension<'_, &'static [u64]>,
+-        f: impl FnOnce(&[x509::Extension<'_, &'static [u64]>]) -> Result<Certificate, Error>,
++        policy_extension: Extension,
++        f: impl FnOnce(Vec<Extension>) -> Result<Certificate, Error>,
+     ) -> Result<Certificate, Error> {
+         match self {
+-            Self::Tag => f(&[policy_extension]),
++            Self::Tag => f(vec![policy_extension]),
+ 
+             Self::TagPq { mut dk_seed } => {
+                 let cert = mlkem768p256tag::encode_ml_kem_768_seed(&dk_seed, |pq_ext| {
+-                    f(&[pq_ext, policy_extension])
++                    f(vec![pq_ext, policy_extension])
+                 })?;
+ 
+                 dk_seed.zeroize();
+diff --git a/src/error.rs b/src/error.rs
+index 0feb119..ca7a684 100644
+--- a/src/error.rs
++++ b/src/error.rs
+@@ -1,5 +1,7 @@
+ use std::fmt;
+ use std::io;
++
++use x509_cert::der;
+ use yubikey::{piv::RetiredSlotId, Serial};
+ 
+ use crate::util::slot_to_ui;
+@@ -14,6 +16,7 @@ macro_rules! wlnfl {
+ }
+ 
+ pub enum Error {
++    Build(der::Error),
+     CustomManagementKey,
+     Dialog(dialoguer::Error),
+     InvalidFlagCommand(String, String),
+@@ -64,6 +67,7 @@ impl fmt::Debug for Error {
+         const CHANGE_MGMT_KEY_URL: &str = "https://developers.yubico.com/yubikey-manager/";
+ 
+         match self {
++            Error::Build(e) => wlnfl!(f, "err-build", err = e.to_string())?,
+             Error::CustomManagementKey => {
+                 wlnfl!(f, "err-custom-mgmt-key")?;
+                 wlnfl!(
+diff --git a/src/key.rs b/src/key.rs
+index ef82644..8c61f00 100644
+--- a/src/key.rs
++++ b/src/key.rs
+@@ -3,15 +3,18 @@
+ use age_core::primitives::bech32_encode;
+ use age_core::secrecy::{ExposeSecret, SecretString};
+ use age_plugin::{identity, Callbacks};
++use const_oid::ObjectIdentifier;
+ use dialoguer::Password;
+ use log::{debug, error, warn};
+ use std::convert::Infallible;
++use std::env;
+ use std::fmt;
+-use std::io;
++use std::io::{self, Read, Write};
+ use std::iter;
++#[cfg(unix)]
++use std::os::unix::net::UnixStream;
+ use std::thread::sleep;
+ use std::time::{Duration, Instant, SystemTime};
+-use x509_parser::der_parser::oid::Oid;
+ use yubikey::{
+     certificate::Certificate,
+     piv::{decrypt_data, AlgorithmId, RetiredSlotId, SlotId},
+@@ -32,7 +35,7 @@ const ONE_SECOND: Duration = Duration::from_secs(1);
+ const FIFTEEN_SECONDS: Duration = Duration::from_secs(15);
+ 
+ /// The set of OIDs that we understand and use when parsing YubiKey slot certificates.
+-const KNOWN_OIDS: &[&[u64]] = &[
++const KNOWN_OIDS: &[ObjectIdentifier] = &[
+     POLICY_EXTENSION_OID,
+     mlkem768p256tag::ML_KEM_768_SEED_EXTENSION_OID,
+ ];
+@@ -260,6 +263,67 @@ pub(crate) fn open(serial: Option<Serial>) -> Result<YubiKey, Error> {
+     Ok(yubikey)
+ }
+ 
++/// Sends a request to the SSH agent to trigger reconnection to the YubiKey.
++///
++/// This function sends an `SSH_AGENTC_REQUEST_IDENTITIES` (opcode 11) message to the
++/// SSH agent socket specified by the `SSH_AUTH_SOCK` environment variable. This triggers
++/// agents like `yubikey-agent` to reconnect to the YubiKey on-demand, preserving PIN
++/// cache state.
++///
++/// All errors are silently ignored to avoid affecting the main encryption/decryption
++/// workflow.
++#[cfg(unix)]
++fn poke_ssh_agent() {
++    // Get SSH_AUTH_SOCK; silently return if not set
++    let socket_path = match env::var("SSH_AUTH_SOCK") {
++        Ok(path) if !path.is_empty() => path,
++        _ => return,
++    };
++
++    // Connect to the SSH agent socket
++    let mut stream = match UnixStream::connect(&socket_path) {
++        Ok(s) => s,
++        Err(e) => {
++            debug!("Failed to connect to SSH agent socket: {}", e);
++            return;
++        }
++    };
++
++    // Set a short timeout to avoid blocking
++    let timeout = Some(Duration::from_secs(1));
++    let _ = stream.set_read_timeout(timeout);
++    let _ = stream.set_write_timeout(timeout);
++
++    // SSH_AGENTC_REQUEST_IDENTITIES message:
++    // - 4 bytes: message length (big-endian) = 1
++    // - 1 byte: message type = 11 (SSH_AGENTC_REQUEST_IDENTITIES)
++    const SSH_AGENTC_REQUEST_IDENTITIES: [u8; 5] = [0, 0, 0, 1, 11];
++
++    if let Err(e) = stream.write_all(&SSH_AGENTC_REQUEST_IDENTITIES) {
++        debug!("Failed to send request to SSH agent: {}", e);
++        return;
++    }
++
++    // Read and discard the response (we don't need the identities list)
++    // Response format: 4-byte length + message body
++    let mut length_buf = [0u8; 4];
++    if stream.read_exact(&mut length_buf).is_ok() {
++        let length = u32::from_be_bytes(length_buf) as usize;
++        // Limit read to prevent memory issues with malformed responses
++        if length <= 64 * 1024 {
++            let mut response = vec![0u8; length];
++            let _ = stream.read_exact(&mut response);
++        }
++    }
++
++    debug!("Sent reconnection trigger to SSH agent at {}", socket_path);
++}
++
++#[cfg(not(unix))]
++fn poke_ssh_agent() {
++    // SSH agent socket communication is Unix-specific
++}
++
+ /// Disconnect from the YubiKey without resetting it.
+ ///
+ /// This can be used to preserve the YubiKey's PIN and touch caches. There are two cases
+@@ -273,8 +337,13 @@ pub(crate) fn open(serial: Option<Serial>) -> Result<YubiKey, Error> {
+ ///   YubiKey's state were to potentially cache the PIN and/or touch (depending on the
+ ///   policies of the slot). We want to allow these to persist beyond our execution, for
+ ///   usability.
++///
++/// After releasing the YubiKey, this function also sends a request to the SSH agent
++/// (if available) to trigger reconnection, allowing agents like `yubikey-agent` to
++/// reclaim the device and preserve PIN cache state.
+ pub(crate) fn disconnect_without_reset(yubikey: YubiKey) {
+     let _ = yubikey.disconnect(pcsc::Disposition::LeaveCard);
++    poke_ssh_agent();
+ }
+ 
+ fn request_pin<E, E2>(
+@@ -358,7 +427,7 @@ pub(crate) fn manage(yubikey: &mut YubiKey) -> Result<(), Error> {
+     }
+ 
+     match MgmKey::get_protected(yubikey) {
+-        Ok(mgm_key) => yubikey.authenticate(mgm_key).map_err(|e| match e {
++        Ok(mgm_key) => yubikey.authenticate(&mgm_key).map_err(|e| match e {
+             yubikey::Error::AuthenticationError => Error::ManagementKeyAuth,
+             _ => e.into(),
+         })?,
+@@ -366,11 +435,11 @@ pub(crate) fn manage(yubikey: &mut YubiKey) -> Result<(), Error> {
+         _ => {
+             // Try to authenticate with the default management key.
+             yubikey
+-                .authenticate(MgmKey::default())
++                .authenticate(&MgmKey::get_default(yubikey)?)
+                 .map_err(|_| Error::CustomManagementKey)?;
+ 
+             // Migrate to a PIN-protected management key.
+-            let mgm_key = MgmKey::generate();
++            let mgm_key = MgmKey::generate_for(yubikey, &mut getrandom::SysRng)?;
+             eprintln!();
+             eprintln!("{}", fl!("mgr-changing-mgmt-key"));
+             eprint!("... ");
+@@ -395,23 +464,19 @@ pub(crate) fn manage(yubikey: &mut YubiKey) -> Result<(), Error> {
+ pub(crate) fn identify_recipient(
+     cert: &Certificate,
+ ) -> Option<(Recipient, Option<mlkem768p256tag::PqPrivateKey>)> {
+-    let known_oids = KNOWN_OIDS
+-        .iter()
+-        .map(|oid| Oid::from(oid).unwrap())
+-        .collect::<Vec<_>>();
+-
+     // If the certificate contains any unrecognised critical extensions, reject it: we
+     // don't know how to correctly use the identity. In particular, some identities store
+     // parts of their private key material in certificate extensions to work around
+     // hardware limitations. Not understanding these extensions could lead to encrypting
+     // with the wrong protocol and violating security assumptions.
+-    let (_, c) = x509_parser::parse_x509_certificate(cert.as_ref()).ok()?;
+-    if c.tbs_certificate
+-        .extensions()
+-        .iter()
+-        .any(|ext| ext.critical && !known_oids.contains(&ext.oid))
+-    {
+-        return None;
++    let c = cert.cert.tbs_certificate();
++    if let Some(extensions) = c.extensions() {
++        if extensions
++            .iter()
++            .any(|ext| ext.critical && !KNOWN_OIDS.contains(&ext.extn_id))
++        {
++            return None;
++        }
+     }
+ 
+     mlkem768p256tag::Recipient::from_certificate(cert)
+diff --git a/src/main.rs b/src/main.rs
+index 87579c6..f3e1549 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -419,15 +419,15 @@ fn main() -> Result<(), Error> {
+                     .map(|(key, _, recipient)| {
+                         recipient.as_ref().map(|_| {
+                             // Cache the details we need to display to the user.
+-                            let (_, cert) =
+-                                x509_parser::parse_x509_certificate(key.certificate().as_ref())
+-                                    .unwrap();
+-                            let (name, _) = util::extract_name_and_version(&cert, true).unwrap();
+-                            let created = cert
+-                                .validity()
+-                                .not_before
+-                                .to_rfc2822()
+-                                .unwrap_or_else(|e| format!("Invalid date: {e}"));
++                            let cert = &key.certificate().cert;
++                            let (name, _) = util::extract_name_and_version(cert, true).unwrap();
++                            let created = chrono::DateTime::<chrono::Utc>::from(
++                                cert.tbs_certificate()
++                                    .validity()
++                                    .not_before
++                                    .to_system_time(),
++                            )
++                            .to_rfc2822();
+ 
+                             format!("{name}, created: {created}")
+                         })
+diff --git a/src/native/mlkem768p256tag.rs b/src/native/mlkem768p256tag.rs
+index e86895b..03e9997 100644
+--- a/src/native/mlkem768p256tag.rs
++++ b/src/native/mlkem768p256tag.rs
+@@ -6,13 +6,18 @@ use age_core::{
+     secrecy::{zeroize::Zeroize, ExposeSecret},
+ };
+ use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
++use const_oid::ObjectIdentifier;
+ use hpke::{Deserializable, Serializable};
+ use ml_kem::{KemCore, MlKem768, MlKem768Params};
+ use p256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
+ use rand::rngs::OsRng;
+ use typenum::Unsigned;
+-use x509_parser::der_parser::Oid;
+-use yubikey::{certificate::PublicKeyInfo, Certificate};
++use x509_cert::{
++    der::{asn1::OctetString, Decode, Encode},
++    ext::Extension,
++    spki::SubjectPublicKeyInfoRef,
++};
++use yubikey::Certificate;
+ 
+ use crate::{
+     key::{self, Connection},
+@@ -37,7 +42,8 @@ const MLKEM768P256TAG_SALT: &str = "age-encryption.org/mlkem768p256tag";
+ /// store the ML-KEM 768 seed somewhere in the YubiKey's publicly-reachable data. The only
+ /// place we can store arbitrary slot-specific data is in the slot's certificate, so we
+ /// use a custom extension.
+-pub(crate) const ML_KEM_768_SEED_EXTENSION_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 64829, 1, 1];
++pub(crate) const ML_KEM_768_SEED_EXTENSION_OID: ObjectIdentifier =
++    ObjectIdentifier::new_unwrap("1.3.6.1.4.1.64829.1.1");
+ 
+ type Kem = kem::MlKem768P256;
+ pub(crate) type PqPrivateKey = ml_kem::kem::DecapsulationKey<MlKem768Params>;
+@@ -61,37 +67,38 @@ pub(crate) fn expand_pq_key(
+     (dk_pq, ek_pq)
+ }
+ 
+-pub(crate) fn encode_ml_kem_768_seed<T>(
+-    dk_seed: &[u8; 64],
+-    f: impl FnOnce(x509::Extension<&'static [u64]>) -> T,
+-) -> T {
+-    let (value, _) = x509::der::write::der_octet_string(dk_seed)((vec![]).into())
+-        .expect("can write to vec")
+-        .into_inner();
+-    f(x509::Extension::critical(
+-        ML_KEM_768_SEED_EXTENSION_OID,
+-        &value,
+-    ))
++pub(crate) fn encode_ml_kem_768_seed<T>(dk_seed: &[u8; 64], f: impl FnOnce(Extension) -> T) -> T {
++    let value = OctetString::new(dk_seed.as_slice())
++        .expect("valid")
++        .to_der()
++        .expect("can write to vec");
++
++    f(Extension {
++        extn_id: ML_KEM_768_SEED_EXTENSION_OID,
++        critical: true,
++        extn_value: OctetString::new(value).expect("valid"),
++    })
+ }
+ 
+ pub(crate) fn extract_ml_kem_768_seed(cert: &Certificate) -> Option<[u8; 64]> {
+-    let (_, cert) = x509_parser::parse_x509_certificate(cert.as_ref()).ok()?;
++    let mut exts = cert
++        .cert
++        .tbs_certificate()
++        .extensions()?
++        .iter()
++        .filter(|ext| ext.extn_id == ML_KEM_768_SEED_EXTENSION_OID);
++
++    let ext = exts.next()?;
++    // The extension must be present at most once.
++    if exts.next().is_some() {
++        return None;
++    }
+ 
+-    cert.tbs_certificate
+-        .get_extension_unique(&Oid::from(ML_KEM_768_SEED_EXTENSION_OID).unwrap())
++    OctetString::from_der(ext.extn_value.as_bytes())
++        .ok()?
++        .as_bytes()
++        .try_into()
+         .ok()
+-        .flatten()
+-        .and_then(|ext| x509_parser::der_parser::parse_der(ext.value).ok())
+-        .and_then(|(rest, data)| {
+-            rest.is_empty()
+-                .then(|| match data.content {
+-                    x509_parser::der_parser::ber::BerObjectContent::OctetString(bytes) => {
+-                        bytes.try_into().ok()
+-                    }
+-                    _ => None,
+-                })
+-                .flatten()
+-        })
+ }
+ 
+ /// The non-hybrid tagged age recipient type, designed for hardware keys where decryption
+@@ -134,15 +141,12 @@ impl Recipient {
+     }
+ 
+     pub(crate) fn from_spki(
+-        spki: &PublicKeyInfo,
++        spki: SubjectPublicKeyInfoRef<'_>,
+         ek_pq: <MlKem768 as KemCore>::EncapsulationKey,
+     ) -> Option<Self> {
+-        let encoded = match spki {
+-            PublicKeyInfo::EcP256(pubkey) => Some(pubkey),
+-            _ => None,
+-        }?;
++        let encoded = p256::EncodedPoint::from_bytes(spki.subject_public_key.as_bytes()?).ok()?;
+ 
+-        let ek_t = p256::PublicKey::from_encoded_point(encoded).into_option()?;
++        let ek_t = p256::PublicKey::from_encoded_point(&encoded).into_option()?;
+ 
+         Some(Self(kem::PublicKey { ek_pq, ek_t }))
+     }
+@@ -260,3 +264,4 @@ impl RecipientLine {
+         })
+     }
+ }
++
+diff --git a/src/native/p256tag.rs b/src/native/p256tag.rs
+index 960f905..7bb8c7d 100644
+--- a/src/native/p256tag.rs
++++ b/src/native/p256tag.rs
+@@ -13,7 +13,8 @@ use p256::{
+     EncodedPoint,
+ };
+ use rand::rngs::OsRng;
+-use yubikey::{certificate::PublicKeyInfo, Certificate};
++use x509_cert::spki::SubjectPublicKeyInfoRef;
++use yubikey::Certificate;
+ 
+ use super::{stanza_tag, YubiKeyKemPrivateKey};
+ use crate::{
+@@ -89,16 +90,13 @@ impl Recipient {
+         Self::from_spki(cert.subject_pki())
+     }
+ 
+-    pub(crate) fn from_spki(spki: &PublicKeyInfo) -> Option<Self> {
+-        let encoded = match spki {
+-            PublicKeyInfo::EcP256(pubkey) => Some(pubkey),
+-            _ => None,
+-        }?;
++    pub(crate) fn from_spki(spki: SubjectPublicKeyInfoRef<'_>) -> Option<Self> {
++        let encoded = p256::EncodedPoint::from_bytes(spki.subject_public_key.as_bytes()?).ok()?;
++        let point = p256::PublicKey::from_encoded_point(&encoded).into_option()?;
+ 
+-        // Check that the certificate encoding is uncompressed.
++        // Enforce uncompressed encoding (HPKE).
+         let pk_recip = <Kem as hpke::Kem>::PublicKey::from_bytes(encoded.as_bytes()).ok()?;
+ 
+-        let point = p256::PublicKey::from_encoded_point(encoded).into_option()?;
+         let compressed = point.to_encoded_point(true);
+ 
+         Some(Self {
+diff --git a/src/util.rs b/src/util.rs
+index b723ce9..65f05dc 100644
+--- a/src/util.rs
++++ b/src/util.rs
+@@ -2,7 +2,8 @@ use std::fmt;
+ use std::iter;
+ 
+ use base64::{prelude::BASE64_STANDARD_NO_PAD, Engine};
+-use x509_parser::{certificate::X509Certificate, der_parser::oid::Oid};
++use const_oid::ObjectIdentifier;
++use x509_cert::der::Decode;
+ use yubikey::{
+     piv::{RetiredSlotId, SlotId},
+     Certificate, PinPolicy, Serial, TouchPolicy, YubiKey,
+@@ -11,7 +12,8 @@ use yubikey::{
+ use crate::fl;
+ use crate::{error::Error, key::Stub, Recipient, BINARY_NAME, USABLE_SLOTS};
+ 
+-pub(crate) const POLICY_EXTENSION_OID: &[u64] = &[1, 3, 6, 1, 4, 1, 41482, 3, 8];
++pub(crate) const POLICY_EXTENSION_OID: ObjectIdentifier =
++    ObjectIdentifier::new_unwrap("1.3.6.1.4.1.41482.3.8");
+ 
+ pub(crate) fn ui_to_slot(slot: u8) -> Result<RetiredSlotId, Error> {
+     // Use 1-indexing in the UI for niceness
+@@ -72,28 +74,28 @@ pub(crate) fn otp_serial_prefix(serial: Serial) -> String {
+ }
+ 
+ pub(crate) fn extract_name_and_version(
+-    cert: &X509Certificate,
++    cert: &x509_cert::Certificate,
+     all: bool,
+ ) -> Option<(String, Option<String>)> {
++    let subject = cert.tbs_certificate().subject();
++
+     // Look at Subject Organization to determine if we created this.
+-    match cert.subject().iter_organization().next() {
+-        Some(org) if org.as_str() == Ok(BINARY_NAME) => {
++    match subject.organization().ok().flatten() {
++        Some(org) if org.value() == BINARY_NAME => {
+             // We store the identity name as a Common Name attribute.
+-            let name = cert
+-                .subject()
+-                .iter_common_name()
+-                .next()
+-                .and_then(|cn| cn.as_str().ok())
+-                .map(|s| s.to_owned())
++            let name = subject
++                .common_name()
++                .ok()
++                .flatten()
++                .map(String::from)
+                 .unwrap_or_default(); // TODO: This should always be present.
+ 
+             // We store the binary version as an Organizational Unit attribute.
+-            let version = cert
+-                .subject()
+-                .iter_organizational_unit()
+-                .next()
+-                .and_then(|cn| cn.as_str().ok())
+-                .map(|s| s.to_owned())
++            let version = subject
++                .organization_unit()
++                .ok()
++                .flatten()
++                .map(String::from)
+                 .unwrap_or_default(); // TODO: This should always be present.
+ 
+             Some((name, Some(version)))
+@@ -105,7 +107,7 @@ pub(crate) fn extract_name_and_version(
+             }
+ 
+             // Display the entire subject.
+-            let name = cert.subject().to_string();
++            let name = subject.to_string();
+ 
+             Some((name, None))
+         }
+@@ -129,29 +131,27 @@ impl Metadata {
+         cert: &Certificate,
+         all: bool,
+     ) -> Option<Self> {
+-        let (_, cert) = x509_parser::parse_x509_certificate(cert.as_ref()).ok()?;
+-
+         // We store the PIN and touch policies for identities in their certificates
+         // using the same certificate extension as PIV attestations.
+         // https://developers.yubico.com/PIV/Introduction/PIV_attestation.html
+-        let policies = |c: &X509Certificate| {
+-            c.tbs_certificate
+-                .get_extension_unique(&Oid::from(POLICY_EXTENSION_OID).unwrap())
+-                // If the extension is duplicated, we assume it is invalid.
+-                .ok()
++        let policies = |c: &x509_cert::Certificate| {
++            c.tbs_certificate()
++                .extensions()
++                .into_iter()
+                 .flatten()
+-                // If the encoded extension doesn't have 2 bytes, we assume it is invalid.
+-                .filter(|policy| policy.value.len() >= 2)
++                .find(|ext| ext.extn_id == POLICY_EXTENSION_OID)
++                .filter(|policy| policy.extn_value.as_bytes().len() >= 2)
+                 .map(|policy| {
++                    let value = policy.extn_value.as_bytes();
+                     // We should only ever see one of three values for either policy, but
+                     // handle unknown values just in case.
+-                    let pin_policy = match policy.value[0] {
++                    let pin_policy = match value[0] {
+                         0x01 => Some(PinPolicy::Never),
+                         0x02 => Some(PinPolicy::Once),
+                         0x03 => Some(PinPolicy::Always),
+                         _ => None,
+                     };
+-                    let touch_policy = match policy.value[1] {
++                    let touch_policy = match value[1] {
+                         0x01 => Some(TouchPolicy::Never),
+                         0x02 => Some(TouchPolicy::Always),
+                         0x03 => Some(TouchPolicy::Cached),
+@@ -162,18 +162,18 @@ impl Metadata {
+                 .unwrap_or((None, None))
+         };
+ 
+-        extract_name_and_version(&cert, all)
++        extract_name_and_version(&cert.cert, all)
+             .map(|(name, version)| {
+                 let (pin_policy, touch_policy) = if version.is_some() {
+-                    policies(&cert)
++                    policies(&cert.cert)
+                 } else {
+                     // We can extract the PIN and touch policies via an attestation. This
+                     // is slow, but the user has asked for all compatible keys, so...
+                     yubikey::piv::attest(yubikey, SlotId::Retired(slot))
+                         .ok()
+                         .and_then(|buf| {
+-                            x509_parser::parse_x509_certificate(&buf)
+-                                .map(|(_, c)| policies(&c))
++                            x509_cert::Certificate::from_der(&buf)
++                                .map(|c| policies(&c))
+                                 .ok()
+                         })
+                         .unwrap_or((None, None))
+@@ -185,11 +185,14 @@ impl Metadata {
+                 slot,
+                 name,
+                 version,
+-                created: cert
+-                    .validity()
+-                    .not_before
+-                    .to_rfc2822()
+-                    .unwrap_or_else(|e| format!("Invalid date: {e}")),
++                created: chrono::DateTime::<chrono::Utc>::from(
++                    cert.cert
++                        .tbs_certificate()
++                        .validity()
++                        .not_before
++                        .to_system_time(),
++                )
++                .to_rfc2822(),
+                 pin_policy,
+                 touch_policy,
+             })
