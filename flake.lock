@@ -2,11 +2,11 @@
   "nodes": {
     "age-secrets": {
       "locked": {
-        "lastModified": 1785443256,
-        "narHash": "sha256-9DqMn4R1SwXiHI89zATQyogzpkTMU5CNtBxY2C3svX8=",
+        "lastModified": 1785443943,
+        "narHash": "sha256-ZrDZjCk9EFTdqaWwBmlet07Icq7v7B9c77Diz+8vlHA=",
         "ref": "refs/heads/main",
-        "rev": "c42a56295ab2782b560a128088c77fc000633d71",
-        "revCount": 15,
+        "rev": "13670549dd168d00b1cf1a3a0fc84417566bc43a",
+        "revCount": 16,
         "type": "git",
         "url": "ssh://git@github.com/diwangs/age-secrets.git"
       },
