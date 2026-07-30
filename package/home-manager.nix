@@ -119,6 +119,43 @@
     };
   };
 
+  # Zed persists dock widths in its state DB (~/.local/share/zed/db/*-stable),
+  # not in settings.json — which is a read-only store symlink anyway. The
+  # `default_width` above is only a seed: it applies when no row exists, so a
+  # single accidental drag pins that panel forever and no `switch` undoes it.
+  # Drop those rows at login to make the widths above authoritative again.
+  # NOTE: only meaningful while Zed is closed; a running Zed re-serializes
+  # panel state from memory on exit, overwriting whatever we delete here.
+  systemd.user.services.zed-reset-dock-width = {
+    Unit.Description = "Reset Zed sidebar widths to the declarative defaults";
+    Service = {
+      Type = "oneshot";
+      ExecStart = toString (
+        pkgs.writeShellScript "zed-reset-dock-width" ''
+          set -eu
+          # Panel names are Zed's `persistent_name()`, which is the struct name
+          # and NOT the settings key: `collaboration_panel` is `CollabPanel`.
+          panels="'ProjectPanel', 'GitPanel', 'CollabPanel', 'OutlinePanel'"
+          # Keys are `<workspace_id>:<PanelName>`, so match on the suffix to
+          # cover every workspace. Other panels (terminal, agent) are left be.
+          for db in "$HOME"/.local/share/zed/db/*-stable/db.sqlite; do
+            [ -e "$db" ] || continue
+            # Absent on a first-run DB whose migrations have not yet applied.
+            table=$(${lib.getExe' pkgs.sqlite "sqlite3"} "$db" \
+              "SELECT name FROM sqlite_master
+                WHERE type = 'table' AND name = 'scoped_kv_store';")
+            [ -n "$table" ] || continue
+            ${lib.getExe' pkgs.sqlite "sqlite3"} "$db" \
+              "DELETE FROM scoped_kv_store
+                WHERE namespace = 'dock_panel_size'
+                  AND substr(key, instr(key, ':') + 1) IN ($panels);"
+          done
+        ''
+      );
+    };
+    Install.WantedBy = [ "default.target" ];
+  };
+
   # Nix-built (not auto-downloaded) Zed extensions. Also reaches nova-devbox:
   # remote_extensions on the SSH remote is a live mirror of this client's
   # extensions/installed, pushed on every connect.
