@@ -11,7 +11,7 @@
   # security.pam.u2f.interactive = true;
   security.pam = {
     u2f.settings = {
-      authfile = "/etc/u2f_keys"; # Content set in user.nix
+      authfile = "/etc/u2f_keys"; # Content set in host-specific .nix
       cue = true;
     };
     services = {
@@ -23,6 +23,7 @@
       sudo.unixAuth = false;
 
       polkit-1.u2fAuth = true;
+      polkit-1.unixAuth = false;
     };
   };
 

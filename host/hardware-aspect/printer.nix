@@ -9,14 +9,21 @@
   services.printing.drivers = [ pkgs.hplip ];
 
   # URI is a secret (see aspect/secret.nix): decrypted to
-  # /run/agenix/network/malone-360-printer-uri at activation and read when this
-  # service starts. Replaces hardware.printers.ensurePrinters, whose
-  # deviceUri is eval-time and leaks into the world-readable nix store.
+  # /run/agenix/network/malone-360-printer-uri by the stage-2 agenix service
+  # and read when this service starts. Replaces
+  # hardware.printers.ensurePrinters, whose deviceUri is eval-time and leaks
+  # into the world-readable nix store.
   systemd.services.ensure-printers = {
     description = "Ensure CUPS printers (URI from agenix)";
     wantedBy = [ "multi-user.target" ];
-    requires = [ "cups.service" ];
-    after = [ "cups.service" ];
+    requires = [
+      "agenix-install-secrets.service"
+      "cups.service"
+    ];
+    after = [
+      "agenix-install-secrets.service"
+      "cups.service"
+    ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
