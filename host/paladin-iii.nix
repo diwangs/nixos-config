@@ -34,6 +34,7 @@ in
     ./hardware-aspect/disk.nix
     ./hardware-aspect/measured-boot.nix
     ./hardware-aspect/kensington-infinity-dock.nix
+    ./hardware-aspect/thunderbolt-initrd.nix
     ./hardware-aspect/printer.nix
   ];
 
@@ -69,7 +70,6 @@ in
     initrd = {
       availableKernelModules = [
         "nvme" # For disk
-        "thunderbolt" # For dock
         "xhci_pci" # For USB (but doesn't work?)
         "usb_storage"
         "sd_mod"
