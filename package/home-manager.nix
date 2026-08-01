@@ -116,6 +116,9 @@
       git_panel.default_width = 250;
       collaboration_panel.default_width = 250;
       outline_panel.default_width = 250;
+
+      # Don't show ACP terminal response in card
+      agent.expand_terminal_card = false;
     };
   };
 
@@ -166,6 +169,9 @@
       latex
     ];
   };
+
+  # CLI Agent overrides
+  programs.codex.settings.cli_auth_credentials_store = lib.mkForce "keyring";
 
   # IDE: VSCode official
   programs.vscode = {

@@ -50,7 +50,10 @@
       agent_servers = {
         "codex-acp" = {
           command = lib.getExe pkgs.codex-acp;
-          env.CODEX_PATH = lib.getExe pkgs.codex;
+          env = {
+            CODEX_PATH = lib.getExe pkgs.codex;
+            INITIAL_AGENT_MODE = "agent";
+          };
         };
         "claude-code-acp" = {
           command = lib.getExe pkgs.claude-agent-acp;
@@ -66,6 +69,29 @@
         "nixd"
         "!nil"
       ];
+    };
+  };
+
+  # CLI agent: Codex
+  programs.codex = {
+    enable = true;
+    # Trust project in $PWD. This allows Codex settings to be read-only.
+    package = pkgs.writeShellApplication {
+      name = "codex";
+      derivationArgs.version = lib.getVersion pkgs.codex;
+      text = ''
+        codex_project_toml="$(${lib.getExe pkgs.jq} -Rn --arg path "$PWD" '$path')"
+        exec ${lib.getExe pkgs.codex} \
+          -c "projects={$codex_project_toml={trust_level=\"trusted\"}}" \
+          "$@"
+      '';
+    };
+    settings = {
+      cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
+      approval_policy = "on-request";
+      approvals_reviewer = "auto_review";
+      model = "gpt-5.6-sol";
+      model_reasoning_effort = "medium";
     };
   };
 
@@ -268,29 +294,4 @@
       ++ landstripPolicyBase.filesystem.denyWrite;
     }
   );
-
-  # CLI agent: Codex
-  programs.codex = {
-    enable = true;
-    settings = { }; # Intentionally empty to allow mutability (e.g., dir trust)
-  };
-
-  # Copy config.toml into place as a real, writable file so Codex can persist
-  # runtime changes (trusted directories, etc.). Runs unconditionally on every
-  # switch and every boot, so any runtime edits are reset to these declarative
-  # defaults on the next activation.
-  home.activation.codexSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    		dst="$HOME/.codex/config.toml"
-    		run rm -f "$dst"
-    		run install -Dm600 ${
-        (pkgs.formats.toml { }).generate "codex-config.toml" {
-          model_provider = "amazon-bedrock";
-          model_providers."amazon-bedrock".aws.region = "us-east-1";
-          approval_policy = "on-request";
-          approvals_reviewer = "auto_review";
-          model = "openai.gpt-5.6-terra";
-          model_reasoning_effort = "xhigh";
-        }
-      } "$dst"
-    	'';
 }
