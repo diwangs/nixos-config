@@ -201,6 +201,7 @@
               ;
           };
           modules = [
+            { home.uid = 1000; }
             ./host/nova-devbox-admin.hm.nix # User-specific
             ./home-manager.devbox.nix # Portable (devbox)
           ];

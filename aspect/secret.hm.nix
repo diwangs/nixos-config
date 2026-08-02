@@ -1,4 +1,5 @@
-{ config, ... }: {
+{ config, pkgs, ... }:
+rec {
   age.identityPaths = [
     "${config.home.homeDirectory}/.age-identity-pq"
   ];
@@ -16,12 +17,20 @@
     - Does not break programs that require non-symlink files, such as `zsh`
       dotfiles and `/run/wrappers`, which would hard-fail on bind.
 
+    Codex has better bubblewrap implementation, but it allows all reads,
+    subject only to UNIX permissions. Worse, Codex doesn't let you configure
+    this at all.
+
     The cost of this is it requires Landlock LSM in the kernel, but it seems
     to be available on all machines that I use.
+
+    The policy below is additive, i.e., it does not cover things that is
+    already covered by UNIX permissions (e.g., root-owned files, nix store).
   */
   _module.args.landstripPolicyBase = {
     enabled = true;
-    # Claude gets direct network access; OpenCode overrides this for its proxy.
+    # Claude and Codex get direct network access; OpenCode overrides this for
+    # its proxy.
     network = {
       # AF_UNIX
       allowAllUnixSockets = false;
@@ -34,7 +43,7 @@
     };
     filesystem = {
       /*
-        Best linux apps store their secrets with portal (sandboxed apps only)
+        Best linux apps store their secrets with portal (+ sandbox)
         Better linux apps store their secrets with service (oo7 secret service)
         Good linux apps read secrets from env (hence the need of `agenix`)
         Okay linux apps store their secrets in top-level ~ (e.g., `~/.aws`)
@@ -44,15 +53,13 @@
 
       # read: allowed by default, re-allow if ancestor is denied
       denyRead = [
-        "/run/agenix.d" # decrypted agenix secrets (root)
-        "/nix/secret" # age identity key (root)
-        # /run/user/$UID/agenix.d is moved for dynamic generation
+        "/run/user/${toString config.home.uid}/credentials" # systemd-creds
+        "/run/user/${toString config.home.uid}/agenix.d" # agenix secrets
+
         config.home.homeDirectory # age identity key (user), okay apps secrets
 
         "${config.xdg.configHome}/zsh/.zsh_history"
-        # Long-term access key
-        # "${config.home.homeDirectory}/.aws/login"
-        # "${config.home.homeDirectory}/.aws/credentials"
+        "${config.home.homeDirectory}/.codex/auth.json" # Devbox only
         "${config.home.homeDirectory}/.claude/.credentials.json"
 
         "**/.env*" # .envrc is fine since we `cat` from agenix
@@ -69,11 +76,12 @@
         "${config.home.homeDirectory}/.bashrc" # For `bash` warning
         "${config.home.homeDirectory}/.gitconfig" # For `libgit2`
 
-        # "${config.home.homeDirectory}/.aws" # Access to STS but not access key
+        "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
 
         "."
       ];
+
       # write: denied by default, re-deny if ancestor is allowed
       allowWrite = [
         "/dev/null"
@@ -83,6 +91,8 @@
         config.xdg.dataHome
         config.xdg.stateHome
         config.xdg.cacheHome
+
+        "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
 
         "."
@@ -98,4 +108,11 @@
       ];
     };
   };
+
+  # Materialized policy shared by agent Bash-tool wrappers (Codex, Claude
+  # Code). Generated here, next to the base policy, so it stays a single
+  # unmodified file rather than something each consumer re-derives.
+  _module.args.landstripPolicyFile =
+    (pkgs.formats.json { }).generate "agent-landstrip-policy.json"
+      _module.args.landstripPolicyBase;
 }

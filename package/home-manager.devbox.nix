@@ -7,6 +7,7 @@
   pkgs,
   lib,
   landstripPolicyBase, # shared sandbox policy, defined in aspect/secret.hm.nix
+  landstripPolicyFile, # landstripPolicyBase materialized to JSON, also from aspect/secret.hm.nix
   ...
 }:
 {
@@ -43,6 +44,7 @@
     });
     installRemoteServer = true;
     mutableUserSettings = false;
+    mutableUserKeymaps = false;
     userSettings = {
       load_direnv = "direct";
       # External agents speak ACP over stdio. Pin each executable to the Nix
@@ -52,18 +54,24 @@
           command = lib.getExe pkgs.codex-acp;
           env = {
             CODEX_PATH = lib.getExe pkgs.codex;
-            INITIAL_AGENT_MODE = "agent";
+            INITIAL_AGENT_MODE = "agent-full-access";
+            CODEX_CONFIG = builtins.toJSON {
+              # codex-acp merges this into every new and resumed app-server
+              # thread, where hook discovery and trust are evaluated.
+              bypass_hook_trust = true;
+            };
           };
         };
         "claude-code-acp" = {
           command = lib.getExe pkgs.claude-agent-acp;
           env.CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
         };
-        "opencode" = {
-          command = lib.getExe pkgs.opencode;
-          args = [ "acp" ];
-          env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
-        };
+        # OpenCode deprecated; kept for reference, not deleted.
+        # "opencode" = {
+        #   command = lib.getExe pkgs.opencode;
+        #   args = [ "acp" ];
+        #   env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
+        # };
       };
       languages.Nix.language_servers = [
         "nixd"
@@ -75,23 +83,76 @@
   # CLI agent: Codex
   programs.codex = {
     enable = true;
-    # Trust project in $PWD. This allows Codex settings to be read-only.
+    # Run the declarative hooks without an interactive trust prompt and trust
+    # the project from which the CLI is launched. ACP configures both concerns
+    # per thread instead, so its CODEX_PATH points directly to pkgs.codex.
     package = pkgs.writeShellApplication {
       name = "codex";
       derivationArgs.version = lib.getVersion pkgs.codex;
       text = ''
         codex_project_toml="$(${lib.getExe pkgs.jq} -Rn --arg path "$PWD" '$path')"
         exec ${lib.getExe pkgs.codex} \
+          --dangerously-bypass-hook-trust \
           -c "projects={$codex_project_toml={trust_level=\"trusted\"}}" \
           "$@"
       '';
     };
     settings = {
       cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
+      sandbox_mode = "danger-full-access"; # Use `landstrip` instead
       approval_policy = "on-request";
       approvals_reviewer = "auto_review";
       model = "gpt-5.6-sol";
       model_reasoning_effort = "medium";
+      hooks.PreToolUse = [
+        {
+          matcher = "^Bash$";
+          hooks = [
+            {
+              type = "command";
+              command = "${pkgs.writeShellScript "codex-bash-landstrip-wrap" ''
+                deny() {
+                  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
+                  exit 0
+                }
+
+                result="$(${lib.getExe pkgs.jq} -c \
+                  --arg prefix ${lib.escapeShellArg "${
+                    # Use a policy file rather than Landstrip's policy-on-stdin mode so
+                    # wrapped commands (notably apply_patch) retain their original stdin.
+                    pkgs.writeShellScript "agent-landstrip-run" ''
+                      if [ "$#" -eq 0 ]; then
+                        printf '%s\n' "landstrip runner: missing command" >&2
+                        exit 64
+                      fi
+
+                      exec ${lib.getExe pkgs.landstrip} -p ${landstripPolicyFile} -- "$@"
+                    ''
+                  } ${pkgs.bashInteractive}/bin/bash -c "} \
+                  'if (.tool_input | type) != "object" or (.tool_input.command | type) != "string" or .tool_input.command == "" then error("invalid Bash tool input") else .tool_input as $ti | { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: ($ti + { command: ($prefix + ($ti.command | @sh)) }) } } end' \
+                  2>/dev/null)" || deny
+                [ -n "$result" ] || deny
+                printf '%s\n' "$result"
+              ''}";
+              timeout = 10;
+              statusMessage = "Entering Landstrip sandbox";
+            }
+          ];
+        }
+        {
+          matcher = "^apply_patch$";
+          hooks = [
+            {
+              type = "command";
+              command = "${pkgs.writeShellScript "codex-apply-patch-landstrip-block" ''
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Native apply_patch is disabled because it bypasses Landstrip. Retry through Bash by invoking apply_patch; it accepts the same patch as an argument or on stdin."}}'
+              ''}";
+              timeout = 10;
+              statusMessage = "Routing patch through Landstrip";
+            }
+          ];
+        }
+      ];
     };
   };
 
@@ -107,25 +168,6 @@
     		run install -Dm600 ${
         (pkgs.formats.json { }).generate "claude-code-settings.json" (
           let
-            # Materialized landstrip policy, embedded into the Bash-tool
-            # wrapping hook below (see hooks.PreToolUse).
-            landstripPolicyFile =
-              (pkgs.formats.json { }).generate "claude-landstrip-policy.json"
-                landstripPolicyBase;
-
-            # The static policy cannot name $XDG_RUNTIME_DIR portably. Add the
-            # current user's agenix directory immediately before sandboxing,
-            # rather than using Landstrip's eagerly-expanded /run/user/* glob.
-            landstripRunner = pkgs.writeShellScript "claude-bash-landstrip-run" ''
-              runtimeAgenixDir="/run/user/$(${pkgs.coreutils}/bin/id -u)/agenix.d"
-              policy="$(${lib.getExe pkgs.jq} -c --arg runtimeAgenixDir "$runtimeAgenixDir" \
-                '.filesystem.denyRead += [$runtimeAgenixDir]' \
-                ${landstripPolicyFile})" || exit 1
-              [ -n "$policy" ] || exit 1
-              printf '%s\n' "$policy" | exec ${lib.getExe pkgs.landstrip} -- \
-                ${pkgs.bashInteractive}/bin/bash -c "$1"
-            '';
-
             # Landstrip to Claude Code policy translation
             toClaudeGlobs =
               path:
@@ -212,7 +254,18 @@
                   {
                     type = "command";
                     command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
-                      result="$(${lib.getExe pkgs.jq} -c --arg prefix ${lib.escapeShellArg "${landstripRunner} "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
+                      result="$(${lib.getExe pkgs.jq} -c --arg prefix ${lib.escapeShellArg "${
+                        # Use a policy file rather than Landstrip's policy-on-stdin mode so
+                        # wrapped commands (notably apply_patch) retain their original stdin.
+                        pkgs.writeShellScript "agent-landstrip-run" ''
+                          if [ "$#" -eq 0 ]; then
+                            printf '%s\n' "landstrip runner: missing command" >&2
+                            exit 64
+                          fi
+
+                          exec ${lib.getExe pkgs.landstrip} -p ${landstripPolicyFile} -- "$@"
+                        ''
+                      } ${pkgs.bashInteractive}/bin/bash -c "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
                         printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
                         exit 0
                       }
@@ -229,69 +282,72 @@
      	'';
 
   # CLI Agent: OpenCode
-  programs.opencode = {
-    enable = true;
-    extraPackages = [ pkgs.nixd ];
-    settings = {
-      autoupdate = false;
-      lsp = true;
-      plugin = [ "opencode-landstrip" ];
-      permission = {
-        "*" = "allow";
-        # Mirrors the bash sandbox below (xdg.configFile "opencode/sandbox.json"):
-        # deny the whole home directory by default and re-allow only the same
-        # few safe subtrees, rather than a short blocklist of specific secret
-        # dirs. External paths (this is the only place they're gated: it's
-        # checked, with the absolute path, before and independently of
-        # `read`/`edit` — whose own patterns are worktree-relative and never
-        # observe an absolute path at all).
-        #
-        # Granularity note: every query here is "immediate children of some
-        # directory D", and a configured pattern's `*`/`**` both expand to the
-        # same unbounded regex wildcard (no single- vs. multi-segment
-        # distinction) — so, unlike the bash sandbox, a lone top-level dotfile
-        # can't be carved out of the deny without reopening all of home's top
-        # level to listing. The bash sandbox's `~/.gitconfig` exception is
-        # therefore intentionally dropped here: it stays denied.
-        external_directory = {
-          "*" = "allow";
-          "~/**" = "deny";
-          "~/.config/**" = "allow";
-          "~/.local/share/**" = "allow";
-          "~/.local/share/opencode/**" = "deny"; # antipattern: secrets in `share`
-          "~/.cache/**" = "allow";
-          "/nix/secret/**" = "deny"; # agenix host key
-          "/run/agenix/**" = "deny"; # decrypted agenix secrets (nixos module)
-          "/run/user/*/agenix/**" = "deny"; # decrypted agenix secrets (home-manager module)
-        };
-      };
-    };
-    tui.plugin = [ "opencode-landstrip/tui" ];
-  };
-
-  # Config for bash tool landstrip sandbox. Derived from the shared base policy
-  # in aspect/secret.hm.nix (single source of truth) with OpenCode's deltas:
-  # direct network is denied by default (the opencode-landstrip plugin runs an
-  # in-process proxy for per-domain filtering) and unix sockets are restricted to
-  # the nix daemon; it also protects its own config + auth token from writes.
-  # The list orderings below are chosen to keep the emitted JSON byte-equivalent
-  # to the previous inline definition.
+  # Deprecated; kept for reference, not deleted. (Line-commented rather than
+  # /* */ because embedded globs like "/run/user/*/agenix/**" contain a
+  # literal `*/` that would close a block comment early.)
+  # programs.opencode = {
+  #   enable = true;
+  #   extraPackages = [ pkgs.nixd ];
+  #   settings = {
+  #     autoupdate = false;
+  #     lsp = true;
+  #     plugin = [ "opencode-landstrip" ];
+  #     permission = {
+  #       "*" = "allow";
+  #       # Mirrors the bash sandbox below (xdg.configFile "opencode/sandbox.json"):
+  #       # deny the whole home directory by default and re-allow only the same
+  #       # few safe subtrees, rather than a short blocklist of specific secret
+  #       # dirs. External paths (this is the only place they're gated: it's
+  #       # checked, with the absolute path, before and independently of
+  #       # `read`/`edit` — whose own patterns are worktree-relative and never
+  #       # observe an absolute path at all).
+  #       #
+  #       # Granularity note: every query here is "immediate children of some
+  #       # directory D", and a configured pattern's `*`/`**` both expand to the
+  #       # same unbounded regex wildcard (no single- vs. multi-segment
+  #       # distinction) — so, unlike the bash sandbox, a lone top-level dotfile
+  #       # can't be carved out of the deny without reopening all of home's top
+  #       # level to listing. The bash sandbox's `~/.gitconfig` exception is
+  #       # therefore intentionally dropped here: it stays denied.
+  #       external_directory = {
+  #         "*" = "allow";
+  #         "~/**" = "deny";
+  #         "~/.config/**" = "allow";
+  #         "~/.local/share/**" = "allow";
+  #         "~/.local/share/opencode/**" = "deny"; # antipattern: secrets in `share`
+  #         "~/.cache/**" = "allow";
+  #         "/nix/secret/**" = "deny"; # agenix host key
+  #         "/run/agenix/**" = "deny"; # decrypted agenix secrets (nixos module)
+  #         "/run/user/*/agenix/**" = "deny"; # decrypted agenix secrets (home-manager module)
+  #       };
+  #     };
+  #   };
+  #   tui.plugin = [ "opencode-landstrip/tui" ];
+  # };
   #
-  # NOTE: at this current version, there is a bypass intended to make session-
-  # level exception by doing the syscall twice. Re-check in the future if there
-  # is a more user-dependent authorization flow.
-  xdg.configFile."opencode/sandbox.json".text = builtins.toJSON (
-    lib.recursiveUpdate landstripPolicyBase {
-      network.allowNetwork = false; # plugin proxy handles per-domain filtering
-      network.allowAllUnixSockets = false;
-      filesystem.denyRead = landstripPolicyBase.filesystem.denyRead ++ [
-        "~/.local/share/opencode/auth.json" # antipattern: secrets in `share`
-      ];
-      filesystem.denyWrite = [
-        "~/.config/opencode/sandbox.json"
-        ".opencode/sandbox.json"
-      ]
-      ++ landstripPolicyBase.filesystem.denyWrite;
-    }
-  );
+  # # Config for bash tool landstrip sandbox. Derived from the shared base policy
+  # # in aspect/secret.hm.nix (single source of truth) with OpenCode's deltas:
+  # # direct network is denied by default (the opencode-landstrip plugin runs an
+  # # in-process proxy for per-domain filtering) and unix sockets are restricted to
+  # # the nix daemon; it also protects its own config + auth token from writes.
+  # # The list orderings below are chosen to keep the emitted JSON byte-equivalent
+  # # to the previous inline definition.
+  # #
+  # # NOTE: at this current version, there is a bypass intended to make session-
+  # # level exception by doing the syscall twice. Re-check in the future if there
+  # # is a more user-dependent authorization flow.
+  # xdg.configFile."opencode/sandbox.json".text = builtins.toJSON (
+  #   lib.recursiveUpdate landstripPolicyBase {
+  #     network.allowNetwork = false; # plugin proxy handles per-domain filtering
+  #     network.allowAllUnixSockets = false;
+  #     filesystem.denyRead = landstripPolicyBase.filesystem.denyRead ++ [
+  #       "~/.local/share/opencode/auth.json" # antipattern: secrets in `share`
+  #     ];
+  #     filesystem.denyWrite = [
+  #       "~/.config/opencode/sandbox.json"
+  #       ".opencode/sandbox.json"
+  #     ]
+  #     ++ landstripPolicyBase.filesystem.denyWrite;
+  #   }
+  # );
 }
