@@ -12,10 +12,8 @@
       diwangs = {
         isNormalUser = true;
         uid = 1000; # Stable runtime directory for the desktop SSH agent.
-        # Disable password authentication for this user
-        # NOTE: we don't use "!" because it disables GDM user list. Pay
-        # attention to `nullok` in services still using `pam_unix`
-        hashedPassword = "";
+        # Pay attention to `nullok` in services still using `pam_unix`.
+        hashedPassword = "*"; # Account is not locked but password is disabled
         extraGroups = [
           "wheel" # For ‘sudo’ and `iwd`.
           "networkmanager"
