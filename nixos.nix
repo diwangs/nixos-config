@@ -55,14 +55,25 @@
 
     (import ./package/overlay/key-rack/overlay.nix)
 
-    # Official Anthropic Claude Desktop (repackaged .deb) + app.asar patches.
-    (import ./package/overlay/claude-desktop/overlay.nix)
-    # Disabled: superseded by the daemon-side fix in ../oo7/portal-token.nix.
-    # This only masked the panic by turning Chromium's Secret-portal client off.
+    # Claude Desktop (repackaged .deb) + app.asar patches. Dogfooding the
+    # upstream nixpkgs draft packaging (PR #537215) as the real `claude-desktop`:
+    # it is vendored + pulled by package/overlay/claude-desktop-draft/pull.sh.
+    # The local base overlay below is DISABLED (kept on disk) in favor of it.
+    # (import ./package/overlay/claude-desktop/overlay.nix)
+    (import ./package/overlay/claude-desktop-draft/overlay.nix)
+    # The base patch/* overlays below target the top-level app.asar, which the
+    # draft's FHS wrapping moves into passthru.unwrapped — so they'd break the
+    # build and must be migrated per-patch. Disabled pending migration:
+    #   - debug-port-guard: MIGRATED, see the draft patch imported below.
+    #   - vm-path: redundant (the draft bakes the OVMF/virtiofsd asar rewrite
+    #     into passthru.unwrapped's postFixup already).
+    #   - cli-path: MIGRATED, see the draft patch imported below.
     # (import ./package/overlay/claude-desktop/patch/oo7.nix)
-    (import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
-    (import ./package/overlay/claude-desktop/patch/vm-path.nix)
-    (import ./package/overlay/claude-desktop/patch/cli-path.nix)
+    # (import ./package/overlay/claude-desktop/patch/debug-port-guard.nix)
+    # (import ./package/overlay/claude-desktop/patch/vm-path.nix)
+    # (import ./package/overlay/claude-desktop/patch/cli-path.nix)
+    (import ./package/overlay/claude-desktop-draft/patch/debug-port-guard.nix)
+    (import ./package/overlay/claude-desktop-draft/patch/cli-path.nix)
     # (import ./package/overlay/claude-desktop/patch/3p/model-id-normalization.nix)
     # (import ./package/overlay/claude-desktop/patch/3p/thinking-flag.nix)
     # (import ./package/overlay/claude-desktop/patch/3p/titlegen-thinking.nix)
