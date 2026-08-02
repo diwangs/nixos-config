@@ -185,7 +185,7 @@
             inherit system;
             overlays = [
               (import ./package/overlay/landstrip/overlay.nix)
-              (import ./package/overlay/codex-acp.nix)
+              (import ./package/overlay/codex-acp/overlay.nix)
             ];
             config.allowUnfreePredicate =
               pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
