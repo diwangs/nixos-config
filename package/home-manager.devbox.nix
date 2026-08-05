@@ -126,7 +126,7 @@
                         exit 64
                       fi
 
-                      exec ${lib.getExe pkgs.landstrip} -p ${landstripPolicyFile} -- "$@"
+                      exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- "$@"
                     ''
                   } ${pkgs.bashInteractive}/bin/bash -c "} \
                   'if (.tool_input | type) != "object" or (.tool_input.command | type) != "string" or .tool_input.command == "" then error("invalid Bash tool input") else .tool_input as $ti | { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: ($ti + { command: ($prefix + ($ti.command | @sh)) }) } } end' \
@@ -263,7 +263,7 @@
                             exit 64
                           fi
 
-                          exec ${lib.getExe pkgs.landstrip} -p ${landstripPolicyFile} -- "$@"
+                          exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- "$@"
                         ''
                       } ${pkgs.bashInteractive}/bin/bash -c "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
                         printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
