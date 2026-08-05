@@ -154,6 +154,11 @@
         }
       ];
     };
+    profiles.bedrock = {
+      model_provider = "amazon-bedrock";
+      model = "openai.gpt-5.6-sol";
+      model_providers.amazon-bedrock.aws.region = "us-east-1";
+    };
   };
 
   # CLI agent: Claude Code
