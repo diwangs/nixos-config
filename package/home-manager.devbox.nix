@@ -13,8 +13,8 @@
 {
   home.packages = with pkgs; [
     # Runtime environment (or environment manager)
-    fnm # Node.js version manager 					(eval $(fnm env))
-    uv # Python environment manager
+    fnm # Node.js version manager 					(`fnm exec --using=24`)
+    # uv # Python environment manager       (`uv run`)
 
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
@@ -29,6 +29,13 @@
   programs.direnv = {
     enable = true; # Add direnv package and sets the shell hook
     nix-direnv.enable = true; # Cached nix-shell/nix develop environments
+  };
+  programs.uv = {
+    enable = true;
+    settings = {
+      python-downloads = "manual";
+      python-preference = "only-managed";
+    };
   };
 
   # Zed server
@@ -154,6 +161,11 @@
         }
       ];
     };
+    context = ''
+      # Python and Node in Nix Environment
+      - Python is available via `uv` (e.g., `uv run`)
+      - Node is available via `fnm` (e.g., `fnm exec --using=24`)
+    '';
     profiles.bedrock = {
       model_provider = "amazon-bedrock";
       model = "openai.gpt-5.6-sol";

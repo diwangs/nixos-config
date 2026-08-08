@@ -149,11 +149,12 @@
   security.rtkit.enable = true;
 
   # nix-ld: for packages that hasn't been nixified
-  # e.g., `fw-ectool` and virtualhere
+  # e.g., `uv`-managed Python, `fnm`-managed Node
   programs.nix-ld.enable = true;
   # programs.nix-ld.libraries = with pkgs; [
   # 	libusb1			# For firmware updates with SuzyQ
   # ];
+  # environment.localBinInPath = true; # Include `~/.local/bin` e.g., for `uv`
 
   # Enable cua-driver (also sets CUA_DRIVER_BIN)
   services.cua-driver = {
