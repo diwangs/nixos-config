@@ -162,14 +162,20 @@
       ];
     };
     context = ''
+      # Sandbox
+      - Bubblewrap sandbox is replaced with landstrip
+      - It restricts directories and AF_UNIX sockets you could access
+      - It does not restrict network access
+
       # Python and Node in Nix Environment
       - Python is available via `uv` (e.g., `uv run`)
       - Node is available via `fnm` (e.g., `fnm exec --using=24`)
     '';
+    # Custom profile to use Bedrock
     profiles.bedrock = {
       model_provider = "amazon-bedrock";
-      model = "openai.gpt-5.6-sol";
       model_providers.amazon-bedrock.aws.region = "us-east-1";
+      model = "openai.gpt-5.6-sol";
     };
   };
 
@@ -239,6 +245,9 @@
             tui = "fullscreen";
             sandbox.enabled = false;
             autoMemoryEnabled = false;
+            context = ''
+                @~/.codex/AGENTS.md
+            '';
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
               CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
