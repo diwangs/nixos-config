@@ -167,6 +167,7 @@
     packages = with pkgs.zed-extensions; [
       nix
       latex
+      terraform
     ];
   };
 
