@@ -6,16 +6,16 @@
 
 buildNpmPackage rec {
   pname = "codex-acp";
-  version = "1.1.9";
+  version = "1.1.14";
 
   src = fetchFromGitHub {
     owner = "agentclientprotocol";
     repo = "codex-acp";
     tag = "v${version}";
-    hash = "sha256-c8Sgj9XNDAO25UOa+vEy619mSi3tG3NJHbKnV1QzOo8=";
+    hash = "sha256-Mz4kxOvJPDp7R2H2wwTkPuuAICUJXxHdyFvtphOfD/M=";
   };
 
-  npmDepsHash = "sha256-MsP8g4X4yX/K8nwNieQdgGaJfAf8FOc0D3OCypTx+w0=";
+  npmDepsHash = "sha256-oST6ENGfWoa65Ts3RrmHUm5G+OgTQ/StptbnQzlJN/E=";
 
   meta = {
     description = "ACP adapter for the OpenAI Codex CLI";
