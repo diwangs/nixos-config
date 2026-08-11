@@ -164,8 +164,8 @@
     context = ''
       # Sandbox
       - Bubblewrap sandbox is replaced with landstrip
-      - It restricts directories and AF_UNIX sockets you could access
-      - It does not restrict network access
+      - It restricts sensitive directories and allowlists AF_UNIX socket paths
+      - AF_INET and AF_INET6 sockets are unrestricted
 
       # Python and Node in Nix Environment
       - Python is available via `uv` (e.g., `uv run`)
@@ -246,7 +246,7 @@
             sandbox.enabled = false;
             autoMemoryEnabled = false;
             context = ''
-                @~/.codex/AGENTS.md
+              @~/.codex/AGENTS.md
             '';
             env = {
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";

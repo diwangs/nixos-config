@@ -29,17 +29,19 @@ rec {
   */
   _module.args.landstripPolicyBase = {
     enabled = true;
-    # Claude and Codex get direct network access; OpenCode overrides this for
-    # its proxy.
+    # Keep Internet sockets unrestricted while retaining path mediation for
+    # AF_UNIX. Unlike allowNetwork, allowAllInetSockets does not bypass the
+    # Unix-socket allowlist.
     network = {
+      allowNetwork = false; # Disable master override
       # AF_UNIX
       allowAllUnixSockets = false;
       allowUnixSockets = [
         "/nix/var/nix/daemon-socket/socket" # nix build/eval
       ];
-      # AF_INET: binary toggle, setup proxy if filtering is wanted
-      allowNetwork = true;
-      allowLocalBinding = true; # dev servers may bind/connect loopback
+      # AF_INET and AF_INET6, including TCP and UDP.
+      allowAllInetSockets = true;
+      allowLocalBinding = true;
     };
     filesystem = {
       /*
