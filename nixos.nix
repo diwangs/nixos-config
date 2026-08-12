@@ -55,6 +55,10 @@
 
     (import ./package/overlay/key-rack/overlay.nix)
 
+    # Dogfood the Linux packaging from nixpkgs PR #551713 as `pkgs.chatgpt`.
+    # Vendored files are synced by package/overlay/chatgpt-draft/pull.sh.
+    (import ./package/overlay/chatgpt-draft/overlay.nix)
+
     # Claude Desktop (repackaged .deb) + app.asar patches. Dogfooding the
     # upstream nixpkgs draft packaging (PR #537215) as the real `claude-desktop`:
     # it is vendored + pulled by package/overlay/claude-desktop-draft/pull.sh.

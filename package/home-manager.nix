@@ -45,6 +45,7 @@
 
       # Agentic
       claude-desktop
+      chatgpt
       # cua-driver: installed system-wide via services.cua-driver (nixos.nix)
       # github-copilot-cli 		# Agentic LLM in the CLI
 

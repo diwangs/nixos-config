@@ -100,6 +100,7 @@
         "codeql"
         "claude-code"
         "claude-desktop"
+        "chatgpt"
 
         # VSCode and some unfree extensions
         "vscode"
