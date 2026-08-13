@@ -107,6 +107,16 @@
     settings = {
       cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
       allow_login_shell = false; # Preserve Codex tool shims in PATH
+      shell_environment_policy = {
+        ignore_default_excludes = true;
+        filters = {
+          "*KEY*" = "exclude";
+          "*SECRET*" = "exclude";
+          "*PASSWORD*" = "exclude";
+          # No allow-in-deny, so spell out exclude rule for *TOKEN*
+          AWS_BEARER_TOKEN_BEDROCK = "exclude";
+        };
+      };
       # Keep Codex's process sandbox while delegating filesystem and socket
       # policy to the Landstrip wrapper installed by the hooks below.
       default_permissions = "bwrap-landstrip";
@@ -270,7 +280,7 @@
               CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
               CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
               CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
-                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(TOKEN|SECRET|KEY|PASSWORD)')
+                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(KEY|SECRET|PASSWORD|^AWS_BEARER_TOKEN_BEDROCK$)')
                 exec ${pkgs.bashInteractive}/bin/bash "$@"
               ''}/bin/bash";
               CLAUDE_BASH_NO_LOGIN = "1";
