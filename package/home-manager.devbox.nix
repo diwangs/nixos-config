@@ -106,8 +106,25 @@
     };
     settings = {
       cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
-      sandbox_mode = "danger-full-access"; # Use `landstrip` instead
       allow_login_shell = false; # Preserve Codex tool shims in PATH
+      # Keep Codex's process sandbox while delegating filesystem and socket
+      # policy to the Landstrip wrapper installed by the hooks below.
+      default_permissions = "bwrap-landstrip";
+      permissions."bwrap-landstrip" = {
+        description = "Bubblewrap process isolation with Landstrip filesystem and socket policy.";
+        filesystem = {
+          ":root" = "write";
+          # A narrower, existing-path rule keeps Codex's bwrap path active. Its
+          # read-only bind is superseded by bwrap's later fresh /proc mount.
+          "/proc" = "read";
+          # Neutralize Codex's implicit missing-metadata masks for a writable
+          # root so bwrap creates no synthetic filesystem targets.
+          "/.git" = "write";
+          "/.agents" = "write";
+          "/.codex" = "write";
+        };
+        network.enabled = true;
+      };
       approval_policy = "on-request";
       approvals_reviewer = "auto_review";
       model = "gpt-5.6-sol";
@@ -164,9 +181,9 @@
     };
     context = ''
       # Sandbox
-      - Bubblewrap sandbox is replaced with landstrip
-      - It restricts sensitive directories and allowlists AF_UNIX socket paths
-      - AF_INET and AF_INET6 sockets are unrestricted
+      - Bubblewrap provides user/PID namespaces and a fresh /proc
+      - Landstrip restricts filesystem access and allowlists AF_UNIX socket paths
+      - Landstrip leaves AF_INET and AF_INET6 sockets unrestricted
 
       # Python and Node in Nix Environment
       - Python is available via `uv` (e.g., `uv run`)

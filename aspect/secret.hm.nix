@@ -7,9 +7,9 @@ rec {
   /*
     landstrip sandbox policy for CLI agent bash tool
 
-    This would also replace Claude Code's built-in bubblewrap sandbox which is
-    based on bind-mounts and user namespaces instead of Landlock LSM, which
-    has the following advantages:
+    This replaces Claude Code's built-in bubblewrap sandbox and runs inside
+    Codex's bubblewrap process sandbox. Landlock-based filesystem policy has
+    the following advantages over bind-mount path masking:
     - Does not require creation of empty files or device nodes to satisfy
       bind-mount requirement. Claude Code is bad at cleaning up after itself.
     - Does not break programs that require non-character device nodes, such
@@ -17,12 +17,17 @@ rec {
     - Does not break programs that require non-symlink files, such as `zsh`
       dotfiles and `/run/wrappers`, which would hard-fail on bind.
 
-    Codex has better bubblewrap implementation, but it allows all reads,
-    subject only to UNIX permissions. Worse, Codex doesn't let you configure
-    this at all.
+    Codex's outer bubblewrap instance keeps its user/PID namespaces, fresh
+    /proc, and process hardening. It exposes the host filesystem read-write so
+    this Landstrip policy remains the sole path and socket policy.
 
     The cost of this is it requires Landlock LSM in the kernel, but it seems
     to be available on all machines that I use.
+
+    The policy below is additive:
+    - Does not protect directories already protected by UNIX permissions
+    - Does not protect `/proc`, `/dev`, etc. Use `bwrap` for these
+    - Does not protect environment variables. Use agent-specific mechanisms.
 
     The policy below is additive, i.e., it does not cover things that is
     already covered by UNIX permissions (e.g., root-owned files, nix store).
