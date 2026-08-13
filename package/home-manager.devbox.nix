@@ -107,6 +107,7 @@
     settings = {
       cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
       sandbox_mode = "danger-full-access"; # Use `landstrip` instead
+      allow_login_shell = false; # Preserve Codex tool shims in PATH
       approval_policy = "on-request";
       approvals_reviewer = "auto_review";
       model = "gpt-5.6-sol";
