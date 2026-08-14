@@ -43,6 +43,8 @@ rec {
       allowAllUnixSockets = false;
       allowUnixSockets = [
         "/nix/var/nix/daemon-socket/socket" # nix build/eval
+        "/run/user/${toString config.home.uid}/agent-browser/"
+        "/tmp/" # Temporary UNIX sockets (e.g., Chrome)
       ];
       # AF_INET and AF_INET6, including TCP and UDP.
       allowAllInetSockets = true;
@@ -85,6 +87,8 @@ rec {
 
         "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
+        "${config.home.homeDirectory}/.npm"
+        "${config.home.homeDirectory}/.codeql"
 
         "."
       ];
@@ -92,7 +96,10 @@ rec {
       # write: denied by default, re-deny if ancestor is allowed
       allowWrite = [
         "/dev/null"
+        "/dev/shm"
         "/tmp"
+
+        "/run/user/${toString config.home.uid}/agent-browser/"
 
         config.xdg.configHome
         config.xdg.dataHome
@@ -101,6 +108,8 @@ rec {
 
         "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
+        "${config.home.homeDirectory}/.npm"
+        "${config.home.homeDirectory}/.codeql"
 
         "."
       ];
@@ -111,7 +120,7 @@ rec {
 
         # rc-style script (except shell since they source from nix store)
         "**/.git/commondir" # CVE-2026-?
-        "**/.envrc"
+        # "**/.envrc"
       ];
     };
   };

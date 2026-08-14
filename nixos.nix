@@ -41,6 +41,7 @@
     self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip/overlay.nix)
+    (import ./package/overlay/codex/overlay.nix)
     # oo7 → git main. Both the content-type reject (aws-vault "application/json")
     # and the digit-leading portal-token panic (hung Claude Desktop on startup)
     # are now fixed upstream, so we build oo7 from a pinned main commit rather

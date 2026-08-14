@@ -10,6 +10,25 @@
   landstripPolicyFile, # landstripPolicyBase materialized to JSON, also from aspect/secret.hm.nix
   ...
 }:
+let
+  # Except handled directories like /dev /proc and /sys
+  codexBridgeRoots = [
+    "/boot"
+    "/etc"
+    "/home"
+    "/root"
+    "/run"
+    "/tmp"
+    "/usr"
+    "/var"
+  ];
+  codexWritableBridge = lib.genAttrs codexBridgeRoots (_: {
+    "." = "write";
+    ".git" = "write";
+    ".agents" = "write";
+    ".codex" = "write";
+  });
+in
 {
   home.packages = with pkgs; [
     # Runtime environment (or environment manager)
@@ -123,20 +142,29 @@
       permissions."bwrap-landstrip" = {
         description = "Bubblewrap process isolation with Landstrip filesystem and socket policy.";
         filesystem = {
-          ":root" = "write";
-          # A narrower, existing-path rule keeps Codex's bwrap path active. Its
-          # read-only bind is superseded by bwrap's later fresh /proc mount.
-          "/proc" = "read";
-          # Neutralize Codex's implicit missing-metadata masks for a writable
-          # root so bwrap creates no synthetic filesystem targets.
-          "/.git" = "write";
-          "/.agents" = "write";
-          "/.codex" = "write";
-        };
+          # Keep `/` read-only so no later writable-root bind hides bwrap's
+          # minimal `/dev`. Existing ordinary FHS trees are writable through
+          # codexWritableBridge; Landstrip remains the fine-grained path policy
+          # inside this coarse mount-namespace bridge.
+          ":root" = "read";
+
+          # `/dev` itself stays bwrap's minimal device tree. Reopen only the
+          # host shared-memory mount, whose access is still mediated by
+          # Landstrip. Explicit project metadata writes keep Landstrip, rather
+          # than Codex's automatic workspace carveouts, authoritative there.
+          "/dev/shm" = "write";
+          ":workspace_roots" = {
+            "." = "write";
+            ".git" = "write";
+            ".agents" = "write";
+            ".codex" = "write";
+          };
+        }
+        // codexWritableBridge;
         network.enabled = true;
       };
-      approval_policy = "on-request";
-      approvals_reviewer = "auto_review";
+      approval_policy = "never"; # was "on-request"
+      # approvals_reviewer = "auto_review";
       model = "gpt-5.6-sol";
       model_reasoning_effort = "medium";
       hooks.PreToolUse = [
@@ -161,7 +189,8 @@
                         exit 64
                       fi
 
-                      exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- "$@"
+                      exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- \
+                        ${lib.getExe pkgs.tini} -s -- "$@"
                     ''
                   } ${pkgs.bashInteractive}/bin/bash -c "} \
                   'if (.tool_input | type) != "object" or (.tool_input.command | type) != "string" or .tool_input.command == "" then error("invalid Bash tool input") else .tool_input as $ti | { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: ($ti + { command: ($prefix + ($ti.command | @sh)) }) } } end' \
@@ -317,7 +346,8 @@
                             exit 64
                           fi
 
-                          exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- "$@"
+                          exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- \
+                            ${lib.getExe pkgs.tini} -s -- "$@"
                         ''
                       } ${pkgs.bashInteractive}/bin/bash -c "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
                         printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'

@@ -200,6 +200,39 @@ in
           "    }\n",
       )
 
+      # Linux implements futimens(fd, times) as
+      # utimensat(fd, NULL, times, 0). Preserve that fd-only form instead of
+      # lowering its null pathname to an empty mutation slot, which the broker
+      # reports as EIO. Resolving the child fd here keeps the existing path
+      # policy check and pinned mutation path intact.
+      replace_once(
+          "src/engine/platform/linux/seccomp.rs",
+          "        let Some(path) = read_child_path(pid, path_ptr)? else {\n"
+          "            slots.push(None);\n"
+          "            continue;\n"
+          "        };\n"
+          "        let raw = resolve_child_path(pid, dirfd, &path)?;\n",
+          "        let path = match read_child_path(pid, path_ptr)? {\n"
+          "            Some(path) => path,\n"
+          "            None if spec.name == \"utimensat\" && path_ptr == 0 => {\n"
+          "                if dirfd == libc::AT_FDCWD {\n"
+          "                    return Err(BrokerError::SystemCall { errno: libc::EFAULT });\n"
+          "                }\n"
+          "                if syscall_i32(request.data.args[3]) != 0 {\n"
+          "                    return Err(BrokerError::SystemCall { errno: libc::EINVAL });\n"
+          "                }\n"
+          "                // An empty relative path makes resolve_child_path use the\n"
+          "                // file referred to by dirfd via /proc/<pid>/fd/<dirfd>.\n"
+          "                PathBuf::new()\n"
+          "            }\n"
+          "            None => {\n"
+          "                slots.push(None);\n"
+          "                continue;\n"
+          "            }\n"
+          "        };\n"
+          "        let raw = resolve_child_path(pid, dirfd, &path)?;\n",
+      )
+
       replace_once(
           "README.md",
           "Direct TCP and new Unix sockets are denied by default. Proxy ports allow\n"
@@ -362,7 +395,7 @@ in
           "src/engine/config.rs": "allow_all_inet_sockets",
           "src/engine/policy.rs": "restrict_inet_socket_types",
           "src/engine/platform/linux/filter.rs": "add_packet_netlink_filters",
-          "src/engine/platform/linux/seccomp.rs": "restrict_connect_tcp",
+          "src/engine/platform/linux/seccomp.rs": "file referred to by dirfd via",
           "tests/data.txt": "allowAllInetSockets permits IPv4 IPv6 TCP and UDP",
       }
       for path_text, needle in required.items():
