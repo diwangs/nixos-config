@@ -30,6 +30,35 @@ in
           replace_once(path, anchor, anchor + addition)
 
 
+      def insert_after_in(
+          path_text: str,
+          start: str,
+          end: str,
+          anchor: str,
+          addition: str,
+      ) -> None:
+          path = Path(path_text)
+          source = path.read_text()
+          start_count = source.count(start)
+          end_count = source.count(end)
+          if start_count != 1 or end_count != 1:
+              raise SystemExit(
+                  f"allowAllInetSockets overlay: expected one region in {path}, "
+                  f"found start={start_count}, end={end_count}"
+              )
+          start_index = source.index(start)
+          end_index = source.index(end, start_index)
+          region = source[start_index:end_index]
+          count = region.count(anchor)
+          if count != 1:
+              raise SystemExit(
+                  f"allowAllInetSockets overlay: expected one anchor in {path} region "
+                  f"{start!r}, found {count}"
+              )
+          region = region.replace(anchor, anchor + addition, 1)
+          path.write_text(source[:start_index] + region + source[end_index:])
+
+
       insert_after(
           "src/engine/config.rs",
           "    pub(crate) allow_network: bool,\n",
@@ -179,9 +208,11 @@ in
           "        unix_sockets,\n"
           "    )?;\n",
       )
-      insert_after(
+      insert_after_in(
           "src/engine/platform/linux/seccomp.rs",
-          "    let mut socket = target_socket(request)?;\n",
+          "fn handle_bind(\n",
+          "fn handle_connect(\n",
+          "    let socket = target_socket(request)?;\n",
           "    if matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)\n"
           "        && !policy.network_access.restrict_inet_socket_types\n"
           "        && !policy.network_access.restrict_bind_tcp\n"
@@ -189,8 +220,10 @@ in
           "        return Ok(NotificationResult::Continue);\n"
           "    }\n",
       )
-      insert_after(
+      insert_after_in(
           "src/engine/platform/linux/seccomp.rs",
+          "fn handle_connect(\n",
+          "fn handle_unix_bind(\n",
           "    let socket = target_socket(request)?;\n",
           "    if matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)\n"
           "        && !policy.network_access.restrict_inet_socket_types\n"
@@ -200,55 +233,16 @@ in
           "    }\n",
       )
 
-      # Linux implements futimens(fd, times) as
-      # utimensat(fd, NULL, times, 0). Preserve that fd-only form instead of
-      # lowering its null pathname to an empty mutation slot, which the broker
-      # reports as EIO. Resolving the child fd here keeps the existing path
-      # policy check and pinned mutation path intact.
-      replace_once(
-          "src/engine/platform/linux/seccomp.rs",
-          "        let Some(path) = read_child_path(pid, path_ptr)? else {\n"
-          "            slots.push(None);\n"
-          "            continue;\n"
-          "        };\n"
-          "        let raw = resolve_child_path(pid, dirfd, &path)?;\n",
-          "        let path = match read_child_path(pid, path_ptr)? {\n"
-          "            Some(path) => path,\n"
-          "            None if spec.name == \"utimensat\" && path_ptr == 0 => {\n"
-          "                if dirfd == libc::AT_FDCWD {\n"
-          "                    return Err(BrokerError::SystemCall { errno: libc::EFAULT });\n"
-          "                }\n"
-          "                if syscall_i32(request.data.args[3]) != 0 {\n"
-          "                    return Err(BrokerError::SystemCall { errno: libc::EINVAL });\n"
-          "                }\n"
-          "                // An empty relative path makes resolve_child_path use the\n"
-          "                // file referred to by dirfd via /proc/<pid>/fd/<dirfd>.\n"
-          "                PathBuf::new()\n"
-          "            }\n"
-          "            None => {\n"
-          "                slots.push(None);\n"
-          "                continue;\n"
-          "            }\n"
-          "        };\n"
-          "        let raw = resolve_child_path(pid, dirfd, &path)?;\n",
-      )
-
-      replace_once(
+      insert_after(
           "README.md",
-          "Direct TCP and new Unix sockets are denied by default. Proxy ports allow\n"
-          "loopback connections only to those ports; Landstrip does not start a proxy or\n"
-          "filter domains. `allowLocalBinding` permits local TCP binding and loopback\n"
-          "connections. `allowUnixSockets` grants pathname sockets, and\n"
-          "`allowAllUnixSockets` allows all Unix sockets. Set `allowNetwork` to `true` to\n"
-          "disable network enforcement while keeping filesystem restrictions.\n",
-          "Direct TCP and new Unix sockets are denied by default. Proxy ports allow\n"
-          "loopback connections only to those ports; Landstrip does not start a proxy or\n"
-          "filter domains. `allowLocalBinding` permits local TCP binding and loopback\n"
-          "connections. `allowUnixSockets` grants pathname sockets, and\n"
-          "`allowAllUnixSockets` allows all Unix sockets. On Linux, `allowAllInetSockets`\n"
-          "permits all AF_INET and AF_INET6 sockets without changing Unix-socket policy. Set\n"
-          "`allowNetwork` to `true` to disable all network enforcement while keeping\n"
-          "filesystem restrictions.\n",
+          '    "allowNetwork": false,\n',
+          '    "allowAllInetSockets": false,\n',
+      )
+      insert_after(
+          "README.md",
+          "limits, traps, and exit status are in the manual page.\n",
+          "\nOn Linux, `network.allowAllInetSockets` permits all AF_INET and AF_INET6\n"
+          "sockets without changing Unix-socket policy.\n",
       )
 
       replace_once(
@@ -261,20 +255,14 @@ in
           "const OPATH_PROBE_ARG: &str = \"--test-opath\";\n",
           "const INET_PROBE_ARG: &str = \"--test-inet\";\n",
       )
-      replace_once(
+      insert_after(
           "tests/data.rs",
-          "    if args.nth(1).as_deref() == Some(std::ffi::OsStr::new(OPATH_PROBE_ARG)) {\n"
-          "        std::process::exit(opath_probe(args.next()));\n"
-          "    }\n",
-          "    match args.nth(1).as_deref() {\n"
-          "        Some(value) if value == std::ffi::OsStr::new(OPATH_PROBE_ARG) => {\n"
-          "            std::process::exit(opath_probe(args.next()));\n"
-          "        }\n"
+          "        Some(value) if value == std::ffi::OsStr::new(FUTIMENS_PROBE_ARG) => {\n"
+          "            std::process::exit(futimens_probe(args.next()));\n"
+          "        }\n",
           "        Some(value) if value == std::ffi::OsStr::new(INET_PROBE_ARG) => {\n"
           "            std::process::exit(inet_probe());\n"
-          "        }\n"
-          "        _ => {}\n"
-          "    }\n",
+          "        }\n",
       )
       insert_after("tests/data.rs", "enum Net {\n", "    InetAllowed,\n")
       insert_after(
@@ -395,7 +383,7 @@ in
           "src/engine/config.rs": "allow_all_inet_sockets",
           "src/engine/policy.rs": "restrict_inet_socket_types",
           "src/engine/platform/linux/filter.rs": "add_packet_netlink_filters",
-          "src/engine/platform/linux/seccomp.rs": "file referred to by dirfd via",
+          "src/engine/platform/linux/seccomp.rs": "!policy.network_access.restrict_inet_socket_types",
           "tests/data.txt": "allowAllInetSockets permits IPv4 IPv6 TCP and UDP",
       }
       for path_text, needle in required.items():
