@@ -7,22 +7,6 @@
   nixos-hardware,
   ...
 }:
-let
-  machineIdCredentialBase64 = pkgs.writeText "system.machine_id.cred.base64" ''
-    DHzAexF2RZGcSwvqCLwg/iAAAAABAAAADAAAABAAAAD9EL4wEIo7bU5Oc2wAAAAAAAAAAAAAAAAL
-    ACMA8AAAACAAAAAAngAgOLMhkWyiZgOfu0AMtz5xqNqonLsRbl+Mvz2ZdKzWFOsAENAxPI25irBY
-    qwkTwMvKDmBqPtwDnMoI+JfQFLI//SdbbE4dpv+JxuxxEhwj3Z0p94ZqjaRNG5LV+JPwieGRUrru
-    HySVibzoplAgqIgmGHj6kKj2v18YQywY6nh5gHTG1opKgBxsfaK/Njznpvz184yt2OaAIy+qouzA
-    AE4ACAALAAAEEgAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAg7LKkuB1EXUM+
-    pStlk3Oic6kZIB4uk6RZYv1LFEcMEloAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    AABokabOc34t39weD26Y2pBllE3F1jtknYsqy74fQr7vS/BL8KmpwmrVLCfj1c4x97957LGwRBxF
-    0jwUUhz3DkhbPEmAVUiHv4Tl9kB9Ftagn9RmJ3KLEn+Z
-  '';
-
-  machineIdCredential = pkgs.runCommandLocal "system.machine_id.cred" { } ''
-    ${pkgs.coreutils}/bin/base64 --decode ${machineIdCredentialBase64} > "$out"
-  '';
-in
 {
   imports = [
     # Laptop hardware
@@ -96,7 +80,11 @@ in
   system.activationScripts.machineIdCredential.text = ''
     if ${pkgs.util-linux}/bin/mountpoint --quiet /boot; then
       ${pkgs.coreutils}/bin/install -D -m 0600 \
-        ${machineIdCredential} \
+        ${
+          pkgs.runCommandLocal "system.machine_id.cred" { } ''
+            ${pkgs.coreutils}/bin/base64 --decode ${pkgs.writeText "system.machine_id.cred.base64" age-secrets.systemd-creds.paladin-iii.machineIdBase64} > "$out"
+          ''
+        } \
         /boot/loader/credentials/system.machine_id.cred
     fi
   '';
@@ -105,19 +93,7 @@ in
   # To replace it:
   # systemd-creds encrypt -T -p --name=age-identity <plaintext-identity> -
   systemd.services.agenix-install-secrets.serviceConfig.SetCredentialEncrypted =
-    ''
-      age-identity: \
-              DHzAexF2RZGcSwvqCLwg/iAAAAABAAAADAAAABAAAADCK3/3jcSWpfTFzUUAAAAAAAAAA \
-              AAAAAALACMA8AAAACAAAAAAngAgjH2bmB9WbWHEf1pR+63gBFfw/eZmHwTWLM5MwXh/ZC \
-              0AEKZMnszxWeRfFtG0DbhxTjphmqNd3HXCEm74K/NTg8ssa5kJlXpgi7Nik23tHae4SxJ \
-              Boeo66xI8h1XsdrVw0eD9hA1MuKOIK/seb4hJoUzprOaWApi0FsJnYT93c27ZXaVbKZdG \
-              6yFooRCAmrSKefV0rbl15AM5uH0LAE4ACAALAAAEEgAgAAAAAAAAAAAAAAAAAAAAAAAAA \
-              AAAAAAAAAAAAAAAAAAAEAAgpW7g5bpAX1GelcFK5Q1ai5BWGUfJc59mziPhfDoepDkAAA \
-              AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABnwshYCtzC/Pu7eRVz0LY/NbI \
-              OUFqPP4nUvMaeye73zf88EKACqND5SaSioxcbNfdmA+RhGPknkpYVonNoSzTmA8EAiUzn \
-              3AvDKdGJFeXasc3zAM9EEOOQIfh0TQ94WZxJ88IQRxudbQ7rO/uiOca51Hg/lfFJRVdWh \
-              latAYY=
-    '';
+    age-secrets.systemd-creds.paladin-iii.ageIdentity;
 
   # Root secrets (decrypts to `/run/agenix/*`)
   age.secrets."paladin-iii/secure-boot/GUID".file =
