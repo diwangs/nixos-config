@@ -88,6 +88,7 @@ rec {
         "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
         "${config.home.homeDirectory}/.npm"
+        "${config.home.homeDirectory}/.bun"
         "${config.home.homeDirectory}/.codeql"
 
         "."
@@ -109,6 +110,7 @@ rec {
         "${config.home.homeDirectory}/.codex"
         "${config.home.homeDirectory}/.claude"
         "${config.home.homeDirectory}/.npm"
+        "${config.home.homeDirectory}/.bun"
         "${config.home.homeDirectory}/.codeql"
 
         "."

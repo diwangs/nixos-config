@@ -34,6 +34,7 @@ in
     # Runtime environment (or environment manager)
     fnm # Node.js version manager 					(`fnm exec --using=24`)
     # uv # Python environment manager       (`uv run`)
+    docker-client # Docker CLI, to be used with Podman
 
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
@@ -54,6 +55,15 @@ in
     settings = {
       python-downloads = "manual";
       python-preference = "only-managed";
+    };
+  };
+  programs.bun = {
+    enable = true;
+    settings = {
+      install = {
+        globalStore = true; # pnpm-style global store
+        linker = "isolated";
+      };
     };
   };
 
