@@ -35,7 +35,7 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_1_8_hardenedOverlay
+    .linuxKernel_7_1_9_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     self.inputs.nix-vscode-extensions.overlays.default

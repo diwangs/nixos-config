@@ -24,7 +24,7 @@
 }:
 
 let
-  version = "0.18.34";
+  version = "0.18.38";
 in
 rustPlatform.buildRustPackage {
   pname = "landstrip";
@@ -34,10 +34,10 @@ rustPlatform.buildRustPackage {
     owner = "landstrip";
     repo = "landstrip";
     tag = version;
-    hash = "sha256-h16eJ9I2PzEmf4MwM/kxj18pryQS5iiMaY4T4y6O3Tc=";
+    hash = "sha256-OPTe6RvnNIC/VCCekyk04bPRAyy6ctxDqDdEdl31r5A=";
   };
 
-  cargoHash = "sha256-rljhjHriZwfAX+akPXgZRqZ9O3TO5UT07z5hbk3wY1s=";
+  cargoHash = "sha256-BMy8D/VY+Yofnd9JEotTTSVyaU8mdJLl6VnuAippcP8=";
 
   # The test suite exercises live Landlock/seccomp enforcement and needs a
   # real kernel, which the Nix build sandbox does not provide.

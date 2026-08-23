@@ -92,12 +92,6 @@ in
           command = lib.getExe pkgs.claude-agent-acp;
           env.CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
         };
-        # OpenCode deprecated; kept for reference, not deleted.
-        # "opencode" = {
-        #   command = lib.getExe pkgs.opencode;
-        #   args = [ "acp" ];
-        #   env.OPENCODE_EXPERIMENTAL_LSP_TOOL = "true";
-        # };
       };
       languages.Nix.language_servers = [
         "nixd"
@@ -209,7 +203,7 @@ in
             {
               type = "command";
               command = "${pkgs.writeShellScript "codex-apply-patch-landstrip-block" ''
-                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Native apply_patch is disabled because it bypasses Landstrip. Retry through Bash by invoking apply_patch; it accepts the same patch as an argument or on stdin."}}'
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch tool disabled. Bypasses sandbox. Retry through bash tool instead. Accepts same patch as argument or stdin."}}'
               ''}";
               timeout = 10;
               statusMessage = "Routing patch through Landstrip";

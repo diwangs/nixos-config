@@ -60,14 +60,14 @@
   # Removing it is not optional once the pin moves: with `mutableUsers = false`
   # the updated module bind-mounts /etc/sub{u,g}id read-only in ExecStartPost,
   # which `environment.etc` cannot then replace with its symlink at activation.
-  environment.etc = {
-    subuid = {
-      text = "diwangs:100000:65536\n";
-      mode = "0644";
-    };
-    subgid = {
-      text = "diwangs:100000:65536\n";
-      mode = "0644";
-    };
-  };
+  # environment.etc = {
+  #   subuid = {
+  #     text = "diwangs:100000:65536\n";
+  #     mode = "0644";
+  #   };
+  #   subgid = {
+  #     text = "diwangs:100000:65536\n";
+  #     mode = "0644";
+  #   };
+  # };
 }

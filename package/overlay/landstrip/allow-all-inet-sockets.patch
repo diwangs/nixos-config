@@ -24,24 +24,24 @@ lives here. See package/overlay/landstrip/overlay.nix.
 diff -ruN a/README.md b/README.md
 --- a/README.md
 +++ b/README.md
-@@ -52,6 +52,7 @@
+@@ -44,6 +44,7 @@
    },
    "network": {
      "allowNetwork": false,
 +    "allowAllInetSockets": false,
-     "httpProxyPort": 8080,
-     "allowLocalBinding": false,
-     "allowUnixSockets": []
-@@ -62,6 +63,9 @@
- Pass policies with `-p, --policy <FILE>` (repeatable). Semantics, platform
- limits, traps, and exit status are in the manual page.
+     "allowLocalBinding": false
+   }
+ }
+@@ -52,6 +53,9 @@
+ Pass policies with `-p, --policy <FILE>`. Later policies merge over earlier
+ ones. Platform behavior and limits are documented in the manual.
  
 +On Linux, `network.allowAllInetSockets` permits all AF_INET and AF_INET6
 +sockets without changing Unix-socket policy.
 +
  ## Development
  
- ### Package
+ ```sh
 diff -ruN a/src/config.rs b/src/config.rs
 --- a/src/config.rs
 +++ b/src/config.rs

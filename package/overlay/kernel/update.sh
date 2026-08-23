@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 # Update the stable and LTS hardened kernel pins in kernel.nix to the latest
-# releases from anthraxx/linux-hardened. Uses kernel.org's releases.json to
-# decide which branch is "stable" and which is "longterm" — anthraxx also
-# publishes regular-stable trees (e.g. 6.19.x) that are not the LTS.
+# releases from anthraxx/linux-hardened. The stable branch is capped at the
+# newest kernel branch exposed by the pinned nixpkgs; kernel.org's releases.json
+# is used to select the newest longterm branch. Anthraxx also publishes
+# regular-stable trees (e.g. 6.19.x) that are not the LTS.
 #
 # Usage:
-#   ./update.sh                          # auto-detect via kernel.org
+#   ./update.sh                          # stable from nixpkgs, LTS from kernel.org
 #   ./update.sh STABLE_MM LTS_MM         # e.g. ./update.sh 7.0 6.18
 #
-# Requires: curl, jq, nix-prefetch-url, sed (GNU).
+# Requires: curl, jq, nix, nix-prefetch-url, sed (GNU), awk, grep, sort.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KERNEL_NIX="$SCRIPT_DIR/kernel.nix"
 NIXOS_NIX="$SCRIPT_DIR/../../../nixos.nix"
+FLAKE_ROOT="$SCRIPT_DIR/../../.."
 
 err()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 info() { printf '==> %s\n' "$*"; }
@@ -24,7 +26,7 @@ info() { printf '==> %s\n' "$*"; }
 # Plain "${v%.*}" is wrong for ".0" releases like 7.1 (gives "7").
 mm_of() { echo "${1%%-*}" | awk -F. '{print $1"."$2}'; }
 
-for cmd in curl jq nix-prefetch-url sed awk grep; do
+for cmd in curl jq nix nix-prefetch-url sed awk grep sort; do
   command -v "$cmd" >/dev/null || err "missing required command: $cmd"
 done
 [[ -f "$KERNEL_NIX" ]] || err "kernel.nix not found at $KERNEL_NIX"
@@ -50,20 +52,49 @@ pick_latest_in_branch() {
   done <<< "$all_tags"
 }
 
+# Determine the newest mainline kernel branch actually exposed by the pinned
+# nixpkgs. Use the first NixOS configuration only to reach its overlaid `pkgs`;
+# all configurations in this flake share the same nixpkgs input.
+info "Resolving the newest kernel branch available in pinned nixpkgs..."
+nixos_config=$(
+  nix eval --json "$FLAKE_ROOT#nixosConfigurations" --apply builtins.attrNames \
+    | jq -r 'first // empty'
+)
+[[ -n "$nixos_config" ]] || err "flake has no NixOS configuration to inspect"
+
+nixpkgs_stable_mm=$(
+  nix eval --json \
+    "$FLAKE_ROOT#nixosConfigurations.${nixos_config}.pkgs.linuxKernel.kernels" \
+    --apply builtins.attrNames \
+    | jq -r '.[] | select(test("^linux_[0-9]+_[0-9]+$")) | sub("^linux_"; "") | gsub("_"; ".")' \
+    | sort -V \
+    | tail -n1
+)
+[[ -n "$nixpkgs_stable_mm" ]] \
+  || err "could not determine the newest kernel branch from pinned nixpkgs"
+info "Pinned nixpkgs supports kernels through $nixpkgs_stable_mm"
+
+version_gt() {
+  [[ "$1" != "$2" && "$(printf '%s\n' "$1" "$2" | sort -V | tail -n1)" == "$1" ]]
+}
+
 if [[ $# -ge 2 ]]; then
   stable_mm="$1"
   lts_mm="$2"
+  if version_gt "$stable_mm" "$nixpkgs_stable_mm"; then
+    info "Capping requested stable branch $stable_mm at nixpkgs branch $nixpkgs_stable_mm"
+    stable_mm="$nixpkgs_stable_mm"
+  fi
 else
-  info "Resolving branch designations from kernel.org..."
+  stable_mm="$nixpkgs_stable_mm"
+  info "Resolving the longterm branch designation from kernel.org..."
   kernel_org=$(curl -fsSL https://www.kernel.org/releases.json)
-  stable_full=$(echo "$kernel_org" | jq -r '.latest_stable.version')
   # Highest-numbered longterm entry = newest LTS line.
   lts_full=$(echo "$kernel_org" \
     | jq -r '.releases[] | select(.moniker=="longterm") | .version' \
     | sort -V -r | head -n1)
-  [[ -n "$stable_full" && -n "$lts_full" ]] \
+  [[ -n "$lts_full" ]] \
     || err "could not parse kernel.org release metadata"
-  stable_mm="$(mm_of "$stable_full")"
   lts_mm="$(mm_of "$lts_full")"
 fi
 
