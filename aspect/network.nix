@@ -19,6 +19,9 @@
   networking.networkmanager = {
     enable = true;
     ethernet.macAddress = "stable";
+    # Enable native CLAT automatically on IPv6-only connections. NetworkManager
+    # learns the PREF64 from router advertisements and translates with BPF.
+    connectionConfig."ipv4.clat" = 1;
     # wifi.backend = "iwd";	# iwd is newer, but buggy support for MSCHAPv2 with NM
 
     # Prioritize dnscrypt-proxy before DHCP-supplied one
@@ -55,7 +58,7 @@
   };
 
   # Enable Tor SOCKS5 proxy
-  # Tor needs IPv4, so it should wait for clat somehow
+  # NetworkManager provides native CLAT when Tor needs IPv4 on IPv6-only links.
   services.tor.enable = true;
   services.tor.client = {
     enable = true;
@@ -75,30 +78,8 @@
   ];
 
   # ===========================================================================
-  # Enable 464XLAT scheme for IPv6 only networks
+  # DNS64 for IPv6-only networks using NetworkManager's native CLAT
   # ===========================================================================
-
-  services.clatd.enable = true;
-
-  # Relaxes strict RFC6052 requirement of not allowing well-known prefix with
-  # private IPv4 addresses, since I still use public DNS64 that provide well-
-  # known prefix and the PLAT is located locally anyway. Tried solutions:
-  # - clatd's script-up -> doesn't work somehow (error code 1 on `clatd`)
-  # - clatd's cmd-tayga + wrapper script -> works, but has longer code
-  # - (this) Patch tayga source code -> simplest, might be fragile to updates
-  nixpkgs.overlays = [
-    (final: prev: {
-      tayga = prev.tayga.overrideAttrs (old: {
-        # Patch conf parser, set value to 0 even if 1 is read (thanks Claude!)
-        postPatch = (old.postPatch or "") + ''
-          				substituteInPlace conffile.c --replace-fail \
-          					'gcfg->wkpf_strict = 1' 'gcfg->wkpf_strict = 0'
-          			'';
-        # Upstream tests assert wkpf_strict defaults to 1, which our patch breaks
-        doCheck = false;
-      });
-    })
-  ];
 
   # dnscrypt-proxy: DNS64 over HTTPS over Tor
   services.dnscrypt-proxy = {
@@ -108,12 +89,12 @@
       # Upstream: Cloudflare and Google DNS64
       # =======================================================================
 
-      # Netprobe is necessary for bootstrap, to detect if clatd is running
+      # Netprobe is necessary for bootstrap and works through native CLAT.
       netprobe_address = "1.1.1.1:53";
 
       # This is done sequentially
       bootstrap_resolvers = [
-        "[2606:4700:4700::64]:53" # Make sure this has PREF64 for clatd
+        "[2606:4700:4700::64]:53" # IPv6 bootstrap for IPv6-only networks
         "9.9.9.9:53" # fallback resolver for IPv4-only network
         "[2606:4700:4700::6400]:53"
         "149.112.112.112:53"
