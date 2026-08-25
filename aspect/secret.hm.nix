@@ -90,6 +90,7 @@ rec {
         "${config.home.homeDirectory}/.npm"
         "${config.home.homeDirectory}/.bun"
         "${config.home.homeDirectory}/.codeql"
+        "${config.home.homeDirectory}/.docker/buildx"
 
         "."
       ];
@@ -112,6 +113,7 @@ rec {
         "${config.home.homeDirectory}/.npm"
         "${config.home.homeDirectory}/.bun"
         "${config.home.homeDirectory}/.codeql"
+        "${config.home.homeDirectory}/.docker/buildx"
 
         "."
       ];
