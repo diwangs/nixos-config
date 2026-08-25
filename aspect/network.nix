@@ -49,6 +49,20 @@
     enable = true; # Enabled by default, but just to make it explicit
     checkReversePath = "loose"; # Disables rpfilter for Wireguard
 
+    # Prioritize IPv6 game-streaming traffic (DSCP CS6). USB/IP server replies
+    # use TCP source port 3240, while Moonlight sends UDP traffic to ports
+    # 47998-48000. Add the rules idempotently for firewall reloads.
+    extraCommands = ''
+      ip6tables -w -t mangle -C OUTPUT -p tcp --sport 3240 -j DSCP --set-dscp 48 2>/dev/null || \
+        ip6tables -w -t mangle -A OUTPUT -p tcp --sport 3240 -j DSCP --set-dscp 48
+      ip6tables -w -t mangle -C OUTPUT -p udp --dport 47998:48000 -j DSCP --set-dscp 48 2>/dev/null || \
+        ip6tables -w -t mangle -A OUTPUT -p udp --dport 47998:48000 -j DSCP --set-dscp 48
+    '';
+    extraStopCommands = ''
+      ip6tables -w -t mangle -D OUTPUT -p tcp --sport 3240 -j DSCP --set-dscp 48 2>/dev/null || true
+      ip6tables -w -t mangle -D OUTPUT -p udp --dport 47998:48000 -j DSCP --set-dscp 48 2>/dev/null || true
+    '';
+
     # Interfaces
     # Home dock 	-> enp103s0 (Ryzen 7040), enp136s0 (Chromebook)
     # Office dock -> enp101s0 (Ryzen 7040), enp134s0 (Chromebook)
