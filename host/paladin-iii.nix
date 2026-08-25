@@ -2,7 +2,7 @@
 {
   lib,
   pkgs,
-  age-secrets,
+  os-secret,
   lanzaboote,
   nixos-hardware,
   ...
@@ -82,7 +82,7 @@
       ${pkgs.coreutils}/bin/install -D -m 0600 \
         ${
           pkgs.runCommandLocal "system.machine_id.cred" { } ''
-            ${pkgs.coreutils}/bin/base64 --decode ${pkgs.writeText "system.machine_id.cred.base64" age-secrets.systemd-creds.paladin-iii.machineIdBase64} > "$out"
+            ${pkgs.coreutils}/bin/base64 --decode ${pkgs.writeText "system.machine_id.cred.base64" os-secret.systemd-creds.paladin-iii.machineIdBase64} > "$out"
           ''
         } \
         /boot/loader/credentials/system.machine_id.cred
@@ -93,32 +93,32 @@
   # To replace it:
   # systemd-creds encrypt -T -p --name=age-identity <plaintext-identity> -
   systemd.services.agenix-install-secrets.serviceConfig.SetCredentialEncrypted =
-    age-secrets.systemd-creds.paladin-iii.ageIdentity;
+    os-secret.systemd-creds.paladin-iii.ageIdentity;
 
   # Root secrets (decrypts to `/run/agenix/*`)
   age.secrets."paladin-iii/secure-boot/GUID".file =
-    age-secrets.paladin-iii.secure-boot.GUID;
+    os-secret.paladin-iii.secure-boot.GUID;
   age.secrets."paladin-iii/secure-boot/keys/PK/PK.key".file =
-    age-secrets.paladin-iii.secure-boot.keys.PK."PK.key";
+    os-secret.paladin-iii.secure-boot.keys.PK."PK.key";
   age.secrets."paladin-iii/secure-boot/keys/PK/PK.pem".file =
-    age-secrets.paladin-iii.secure-boot.keys.PK."PK.pem";
+    os-secret.paladin-iii.secure-boot.keys.PK."PK.pem";
   age.secrets."paladin-iii/secure-boot/keys/KEK/KEK.key".file =
-    age-secrets.paladin-iii.secure-boot.keys.KEK."KEK.key";
+    os-secret.paladin-iii.secure-boot.keys.KEK."KEK.key";
   age.secrets."paladin-iii/secure-boot/keys/KEK/KEK.pem".file =
-    age-secrets.paladin-iii.secure-boot.keys.KEK."KEK.pem";
+    os-secret.paladin-iii.secure-boot.keys.KEK."KEK.pem";
   age.secrets."paladin-iii/secure-boot/keys/db/db.key".file =
-    age-secrets.paladin-iii.secure-boot.keys.db."db.key";
+    os-secret.paladin-iii.secure-boot.keys.db."db.key";
   age.secrets."paladin-iii/secure-boot/keys/db/db.pem".file =
-    age-secrets.paladin-iii.secure-boot.keys.db."db.pem";
+    os-secret.paladin-iii.secure-boot.keys.db."db.pem";
   age.secrets."paladin-iii/measured-boot/fido2-fde-salt.luks".file =
-    age-secrets.paladin-iii.measured-boot."fido2-fde-salt.luks";
+    os-secret.paladin-iii.measured-boot."fido2-fde-salt.luks";
 
   # age.secrets."paladin-iii/hashed-password".file =
-  #   age-secrets.paladin-iii.hashed-password;
+  #   os-secret.paladin-iii.hashed-password;
 
   # Consumed by ensure-printers (hardware/peripherals/printer.nix)
   age.secrets."network/malone-360-printer-uri".file =
-    age-secrets.network.malone-360-printer-uri;
+    os-secret.network.malone-360-printer-uri;
 
   # Yubikey FIDO2 PAM
   # Register a new key with `pamu2fcfg`, then add its four fields - keyHandle,

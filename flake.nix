@@ -63,8 +63,8 @@
     };
 
     # Private secrets (eval-time toml + runtime .age), pinned like any input.
-    # After every edit in the secrets repo: `nix flake update agenix-secrets`.
-    age-secrets.url = "git+ssh://git@github.com/diwangs/age-secrets.git";
+    # After every edit in the secrets repo: `nix flake update os-secret`.
+    os-secret.url = "git+ssh://git@github.com/diwangs/os-secret.git";
   };
 
   outputs =
@@ -79,7 +79,7 @@
       nix-zed-extensions,
       cua,
       agenix,
-      age-secrets,
+      os-secret,
       lanzaboote,
       ...
     }:
@@ -125,7 +125,7 @@
           inherit cua;
           inherit nix-zed-extensions;
           inherit agenix; # for the CLI package in aspect/secret.nix
-          inherit age-secrets; # .age file paths in aspect/secret.nix
+          inherit os-secret; # .age file paths in aspect/secret.nix
           inherit lanzaboote;
           inherit nixos-hardware;
           inherit nix-flatpak;
@@ -198,7 +198,7 @@
               self
               allowedUnfree
               agenix
-              age-secrets
+              os-secret
               ;
           };
           modules = [

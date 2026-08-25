@@ -1,20 +1,5 @@
 {
   "nodes": {
-    "age-secrets": {
-      "locked": {
-        "lastModified": 1787364457,
-        "narHash": "sha256-xzopMZye08/35kfNdE0M1WViZFVVSk58ZZ49k+uiG8w=",
-        "ref": "refs/heads/main",
-        "rev": "1ce8c0aeb2f6fcb8b7386e9df3fbf37fbafb7d7c",
-        "revCount": 20,
-        "type": "git",
-        "url": "ssh://git@github.com/diwangs/age-secrets.git"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/diwangs/age-secrets.git"
-      }
-    },
     "agenix": {
       "inputs": {
         "darwin": [],
@@ -253,6 +238,21 @@
         "url": "https://flakehub.com/f/NixOS/nixpkgs/0.2605"
       }
     },
+    "os-secret": {
+      "locked": {
+        "lastModified": 1787690144,
+        "narHash": "sha256-dluVuBAD/ibGJbHJI1D4njCUfMu6IKRMsXqiIVEG5Uo=",
+        "ref": "refs/heads/main",
+        "rev": "e6f2d844b6306803cfb8eccb9f234e66754afa96",
+        "revCount": 21,
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/os-secret.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/diwangs/os-secret.git"
+      }
+    },
     "pre-commit": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -277,7 +277,6 @@
     },
     "root": {
       "inputs": {
-        "age-secrets": "age-secrets",
         "agenix": "agenix",
         "cua": "cua",
         "home-manager": "home-manager",
@@ -288,6 +287,7 @@
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",
         "nixpkgs-stable": "nixpkgs-stable",
+        "os-secret": "os-secret",
         "treefmt-nix": "treefmt-nix"
       }
     },

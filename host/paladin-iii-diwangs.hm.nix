@@ -1,14 +1,13 @@
-{ age-secrets, ... }: {
+{ os-secret, ... }: {
   home.username = "diwangs";
   home.stateVersion = "25.05";
 
   # Secrets it can decrypt
   age.secrets."paladin-iii/oo7.keyring-encryption-password".file =
-    age-secrets.paladin-iii."oo7.keyring-encryption-password";
-  age.secrets."network/ssh-hosts".file = age-secrets.network.ssh-hosts;
-  age.secrets."token/access-nova.json".file =
-    age-secrets.token."access-nova.json";
-  age.secrets."token/bedrock".file = age-secrets.token.bedrock;
+    os-secret.paladin-iii."oo7.keyring-encryption-password";
+  age.secrets."network/ssh-hosts".file = os-secret.network.ssh-hosts;
+  age.secrets."token/access-nova.json".file = os-secret.token."access-nova.json";
+  age.secrets."token/bedrock".file = os-secret.token.bedrock;
 
   # SSH config
   programs.ssh = {

@@ -1,4 +1,4 @@
-{ pkgs, age-secrets, ... }: {
+{ pkgs, os-secret, ... }: {
   home.username = "admin";
   home.homeDirectory = "/home/admin";
   home.stateVersion = "25.05";
@@ -10,7 +10,7 @@
   manual.manpages.enable = true;
 
   # Secrets it can decrypt
-  age.secrets."token/bedrock".file = age-secrets.token.bedrock;
+  age.secrets."token/bedrock".file = os-secret.token.bedrock;
 
   # Headless tools that NixOS provides system-wide on the laptop
   home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
