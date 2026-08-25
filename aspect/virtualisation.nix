@@ -28,9 +28,13 @@
   # init, so it is not listed here.)
   boot.kernelModules = [ "vhost_vsock" ];
 
-  # Enable unprivileged user NS
-  # Historically this allows for some CVE, but a bunch of packages rely on this (e.g. chromium-based, Zoom, etc.)
-  security.unprivilegedUsernsClone = true;
+  # Enable unprivileged user namespaces. The first setting is the upstream
+  # control; anthraxx's hardened kernel also retains the second, hardened-only
+  # gate that the removed `security.unprivilegedUsernsClone` option managed.
+  boot.kernel.sysctl = {
+    "user.max_user_namespaces" = 2147483647;
+    "kernel.unprivileged_userns_clone" = 1;
+  };
 
   # Podman
   virtualisation = {

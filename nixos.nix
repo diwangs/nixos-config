@@ -35,13 +35,12 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_1_9_hardenedOverlay
+    .linuxKernel_7_2_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip/overlay.nix)
-    (import ./package/overlay/codex/overlay.nix)
     # oo7 → git main. Both the content-type reject (aws-vault "application/json")
     # and the digit-leading portal-token panic (hung Claude Desktop on startup)
     # are now fixed upstream, so we build oo7 from a pinned main commit rather
@@ -106,7 +105,7 @@
   # Replace stdenv with Clang/LLVM and compile with NixOS' hardening
   # This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
   boot.kernelPackages =
-    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_1
+    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_2
       (old: {
         stdenv = pkgs.withCFlags [
           "-Wno-unused-command-line-argument"

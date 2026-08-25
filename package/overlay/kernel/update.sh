@@ -9,7 +9,8 @@
 #   ./update.sh                          # stable from nixpkgs, LTS from kernel.org
 #   ./update.sh STABLE_MM LTS_MM         # e.g. ./update.sh 7.0 6.18
 #
-# Requires: curl, jq, nix, nix-prefetch-url, sed (GNU), awk, grep, sort.
+# Requires: curl, jq, nix, nix-prefetch-url, sed (GNU), awk, grep, sort,
+# timeout (GNU).
 
 set -euo pipefail
 
@@ -26,7 +27,7 @@ info() { printf '==> %s\n' "$*"; }
 # Plain "${v%.*}" is wrong for ".0" releases like 7.1 (gives "7").
 mm_of() { echo "${1%%-*}" | awk -F. '{print $1"."$2}'; }
 
-for cmd in curl jq nix nix-prefetch-url sed awk grep sort; do
+for cmd in curl jq nix nix-prefetch-url sed awk grep sort timeout; do
   command -v "$cmd" >/dev/null || err "missing required command: $cmd"
 done
 [[ -f "$KERNEL_NIX" ]] || err "kernel.nix not found at $KERNEL_NIX"
@@ -108,14 +109,43 @@ info "LTS    branch $lts_mm -> $latest_lts"
 
 prefetch_kernel() {
   local version="$1" major="${1%%.*}"
-  nix-prefetch-url --type sha256 \
-    "mirror://kernel/linux/kernel/v${major}.x/linux-${version}.tar.xz" 2>/dev/null
+  timeout --foreground 10m nix-prefetch-url --type sha256 \
+    "mirror://kernel/linux/kernel/v${major}.x/linux-${version}.tar.xz"
 }
 prefetch_patch() {
   local full="$1"
-  nix-prefetch-url --type sha256 --name "linux-hardened-v${full}.patch" \
-    "https://github.com/anthraxx/linux-hardened/releases/download/v${full}/linux-hardened-v${full}.patch" \
-    2>/dev/null
+  timeout --foreground 10m nix-prefetch-url --type sha256 \
+    --name "linux-hardened-v${full}.patch" \
+    "https://github.com/anthraxx/linux-hardened/releases/download/v${full}/linux-hardened-v${full}.patch"
+}
+
+# Print the currently pinned full version, kernel hash, and patch hash for the
+# block identified by $2, one value per line. This lets unchanged branches
+# avoid re-downloading a kernel tarball merely to rediscover the same hashes.
+read_current_pin() {
+  local kind="$1" marker_re="$2" start end block_indent block
+  local version extra sha_lines
+  local -a shas
+
+  start=$(grep -nE "$marker_re" "$KERNEL_NIX" | head -n1 | cut -d: -f1)
+  [[ -n "$start" ]] || err "could not locate $kind block marker (/$marker_re/)"
+  block_indent=$(sed -n "$((start + 1))s/[^[:space:]].*$//p" "$KERNEL_NIX")
+  end=$(awk -v s="$start" -v closing="${block_indent});" \
+    'NR >= s && $0 == closing { print NR; exit }' "$KERNEL_NIX")
+  [[ -n "$end" ]] || err "could not locate end of $kind block"
+
+  block=$(sed -n "${start},${end}p" "$KERNEL_NIX")
+  version=$(echo "$block" | grep -oE 'version *= *"[0-9]+\.[0-9]+(\.[0-9]+)?"' \
+            | head -n1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?')
+  extra=$(echo "$block" | grep -oE 'extra *= *"-hardened[0-9]+"' \
+          | head -n1 | grep -oE -- '-hardened[0-9]+')
+  sha_lines=$(echo "$block" | grep -oE 'sha256 *= *"[^"]+"' \
+              | sed -E 's/.*"([^"]+)"$/\1/')
+  mapfile -t shas <<< "$sha_lines"
+
+  [[ -n "$version" && -n "$extra" && -n "${shas[0]:-}" && -n "${shas[1]:-}" ]] \
+    || err "could not parse current version or hashes in $kind block"
+  printf '%s\n%s\n%s\n' "${version}${extra}" "${shas[0]}" "${shas[1]}"
 }
 
 # Rewrite a single overlay block in kernel.nix.
@@ -185,26 +215,52 @@ update_block() {
 update_stable_overlay_reference() {
   local version="${1%-hardened*}"
   local version_under="${version//./_}"
-  local pattern='^[[:space:]]*\.linuxKernel_[0-9_]+_hardenedOverlay$'
+  local branch branch_under overlay_pattern kernel_pattern
+  branch=$(mm_of "$version")
+  branch_under="${branch//./_}"
+  overlay_pattern='^[[:space:]]*\.linuxKernel_[0-9_]+_hardenedOverlay$'
+  kernel_pattern='pkgs\.linuxKernel\.kernels\.linux_[0-9]+_[0-9]+'
 
-  grep -qE "$pattern" "$NIXOS_NIX" \
+  grep -qE "$overlay_pattern" "$NIXOS_NIX" \
     || err "could not locate stable kernel overlay reference in $NIXOS_NIX"
   sed -i -E "s|^([[:space:]]*)\.linuxKernel_[0-9_]+_hardenedOverlay$|\\1.linuxKernel_${version_under}_hardenedOverlay|" "$NIXOS_NIX"
+
+  grep -qE "$kernel_pattern" "$NIXOS_NIX" \
+    || err "could not locate stable base kernel reference in $NIXOS_NIX"
+  sed -i -E "s|${kernel_pattern}|pkgs.linuxKernel.kernels.linux_${branch_under}|" "$NIXOS_NIX"
 }
 
-info "Hashing stable ($latest_stable)..."
-stable_version="${latest_stable%-hardened*}"
-stable_kernel_sha=$(prefetch_kernel "$stable_version")
-stable_patch_sha=$(prefetch_patch  "$latest_stable")
-[[ -n "$stable_kernel_sha" && -n "$stable_patch_sha" ]] \
-  || err "failed to hash stable kernel or patch"
+stable_pin=$(read_current_pin stable '# Latest stable from anthraxx')
+mapfile -t stable_current <<< "$stable_pin"
+if [[ "${stable_current[0]}" == "$latest_stable" ]]; then
+  info "Stable $latest_stable is already pinned; reusing existing hashes"
+  stable_kernel_sha="${stable_current[1]}"
+  stable_patch_sha="${stable_current[2]}"
+else
+  stable_version="${latest_stable%-hardened*}"
+  info "Prefetching stable kernel source ($latest_stable)..."
+  stable_kernel_sha=$(prefetch_kernel "$stable_version") \
+    || err "failed to fetch or hash stable kernel source"
+  info "Prefetching stable hardened patch ($latest_stable)..."
+  stable_patch_sha=$(prefetch_patch "$latest_stable") \
+    || err "failed to fetch or hash stable hardened patch"
+fi
 
-info "Hashing LTS ($latest_lts)..."
-lts_version="${latest_lts%-hardened*}"
-lts_kernel_sha=$(prefetch_kernel "$lts_version")
-lts_patch_sha=$(prefetch_patch  "$latest_lts")
-[[ -n "$lts_kernel_sha" && -n "$lts_patch_sha" ]] \
-  || err "failed to hash LTS kernel or patch"
+lts_pin=$(read_current_pin lts '# Backup: Latest LTS')
+mapfile -t lts_current <<< "$lts_pin"
+if [[ "${lts_current[0]}" == "$latest_lts" ]]; then
+  info "LTS $latest_lts is already pinned; reusing existing hashes"
+  lts_kernel_sha="${lts_current[1]}"
+  lts_patch_sha="${lts_current[2]}"
+else
+  lts_version="${latest_lts%-hardened*}"
+  info "Prefetching LTS kernel source ($latest_lts)..."
+  lts_kernel_sha=$(prefetch_kernel "$lts_version") \
+    || err "failed to fetch or hash LTS kernel source"
+  info "Prefetching LTS hardened patch ($latest_lts)..."
+  lts_patch_sha=$(prefetch_patch "$latest_lts") \
+    || err "failed to fetch or hash LTS hardened patch"
+fi
 
 update_block stable '# Latest stable from anthraxx' \
   "$latest_stable" "$stable_kernel_sha" "$stable_patch_sha"
