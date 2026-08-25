@@ -1,4 +1,9 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 rec {
   age.identityPaths = [
     "${config.home.homeDirectory}/.age-identity-pq"
@@ -135,4 +140,49 @@ rec {
   _module.args.landstripPolicyFile =
     (pkgs.formats.json { }).generate "agent-landstrip-policy.json"
       _module.args.landstripPolicyBase;
+
+  # Codex hook shared by the base and opt-in profiles. Keep it beside the
+  # Landstrip policy inputs it wraps so consumers only provide the selected
+  # materialized policy and presentation details.
+  _module.args.mkCodexBashLandstripHook =
+    {
+      policyFile,
+      scriptName,
+      statusMessage,
+    }:
+    {
+      matcher = "^Bash$";
+      hooks = [
+        {
+          type = "command";
+          command = "${pkgs.writeShellScript scriptName ''
+            deny() {
+              printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
+              exit 0
+            }
+
+            result="$(${lib.getExe pkgs.jq} -c \
+              --arg prefix ${lib.escapeShellArg "${
+                # Use a policy file rather than Landstrip's policy-on-stdin mode so
+                # wrapped commands (notably apply_patch) retain their original stdin.
+                pkgs.writeShellScript "agent-landstrip-run" ''
+                  if [ "$#" -eq 0 ]; then
+                    printf '%s\n' "landstrip runner: missing command" >&2
+                    exit 64
+                  fi
+
+                  exec ${lib.getExe pkgs.landstrip} run -p ${policyFile} -- \
+                    ${lib.getExe pkgs.tini} -s -- "$@"
+                ''
+              } ${pkgs.bashInteractive}/bin/bash -c "} \
+              'if (.tool_input | type) != "object" or (.tool_input.command | type) != "string" or .tool_input.command == "" then error("invalid Bash tool input") else .tool_input as $ti | { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: ($ti + { command: ($prefix + ($ti.command | @sh)) }) } } end' \
+              2>/dev/null)" || deny
+            [ -n "$result" ] || deny
+            printf '%s\n' "$result"
+          ''}";
+          timeout = 10;
+          inherit statusMessage;
+        }
+      ];
+    };
 }

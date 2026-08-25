@@ -8,27 +8,9 @@
   lib,
   landstripPolicyBase, # shared sandbox policy, defined in aspect/secret.hm.nix
   landstripPolicyFile, # landstripPolicyBase materialized to JSON, also from aspect/secret.hm.nix
+  mkCodexBashLandstripHook, # shared hook builder, also from aspect/secret.hm.nix
   ...
 }:
-let
-  # Except handled directories like /dev /proc and /sys
-  codexBridgeRoots = [
-    "/boot"
-    "/etc"
-    "/home"
-    "/root"
-    "/run"
-    "/tmp"
-    "/usr"
-    "/var"
-  ];
-  codexWritableBridge = lib.genAttrs codexBridgeRoots (_: {
-    "." = "write";
-    ".git" = "write";
-    ".agents" = "write";
-    ".codex" = "write";
-  });
-in
 {
   home.packages = with pkgs; [
     # Runtime environment (or environment manager)
@@ -142,29 +124,50 @@ in
       };
       # Keep Codex's process sandbox while delegating filesystem and socket
       # policy to the Landstrip wrapper installed by the hooks below.
-      default_permissions = "bwrap-landstrip";
-      permissions."bwrap-landstrip" = {
-        description = "Bubblewrap process isolation with Landstrip filesystem and socket policy.";
-        filesystem = {
-          # Keep `/` read-only so no later writable-root bind hides bwrap's
-          # minimal `/dev`. Existing ordinary FHS trees are writable through
-          # codexWritableBridge; Landstrip remains the fine-grained path policy
-          # inside this coarse mount-namespace bridge.
-          ":root" = "read";
+      default_permissions = "Profile-based";
+      permissions."Profile-based" = {
+        description = "Bubblewrap process isolation with Landstrip filesystem and socket policy based on selected profile.";
+        # Reopen the ordinary FHS trees for Landstrip, along with explicit
+        # metadata opt-outs that prevent Codex from creating synthetic mask
+        # targets in system-owned directories. Excludes special fs directories
+        # such as `/sys`, `/proc`, and `/dev`.
+        filesystem =
+          lib.genAttrs (lib.concatMap
+            (
+              root:
+              [ root ]
+              ++ map (name: "${root}/${name}") [
+                ".git"
+                ".agents"
+                ".codex"
+              ]
+            )
+            [
+              "/boot"
+              "/usr"
+              "/var"
+              "/etc"
+              "/run"
+              "/tmp"
+              "/root"
+              "/home"
+            ]
+          ) (_: "write")
+          // {
+            ":root" = "read";
 
-          # `/dev` itself stays bwrap's minimal device tree. Reopen only the
-          # host shared-memory mount, whose access is still mediated by
-          # Landstrip. Explicit project metadata writes keep Landstrip, rather
-          # than Codex's automatic workspace carveouts, authoritative there.
-          "/dev/shm" = "write";
-          ":workspace_roots" = {
-            "." = "write";
-            ".git" = "write";
-            ".agents" = "write";
-            ".codex" = "write";
+            # `/dev` itself stays bwrap's minimal device tree. Reopen only the
+            # host shared-memory mount, whose access is still mediated by
+            # Landstrip. Explicit project metadata writes keep Landstrip, rather
+            # than Codex's automatic workspace carveouts, authoritative there.
+            "/dev/shm" = "write";
+            ":workspace_roots" = {
+              "." = "write";
+              ".git" = "write";
+              ".agents" = "write";
+              ".codex" = "write";
+            };
           };
-        }
-        // codexWritableBridge;
         network.enabled = true;
       };
       approval_policy = "never"; # was "on-request"
@@ -173,53 +176,23 @@ in
       model_reasoning_effort = "medium";
       hooks.PreToolUse = [
         {
-          matcher = "^Bash$";
-          hooks = [
-            {
-              type = "command";
-              command = "${pkgs.writeShellScript "codex-bash-landstrip-wrap" ''
-                deny() {
-                  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
-                  exit 0
-                }
-
-                result="$(${lib.getExe pkgs.jq} -c \
-                  --arg prefix ${lib.escapeShellArg "${
-                    # Use a policy file rather than Landstrip's policy-on-stdin mode so
-                    # wrapped commands (notably apply_patch) retain their original stdin.
-                    pkgs.writeShellScript "agent-landstrip-run" ''
-                      if [ "$#" -eq 0 ]; then
-                        printf '%s\n' "landstrip runner: missing command" >&2
-                        exit 64
-                      fi
-
-                      exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- \
-                        ${lib.getExe pkgs.tini} -s -- "$@"
-                    ''
-                  } ${pkgs.bashInteractive}/bin/bash -c "} \
-                  'if (.tool_input | type) != "object" or (.tool_input.command | type) != "string" or .tool_input.command == "" then error("invalid Bash tool input") else .tool_input as $ti | { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow", updatedInput: ($ti + { command: ($prefix + ($ti.command | @sh)) }) } } end' \
-                  2>/dev/null)" || deny
-                [ -n "$result" ] || deny
-                printf '%s\n' "$result"
-              ''}";
-              timeout = 10;
-              statusMessage = "Entering Landstrip sandbox";
-            }
-          ];
-        }
-        {
           matcher = "^apply_patch$";
           hooks = [
             {
               type = "command";
               command = "${pkgs.writeShellScript "codex-apply-patch-landstrip-block" ''
-                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch tool disabled. Bypasses sandbox. Retry through bash tool instead. Accepts same patch as argument or stdin."}}'
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch tool disabled. Bypasses sandbox. Retry through bash tool. Accepts same patch as argument or stdin."}}'
               ''}";
               timeout = 10;
               statusMessage = "Routing patch through Landstrip";
             }
           ];
         }
+        (mkCodexBashLandstripHook {
+          policyFile = landstripPolicyFile;
+          scriptName = "codex-bash-landstrip-wrap";
+          statusMessage = "Entering Landstrip sandbox";
+        })
       ];
     };
     context = ''
@@ -232,11 +205,45 @@ in
       - Python is available via `uv` (e.g., `uv run`)
       - Node is available via `fnm` (e.g., `fnm exec --using=24`)
     '';
-    # Custom profile to use Bedrock
-    profiles.bedrock = {
-      model_provider = "amazon-bedrock";
-      model_providers.amazon-bedrock.aws.region = "us-east-1";
-      model = "openai.gpt-5.6-sol";
+    profiles = rec {
+      # Custom profile to use Bedrock.
+      bedrock = {
+        model_provider = "amazon-bedrock";
+        model_providers.amazon-bedrock.aws.region = "us-east-1";
+        model = "openai.gpt-5.6-sol"; # openai prefix
+      };
+
+      # Opt-in access to the Docker-compatible rootless Podman API.
+      docker = {
+        hooks = {
+          # Hook state keys are positional. The base Bash matcher is the second
+          # PreToolUse group, with its wrapper as the first handler.
+          state."${config.home.homeDirectory}/.codex/config.toml:pre_tool_use:1:0".enabled =
+            false;
+          PreToolUse = [
+            (mkCodexBashLandstripHook {
+              # The Docker-compatible Podman API deliberately crosses the
+              # Landstrip filesystem boundary: the rootless service runs
+              # outside the agent sandbox with the user's authority. Keep this
+              # exception opt-in and socket-specific.
+              policyFile =
+                (pkgs.formats.json { }).generate "agent-landstrip-docker-policy.json"
+                  (
+                    lib.recursiveUpdate landstripPolicyBase {
+                      network.allowUnixSockets = landstripPolicyBase.network.allowUnixSockets ++ [
+                        "/run/user/${toString config.home.uid}/podman/podman.sock"
+                      ];
+                    }
+                  );
+              scriptName = "codex-bash-landstrip-docker-wrap";
+              statusMessage = "Entering Docker-capable Landstrip sandbox";
+            })
+          ];
+        };
+      };
+
+      # Codex selects one profile at launch, so compose both deltas explicitly.
+      bedrock-docker = lib.recursiveUpdate bedrock docker;
     };
   };
 
