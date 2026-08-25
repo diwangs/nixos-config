@@ -1,14 +1,19 @@
 {
   lib,
-  callPackage,
   stdenv,
-  stdenvNoCC,
+  callPackage,
   fetchurl,
-  unzip,
+
+  # hooks
   autoPatchelfHook,
-  dpkg,
   makeWrapper,
   wrapGAppsHook3,
+
+  # native build inputs
+  dpkg,
+  unzip,
+
+  # build inputs
   alsa-lib,
   at-spi2-atk,
   at-spi2-core,
@@ -16,15 +21,13 @@
   cairo,
   cups,
   dbus,
+  dconf,
   expat,
   gdk-pixbuf,
   glib,
   gtk3,
   libgbm,
-  libGL,
   libnotify,
-  libpulseaudio,
-  libsecret,
   libusb1,
   libx11,
   libxcb,
@@ -37,14 +40,27 @@
   nspr,
   nss,
   pango,
-  pipewire,
   qt6,
   systemdLibs,
+
+  # runtime deps
+  bubblewrap,
+  libGL,
+  libpulseaudio,
+  libsecret,
+  nodejs-slim,
+  pipewire,
+  ripgrep,
   tectonic-unwrapped,
   vulkan-loader,
   xdg-utils,
+  # override to null to use bundled codex
+  codex,
 }:
-stdenvNoCC.mkDerivation (finalAttrs: {
+let
+  inherit (stdenv.hostPlatform) isLinux isDarwin system;
+in
+stdenv.mkDerivation (finalAttrs: {
   pname = "chatgpt";
   inherit (finalAttrs.passthru.source) version;
 
@@ -53,9 +69,16 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   strictDeps = true;
   __structuredAttrs = true;
 
+  # autoPatchelf moves PT_INTERP beyond detect-libc's 2 KiB scan. Its
+  # process.report fallback trips Electron's CFI, so use the glibc watcher.
+  postPatch = lib.optionalString isLinux ''
+    grep -aFq 'const family = familySync();' usr/lib/chatgpt/resources/app.asar
+    sed -i "s|const family = familySync();|const family = 'glibc'     ;|" usr/lib/chatgpt/resources/app.asar
+  '';
+
   nativeBuildInputs =
-    lib.optionals stdenvNoCC.hostPlatform.isDarwin [ unzip ]
-    ++ lib.optionals stdenvNoCC.hostPlatform.isLinux [
+    lib.optionals isDarwin [ unzip ]
+    ++ lib.optionals isLinux [
       autoPatchelfHook
       dpkg
       makeWrapper
@@ -63,8 +86,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       wrapGAppsHook3
     ];
 
-  buildInputs = lib.optionals stdenvNoCC.hostPlatform.isLinux [
-    (lib.getLib stdenv.cc.cc)
+  buildInputs = lib.optionals isLinux [
     alsa-lib
     at-spi2-atk
     at-spi2-core
@@ -72,6 +94,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     cairo
     cups
     dbus
+    dconf
     expat
     gdk-pixbuf
     glib
@@ -91,79 +114,99 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     nss
     pango
     qt6.qtbase
+    stdenv.cc.cc.lib
     systemdLibs
   ];
 
-  autoPatchelfIgnoreMissingDeps = lib.optionals stdenvNoCC.hostPlatform.isLinux [
-    "libQt5Core.so.5"
-    "libQt5Gui.so.5"
-    "libQt5Widgets.so.5"
-    "libc.musl-*.so.1"
-    # Android prebuilds are not used by the desktop app.
-    "libc++_shared.so"
-    "liblog.so"
+  runtimeDependencies = lib.optionals isLinux [
+    libGL
+    libnotify
+    libpulseaudio
+    libsecret
+    pipewire
+    vulkan-loader
   ];
 
   dontWrapGApps = true;
   dontWrapQtApps = true;
 
-  sourceRoot = if stdenvNoCC.hostPlatform.isLinux then "root" else ".";
+  sourceRoot = if isLinux then "root" else ".";
 
   installPhase = ''
     runHook preInstall
   ''
-  + lib.optionalString stdenvNoCC.hostPlatform.isDarwin ''
+  + lib.optionalString isDarwin ''
     mkdir -p "$out/Applications"
     mkdir -p "$out/bin"
     cp -a ChatGPT.app "$out/Applications"
     ln -s "$out/Applications/ChatGPT.app/Contents/MacOS/ChatGPT" "$out/bin/ChatGPT"
   ''
-  + lib.optionalString stdenvNoCC.hostPlatform.isLinux ''
+  + lib.optionalString isLinux ''
     mkdir -p "$out"
     cp -r usr/* "$out"
 
-    # The bundled Tectonic has an invalid section table and patchelf fails to fix it.
-    rm "$out/lib/chatgpt/resources/plugins/openai-bundled/plugins/latex/bin/tectonic"
-    ln -s ${lib.getExe tectonic-unwrapped} \
-      "$out/lib/chatgpt/resources/plugins/openai-bundled/plugins/latex/bin/tectonic"
+    # Remove the unused Qt 5 fallback shim.
+    rm -f "$out/lib/chatgpt/libqt5_shim.so"
 
-    rm "$out/bin/chatgpt"
-    makeWrapper ${lib.getExe (callPackage ./launcher.nix { })} "$out/bin/chatgpt" \
+    # This glibc desktop package uses neither musl nor Android variants.
+    rm -f \
+      "$out/lib/chatgpt/resources/app.asar.unpacked/node_modules/@worklouder/device-kit-oai/node_modules/@worklouder/wl-device-kit/node_modules/serialport/node_modules/@serialport/bindings-cpp/prebuilds/"{linux-*/node.napi.musl.node,android-*/node.napi.*.node} \
+      "$out/lib/chatgpt/resources/app.asar.unpacked/node_modules/@worklouder/device-kit-oai/node_modules/@worklouder/wl-device-kit/node_modules/node-hid/prebuilds/"{HID,HID_hidraw}-linux-*-musl/node-napi-v4.node \
+      "$out/lib/chatgpt/resources/plugins/openai-bundled/plugins/"{browser,chrome}"/node_modules/classic-level/prebuilds/"{linux-*/classic-level.musl.node,android-*/classic-level.*.node}
+
+    ln -sf ${lib.getExe tectonic-unwrapped} "$out/lib/chatgpt/resources/plugins/openai-bundled/plugins/latex/bin/tectonic"
+    ln -sf ${lib.getExe ripgrep} "$out/lib/chatgpt/resources/rg"
+    ln -sf ${lib.getExe nodejs-slim} "$out/lib/chatgpt/resources/cua_node/bin/node"
+
+    install -Dm755 ${lib.getExe finalAttrs.passthru.launcher} "$out/bin/chatgpt"
+  ''
+  + lib.optionalString (isLinux && codex != null) ''
+    ln -sf ${lib.getExe codex} "$out/lib/chatgpt/resources/codex"
+    ln -sf ${lib.getExe' codex "codex-code-mode-host"} "$out/lib/chatgpt/resources/codex-code-mode-host"
+  ''
+  + ''
+    runHook postInstall
+  '';
+
+  postFixup = lib.optionalString isLinux ''
+    wrapProgram "$out/bin/chatgpt" \
       "''${gappsWrapperArgs[@]}" \
       "''${qtWrapperArgs[@]}" \
       --set CHATGPT_EXECUTABLE "$out/lib/chatgpt/ChatGPT" \
       --set CHATGPT_RESOURCES_SOURCE "$out/lib/chatgpt/resources" \
-      --set CHATGPT_RESOURCES_CACHE_KEY ${lib.escapeShellArg "${finalAttrs.version}-${stdenvNoCC.hostPlatform.system}"} \
-      --prefix LD_LIBRARY_PATH : ${
-        lib.makeLibraryPath [
-          libGL
-          libnotify
-          libpulseaudio
-          libsecret
-          pipewire
-          vulkan-loader
+      --set CHATGPT_RESOURCES_CACHE_LABEL ${lib.escapeShellArg "${finalAttrs.version}-${system}"} \
+      --prefix PATH : ${
+        lib.makeBinPath [
+          nodejs-slim
+          xdg-utils
+          bubblewrap
         ]
       } \
-      --prefix PATH : ${lib.makeBinPath [ xdg-utils ]} \
-      --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations --enable-wayland-ime=true}}"
-  ''
-  + ''
-    runHook postInstall
+      --set-default CODEX_BROWSER_USE_NODE_PATH ${lib.getExe nodejs-slim} \
+      --set-default NODE_REPL_NODE_PATH ${lib.getExe nodejs-slim} \
+      ${lib.escapeShellArgs (
+        lib.optionals (codex != null) [
+          "--set-default"
+          "CODEX_CLI_PATH"
+          (lib.getExe codex)
+        ]
+      )}
   '';
 
   dontStrip = true;
 
   passthru = {
     updateScript = ./update.sh;
-    sources = import ./source.nix;
+    sources = lib.importJSON ./source.json;
     source =
-      finalAttrs.passthru.sources.${stdenvNoCC.hostPlatform.system}
-        or (throw "chatgpt is not supported on ${stdenvNoCC.hostPlatform.system}");
+      finalAttrs.passthru.sources.${system}
+        or (throw "chatgpt is not supported on ${system}");
+    launcher = callPackage ./launcher.nix { };
   };
 
   meta = {
     description = "Desktop application for ChatGPT";
-    homepage = "https://openai.com/chatgpt/desktop/";
+    homepage = "https://developers.openai.com/codex/app";
     changelog = "https://learn.chatgpt.com/docs/changelog";
     license = lib.licenses.unfree;
     maintainers = with lib.maintainers; [
@@ -172,6 +215,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     ];
     platforms = lib.attrNames finalAttrs.passthru.sources;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
-    mainProgram = if stdenvNoCC.hostPlatform.isDarwin then "ChatGPT" else "chatgpt";
+    mainProgram = if isDarwin then "ChatGPT" else "chatgpt";
   };
 })

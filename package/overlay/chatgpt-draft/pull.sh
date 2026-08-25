@@ -13,7 +13,8 @@ set -euo pipefail
 PR=551713
 UPSTREAM_REPO="NixOS/nixpkgs"
 PKG_PATH="pkgs/by-name/ch/chatgpt"
-FILES=(package.nix source.nix launcher.nix update.sh)
+FILES=(package.nix source.json launcher.nix update.sh)
+OBSOLETE_FILES=(source.nix)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REV_FILE="$SCRIPT_DIR/.pinned-rev"
@@ -43,11 +44,19 @@ if [[ "$pinned" == "$head" ]]; then
 fi
 
 info "Head moved (${pinned:-<none>} -> $head); pulling $PKG_PATH..."
+staging_dir="$(mktemp -d)"
+trap 'rm -rf -- "$staging_dir"' EXIT
+
 for f in "${FILES[@]}"; do
   url="https://raw.githubusercontent.com/$owner/$repo/$head/$PKG_PATH/$f"
   info "fetch $f"
-  curl -fsSL "$url" -o "$SCRIPT_DIR/$f" || err "failed to fetch $f from $url"
+  curl -fsSL "$url" -o "$staging_dir/$f" || err "failed to fetch $f from $url"
 done
+
+for f in "${FILES[@]}"; do
+  mv -- "$staging_dir/$f" "$SCRIPT_DIR/$f"
+done
+rm -f -- "${OBSOLETE_FILES[@]/#/$SCRIPT_DIR/}"
 chmod +x "$SCRIPT_DIR/update.sh"
 
 printf '%s\n' "$head" >"$REV_FILE"
