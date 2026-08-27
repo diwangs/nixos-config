@@ -138,21 +138,25 @@ let
 in
 {
 
-  # Latest stable from anthraxx
-  linuxKernel_7_2_hardenedOverlay = (
+  # Pinned before Linux 7.2: that release can hang indefinitely during
+  # shutdown/restart while tearing down Thunderbolt DisplayPort tunnels.
+  # Before updating, verify the domain-reference-leak fix is included:
+  # https://lore.kernel.org/r/20260823-b4-tbt-fixes-v2-3-26a18a426c9f@kernel.org
+  # Regression: https://github.com/torvalds/linux/commit/f5cc545f59699549adbaa4084149f8247865a51d
+  linuxKernel_7_1_9_hardenedOverlay = (
     final: prev: {
       linuxKernel = prev.linuxKernel // {
         kernelPatches = prev.linuxKernel.kernelPatches // {
           hardened = (prev.linuxKernel.kernelPatches.hardened or { }) // {
-            "7.2" = {
-              version = "7.2";
+            "7.1" = {
+              version = "7.1.9";
               extra = "-hardened1";
-              sha256 = "1cq2jj1g06gav6xvbxfb1l5jlp43b52ffjvg08ckix8d9k8z7zpr"; # Hash of the pre-patch kernel
-              name = "linux-hardened-7.2-hardened1";
+              sha256 = "1c3jq2y2isas3hi8dla4qs0wl6z6p9shjaqgk1987cwp72pa8w9j"; # Hash of the pre-patch kernel
+              name = "linux-hardened-7.1.9-hardened1";
               patch = final.fetchurl {
-                name = "linux-hardened-v7.2-hardened1.patch";
-                url = "https://github.com/anthraxx/linux-hardened/releases/download/v7.2-hardened1/linux-hardened-v7.2-hardened1.patch";
-                sha256 = "0gk52q1pz78xrhxmpdyc2wl5k75fjnh9y118kgp4kg6qin75ilzw"; # Hash of the patch itself
+                name = "linux-hardened-v7.1.9-hardened1.patch";
+                url = "https://github.com/anthraxx/linux-hardened/releases/download/v7.1.9-hardened1/linux-hardened-v7.1.9-hardened1.patch";
+                sha256 = "0jv0aj3qkys1hhw1ibjf1bcwxckv20jf7mwkpym5i2q2gy37a66h"; # Hash of the patch itself
               };
             };
           };

@@ -35,7 +35,7 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_2_hardenedOverlay
+    .linuxKernel_7_1_9_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     self.inputs.nix-vscode-extensions.overlays.default
@@ -105,7 +105,7 @@
   # Replace stdenv with Clang/LLVM and compile with NixOS' hardening
   # This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
   boot.kernelPackages =
-    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_2
+    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_1
       (old: {
         stdenv = pkgs.withCFlags [
           "-Wno-unused-command-line-argument"

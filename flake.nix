@@ -10,20 +10,20 @@
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
     nixpkgs-stable.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2605"; # Latest stable
 
-    # Repository formatting
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # Home manager
     home-manager = {
-      url = "github:nix-community/home-manager"; # master, follows unstable
+      url = "https://flakehub.com/f/nix-community/home-manager/0.1"; # master, follows unstable
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Flatpak
     nix-flatpak.url = "https://flakehub.com/f/gmodena/nix-flatpak/*";
+
+    # Repository formatting
+    treefmt-nix = {
+      url = "https://flakehub.com/f/numtide/treefmt-nix/0.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # nix-vscode-extensions
     nix-vscode-extensions = {
