@@ -14,7 +14,7 @@ that, so this adds one.
   * seccomp filter: `build_errno_filter` splits the old single `needs_network`
     flag into `restrict_inet_socket_types` and `restrict_packet_netlink`, so
     AF_PACKET/AF_NETLINK stay denied and the Unix-socket filters stay installed
-    even when the INET socket-type filter is dropped.
+    even when INET socket-type and TCP Fast Open restrictions are dropped.
   * broker: the connect/bind notification handlers short-circuit to
     `NotificationResult::Continue` for AF_INET/AF_INET6 targets.
 
@@ -42,21 +42,21 @@ diff -ruN a/README.md b/README.md
  ## Development
  
  ```sh
-diff -ruN a/src/config.rs b/src/config.rs
---- a/src/config.rs
-+++ b/src/config.rs
-@@ -82,6 +82,7 @@
- #[serde(default, rename_all = "camelCase")]
+diff -ruN a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
+--- a/packages/landstrip/src/config.rs
++++ b/packages/landstrip/src/config.rs
+@@ -52,6 +52,7 @@
+ #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
  pub(crate) struct SandboxNetwork {
      pub(crate) allow_network: bool,
 +    pub(crate) allow_all_inet_sockets: bool,
      pub(crate) allow_local_binding: bool,
      pub(crate) allow_all_unix_sockets: bool,
      #[serde(deserialize_with = "deserialize_paths")]
-diff -ruN a/src/platform/linux/filter.rs b/src/platform/linux/filter.rs
---- a/src/platform/linux/filter.rs
-+++ b/src/platform/linux/filter.rs
-@@ -38,14 +38,18 @@
+diff -ruN a/packages/landstrip/src/platform/linux/filter.rs b/packages/landstrip/src/platform/linux/filter.rs
+--- a/packages/landstrip/src/platform/linux/filter.rs
++++ b/packages/landstrip/src/platform/linux/filter.rs
+@@ -39,15 +39,19 @@
  
  pub(super) fn build_errno_filter(
      syscalls: &NotificationSyscalls,
@@ -71,6 +71,7 @@ diff -ruN a/src/platform/linux/filter.rs b/src/platform/linux/filter.rs
 -        add_unix_socket_filters(&mut errno_rules, syscalls.socket, unix_sockets)?;
 +    if restrict_inet_socket_types {
 +        add_inet_socket_type_filters(&mut errno_rules, syscalls.socket)?;
+         add_network_bypass_filters(&mut errno_rules, syscalls)?;
      }
 +    if restrict_packet_netlink {
 +        add_packet_netlink_filters(&mut errno_rules, syscalls.socket)?;
@@ -79,25 +80,7 @@ diff -ruN a/src/platform/linux/filter.rs b/src/platform/linux/filter.rs
      if errno_rules.is_empty() {
          return Ok(None);
      }
-@@ -56,10 +60,15 @@
- 
- pub(super) fn network_filter(
-     unix_sockets: UnixSocketFilter,
--    needs_network: bool,
-+    restrict_inet_socket_types: bool,
- ) -> Result<NetworkFilters> {
-     let syscalls = NotificationSyscalls::new();
--    let errno = build_errno_filter(&syscalls, needs_network, unix_sockets)?;
-+    let errno = build_errno_filter(
-+        &syscalls,
-+        restrict_inet_socket_types,
-+        true,
-+        unix_sockets,
-+    )?;
-     Ok(NetworkFilters {
-         errno,
-         notify: None,
-@@ -289,7 +298,7 @@
+@@ -315,7 +319,7 @@
      }
  }
  
@@ -106,7 +89,7 @@ diff -ruN a/src/platform/linux/filter.rs b/src/platform/linux/filter.rs
      let stream = u64::try_from(libc::SOCK_STREAM).map_err(|_| LandstripError::IntegerTooLarge)?;
      let tcp = u64::try_from(libc::IPPROTO_TCP).map_err(|_| LandstripError::IntegerTooLarge)?;
  
-@@ -334,6 +343,10 @@
+@@ -375,6 +379,10 @@
          )?;
      }
  
@@ -115,41 +98,26 @@ diff -ruN a/src/platform/linux/filter.rs b/src/platform/linux/filter.rs
 +
 +fn add_packet_netlink_filters(rules: &mut RuleMap, socket: i64) -> Result<()> {
      for domain in [libc::AF_PACKET, libc::AF_NETLINK] {
-         add_socket_domain_filter(rules, socket, domain)?;
-     }
-diff -ruN a/src/platform/linux/mod.rs b/src/platform/linux/mod.rs
---- a/src/platform/linux/mod.rs
-+++ b/src/platform/linux/mod.rs
-@@ -89,7 +89,10 @@
-     enforce_access_policy(policy)?;
- 
-     if !network.is_unrestricted() {
--        let filters = filter::network_filter(network.unix_socket_access().into(), true)?;
-+        let filters = filter::network_filter(
-+            network.unix_socket_access().into(),
-+            !network.allows_all_inet_sockets(),
-+        )?;
-         filters.load()?;
-     }
-     close_inherited_fds(&[]).map_err(Error::supervise)?;
-diff -ruN a/src/platform/linux/seccomp.rs b/src/platform/linux/seccomp.rs
---- a/src/platform/linux/seccomp.rs
-+++ b/src/platform/linux/seccomp.rs
-@@ -156,7 +156,12 @@
-     ensure_notification_supported()?;
+         let domain = u64::try_from(domain).map_err(|_| LandstripError::IntegerTooLarge)?;
+         add_conditional_rule(
+diff -ruN a/packages/landstrip/src/platform/linux/seccomp.rs b/packages/landstrip/src/platform/linux/seccomp.rs
+--- a/packages/landstrip/src/platform/linux/seccomp.rs
++++ b/packages/landstrip/src/platform/linux/seccomp.rs
+@@ -243,7 +243,12 @@
  
      let syscalls = NotificationSyscalls::new();
--    let errno = build_errno_filter(&syscalls, needs_network, unix_sockets)?;
+     let restricted = !policy.network_access.is_unrestricted();
+-    let errno = build_errno_filter(&syscalls, restricted, unix_sockets)?;
 +    let errno = build_errno_filter(
 +        &syscalls,
-+        needs_network && !policy.network_access.allows_all_inet_sockets(),
-+        needs_network,
++        restricted && !policy.network_access.allows_all_inet_sockets(),
++        restricted,
 +        unix_sockets,
 +    )?;
+     let io_uring = Some(build_io_uring_deny(&syscalls)?);
  
      let mut notify_syscalls: Vec<i64> = Vec::new();
-     if notify_bind {
-@@ -759,6 +764,11 @@
+@@ -911,6 +916,11 @@
      next_query_id: &mut u64,
  ) -> SysResult<NotificationResult> {
      let socket = target_socket(request)?;
@@ -161,7 +129,7 @@ diff -ruN a/src/platform/linux/seccomp.rs b/src/platform/linux/seccomp.rs
  
      match socket.info.kind() {
          SocketKind::Tcp => {
-@@ -821,6 +831,11 @@
+@@ -973,6 +983,11 @@
      next_query_id: &mut u64,
  ) -> SysResult<NotificationResult> {
      let socket = target_socket(request)?;
@@ -173,10 +141,10 @@ diff -ruN a/src/platform/linux/seccomp.rs b/src/platform/linux/seccomp.rs
  
      match socket.info.kind() {
          SocketKind::Tcp => {
-diff -ruN a/src/policy.rs b/src/policy.rs
---- a/src/policy.rs
-+++ b/src/policy.rs
-@@ -177,6 +177,7 @@
+diff -ruN a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
+--- a/packages/landstrip/src/policy.rs
++++ b/packages/landstrip/src/policy.rs
+@@ -176,6 +176,7 @@
  pub(crate) enum NetworkAccess {
      Unrestricted,
      Restricted {
@@ -184,7 +152,7 @@ diff -ruN a/src/policy.rs b/src/policy.rs
          connect_tcp_ports: Vec<u16>,
          bind: TcpBindAccess,
          unix_socket_access: UnixSocketAccess,
-@@ -228,6 +229,7 @@
+@@ -227,6 +228,7 @@
          matches!(
              self,
              Self::Restricted {
@@ -192,7 +160,7 @@ diff -ruN a/src/policy.rs b/src/policy.rs
                  bind: TcpBindAccess::Deny,
                  ..
              }
-@@ -236,7 +238,23 @@
+@@ -235,7 +237,23 @@
  
      #[cfg(target_os = "linux")]
      pub(crate) fn restricts_connect_tcp(&self) -> bool {
@@ -217,15 +185,7 @@ diff -ruN a/src/policy.rs b/src/policy.rs
      }
  
      #[cfg(target_os = "linux")]
-@@ -259,6 +277,7 @@
-                 connect_tcp_ports,
-                 bind,
-                 unix_socket_access,
-+                ..
-             } => {
-                 matches!(bind, TcpBindAccess::Localhost)
-                     || !connect_tcp_ports.is_empty()
-@@ -521,6 +540,7 @@
+@@ -504,6 +522,7 @@
          TcpBindAccess::Deny
      };
      Ok(NetworkAccess::Restricted {

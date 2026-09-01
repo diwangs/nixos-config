@@ -47,14 +47,30 @@ cur_version=$(grep -oE 'version *= *"[^"]+"' "$LANDSTRIP_NIX" | head -n1 \
               | grep -oE '"[^"]+"' | tr -d '"')
 [[ -n "$cur_version" ]] || err "could not parse current version from package.nix"
 
-# callPackage the package through the flake's own nixpkgs input, so the
-# cargoHash matches what the system build will vendor.
-build_landstrip() {
+# Build the unpatched package through the flake's own nixpkgs input, so the
+# cargoHash matches what the system build will vendor. Keep this separate from
+# the overlay build: an outdated downstream patch can fail before Nix reports
+# the expected fake-hash mismatch.
+build_upstream_landstrip() {
   nix build --no-link --impure --expr "
     let
       flake = builtins.getFlake \"$(cd "$FLAKE_DIR" && pwd)\";
       pkgs = import flake.inputs.nixpkgs { system = builtins.currentSystem; };
     in pkgs.callPackage $LANDSTRIP_NIX { }
+  " 2>&1
+}
+
+# Verify the package exactly as the system consumes it, including the local
+# policy-extension patch from overlay.nix.
+build_landstrip() {
+  nix build --no-link --impure --expr "
+    let
+      flake = builtins.getFlake \"$(cd "$FLAKE_DIR" && pwd)\";
+      pkgs = import flake.inputs.nixpkgs {
+        system = builtins.currentSystem;
+        overlays = [ (import $SCRIPT_DIR/overlay.nix) ];
+      };
+    in pkgs.landstrip
   " 2>&1
 }
 
@@ -81,7 +97,7 @@ sed -i -E "0,/hash *= *\"[^\"]+\";/ s||hash = \"${src_hash}\";|" "$LANDSTRIP_NIX
 sed -i -E "s|cargoHash *= *\"[^\"]+\"|cargoHash = \"${FAKE_HASH}\"|" "$LANDSTRIP_NIX"
 
 info "Computing cargoHash (a hash-mismatch build failure is expected)..."
-build_out=$(build_landstrip || true)
+build_out=$(build_upstream_landstrip || true)
 cargo_hash=$(echo "$build_out" | extract_got_hash || true)
 if [[ -z "$cargo_hash" ]]; then
   echo "$build_out" >&2
