@@ -38,7 +38,6 @@ rec {
     already covered by UNIX permissions (e.g., root-owned files, nix store).
   */
   _module.args.landstripPolicyBase = {
-    enabled = true;
     # Keep Internet sockets unrestricted while retaining path mediation for
     # AF_UNIX. Unlike allowNetwork, allowAllInetSockets does not bypass the
     # Unix-socket allowlist.
