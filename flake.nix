@@ -37,6 +37,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Official Hermes Desktop package. Keep its own locked nixpkgs: upstream's
+    # Electron headers and native node-pty build are tied to that package set.
+    hermes-agent.url = "github:NousResearch/hermes-agent/v2026.8.31";
+
     # trycua's computer-use driver flake (package + nixosModule).
     # Follow nixpkgs-stable (also 26.05) so the driver is built against the
     # same baseline upstream tests, without a duplicate nixpkgs in the closure.
