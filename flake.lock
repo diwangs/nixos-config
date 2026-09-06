@@ -203,27 +203,6 @@
         "url": "https://flakehub.com/f/gmodena/nix-flatpak/%2A"
       }
     },
-    "nix-vscode-extensions": {
-      "inputs": {
-        "nixpkgs": [
-          "home-manager"
-        ]
-      },
-      "locked": {
-        "lastModified": 1788580600,
-        "narHash": "sha256-cU9wBSSJk2jQbFdWdgxgkVm9W32L9TQgCzAfxtDFIqg=",
-        "owner": "nix-community",
-        "repo": "nix-vscode-extensions",
-        "rev": "2bdda593f9225883f9c2bb8fd4044ba440ce0564",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "ref": "master",
-        "repo": "nix-vscode-extensions",
-        "type": "github"
-      }
-    },
     "nix-zed-extensions": {
       "inputs": {
         "nixpkgs": [
@@ -403,7 +382,6 @@
         "home-manager": "home-manager",
         "lanzaboote": "lanzaboote",
         "nix-flatpak": "nix-flatpak",
-        "nix-vscode-extensions": "nix-vscode-extensions",
         "nix-zed-extensions": "nix-zed-extensions",
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",

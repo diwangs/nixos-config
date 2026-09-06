@@ -38,7 +38,7 @@
     .linuxKernel_7_1_9_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
-    self.inputs.nix-vscode-extensions.overlays.default
+    # self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
     (import ./package/overlay/landstrip/overlay.nix)
     (import ./package/overlay/hermes-desktop/overlay.nix {

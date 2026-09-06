@@ -2,8 +2,19 @@
   description = "diwangs' NixOS and Home Manager config for various machines";
 
   inputs = {
+    # Private secrets (eval-time toml + runtime .age), pinned like any input.
+    # After every edit in the secrets repo: `nix flake update os-secret`.
+    os-secret.url = "git+ssh://git@github.com/diwangs/os-secret.git";
+
     # nixos-hardware
     nixos-hardware.url = "https://flakehub.com/f/NixOS/nixos-hardware/*";
+
+    # Secure Boot
+    lanzaboote = {
+      # Post-v1.1 revision with Framework firmware-builtin key enrollment.
+      url = "github:nix-community/lanzaboote/6183ac79eadb079a1e72fa2c60915601be669100";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # NixOS official package source
     # nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/=0.1.985613";
@@ -16,20 +27,24 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Encrypted secrets, decrypted at activation time (runtime-only; eval-time
+    # values stay in secret.toml). Editing identity: YubiKey PIV P-256 via
+    # age-plugin-yubikey. Machine identity: /nix/secret/host.key.
+    agenix = {
+      url = "github:ryantm/agenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+      inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
+    };
+
     # Flatpak
     nix-flatpak.url = "https://flakehub.com/f/gmodena/nix-flatpak/*";
 
-    # Repository formatting
-    treefmt-nix = {
-      url = "https://flakehub.com/f/numtide/treefmt-nix/0.1";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     # nix-vscode-extensions
-    nix-vscode-extensions = {
-      url = "github:nix-community/nix-vscode-extensions/master";
-      inputs.nixpkgs.follows = "home-manager"; # vscode is defined by hm
-    };
+    # nix-vscode-extensions = {
+    #   url = "github:nix-community/nix-vscode-extensions/master";
+    #   inputs.nixpkgs.follows = "home-manager"; # vscode is defined by hm
+    # };
 
     # nix-zed-extensions: Nix-built (not auto-downloaded) Zed extensions
     nix-zed-extensions = {
@@ -52,43 +67,28 @@
       inputs.nixpkgs.follows = "nixpkgs-stable";
     };
 
-    # Encrypted secrets, decrypted at activation time (runtime-only; eval-time
-    # values stay in secret.toml). Editing identity: YubiKey PIV P-256 via
-    # age-plugin-yubikey. Machine identity: /nix/secret/host.key.
-    agenix = {
-      url = "github:ryantm/agenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-      inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
-    };
-
-    # Secure Boot
-    lanzaboote = {
-      # Post-v1.1 revision with Framework firmware-builtin key enrollment.
-      url = "github:nix-community/lanzaboote/6183ac79eadb079a1e72fa2c60915601be669100";
+    # Repository formatting
+    treefmt-nix = {
+      url = "https://flakehub.com/f/numtide/treefmt-nix/0.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # Private secrets (eval-time toml + runtime .age), pinned like any input.
-    # After every edit in the secrets repo: `nix flake update os-secret`.
-    os-secret.url = "git+ssh://git@github.com/diwangs/os-secret.git";
   };
 
   outputs =
     {
       self,
+      os-secret,
       nixos-hardware,
+      lanzaboote,
       nixpkgs,
       nixpkgs-stable,
-      treefmt-nix,
       home-manager,
+      agenix,
       nix-flatpak,
       nix-zed-extensions,
+      hermes-agent,
       cua,
-      agenix,
-      os-secret,
-      lanzaboote,
-      ...
+      treefmt-nix
     }:
     let
       system = "x86_64-linux";
