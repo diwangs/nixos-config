@@ -88,7 +88,7 @@
       nix-zed-extensions,
       hermes-agent,
       cua,
-      treefmt-nix
+      treefmt-nix,
     }:
     let
       system = "x86_64-linux";
