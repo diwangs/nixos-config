@@ -113,6 +113,8 @@
     installRemoteServer = lib.mkForce false; # GUI needs no server symlink
     # Keep this client-specific
     userSettings = {
+      edit_predictions.mode = "subtle";
+
       # Right dock width of 250p fit 80-columned code perfectly on 1080p width
       project_panel.default_width = 250;
       git_panel.default_width = 250;
