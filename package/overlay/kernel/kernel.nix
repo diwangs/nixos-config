@@ -19,7 +19,7 @@
 # along with kernelPatches.hardened and pkgs/os-specific/linux/kernel/hardened/config.nix.
 # We re-implement them here so the overlay remains self-contained.
 
-# Last updated: 130926
+# Last updated: 210926
 { ... }:
 
 let
@@ -144,20 +144,20 @@ in
   # Before updating, verify the domain-reference-leak fix is included:
   # https://lore.kernel.org/r/20260823-b4-tbt-fixes-v2-3-26a18a426c9f@kernel.org
   # Regression: https://github.com/torvalds/linux/commit/f5cc545f59699549adbaa4084149f8247865a51d
-  linuxKernel_7_2_5_hardenedOverlay = (
+  linuxKernel_7_2_6_hardenedOverlay = (
     final: prev: {
       linuxKernel = prev.linuxKernel // {
         kernelPatches = prev.linuxKernel.kernelPatches // {
           hardened = (prev.linuxKernel.kernelPatches.hardened or { }) // {
             "7.2" = {
-              version = "7.2.5";
+              version = "7.2.6";
               extra = "-hardened1";
-              sha256 = "0y1bcg3pg6zm59bjfrgh1bsy68kxjy9vvxygdzcxmn95hggz1pam"; # Hash of the pre-patch kernel
-              name = "linux-hardened-7.2.5-hardened1";
+              sha256 = "01pnc344dx239hkfl84hpfdpm7gc08yzrz7llgnlm6dhya2fz6h3"; # Hash of the pre-patch kernel
+              name = "linux-hardened-7.2.6-hardened1";
               patch = final.fetchurl {
-                name = "linux-hardened-v7.2.5-hardened1.patch";
-                url = "https://github.com/anthraxx/linux-hardened/releases/download/v7.2.5-hardened1/linux-hardened-v7.2.5-hardened1.patch";
-                sha256 = "0pl32jnyxb66kkkmlhdlrps1lsdf99bipsjywpbvmk44w6kj47n8"; # Hash of the patch itself
+                name = "linux-hardened-v7.2.6-hardened1.patch";
+                url = "https://github.com/anthraxx/linux-hardened/releases/download/v7.2.6-hardened1/linux-hardened-v7.2.6-hardened1.patch";
+                sha256 = "113pj29pwvglc4n6gacqfnavz8rr2bszzsal2l638k8qk16da25d"; # Hash of the patch itself
               };
             };
           };
@@ -181,20 +181,20 @@ in
   );
 
   # Backup: Latest LTS (6.x)
-  linuxKernel_6_18_51_hardenedOverlay = (
+  linuxKernel_6_18_52_hardenedOverlay = (
     final: prev: {
       linuxKernel = prev.linuxKernel // {
         kernelPatches = prev.linuxKernel.kernelPatches // {
           hardened = (prev.linuxKernel.kernelPatches.hardened or { }) // {
             "6.18" = {
-              version = "6.18.51";
+              version = "6.18.52";
               extra = "-hardened1";
-              sha256 = "04znimsjfimxxaarzaksn4jvkj1xr5ba7yh1j691ykdzb3w60bxs"; # Hash of the pre-patch kernel
-              name = "linux-hardened-6.18.51-hardened1";
+              sha256 = "1f11had1amrvhl5f606ikc9ykrlyf0rvln8rkf2hrsjggm7mcs9b"; # Hash of the pre-patch kernel
+              name = "linux-hardened-6.18.52-hardened1";
               patch = final.fetchurl {
-                name = "linux-hardened-v6.18.51-hardened1.patch";
-                url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.18.51-hardened1/linux-hardened-v6.18.51-hardened1.patch";
-                sha256 = "0xnddwcaim1aghd9lzyb429h9zp5v2p2ddpwsg1f19xvib5n7f2q"; # Hash of the patch itself
+                name = "linux-hardened-v6.18.52-hardened1.patch";
+                url = "https://github.com/anthraxx/linux-hardened/releases/download/v6.18.52-hardened1/linux-hardened-v6.18.52-hardened1.patch";
+                sha256 = "1k5mgvk7dnakamp3x710218j2q06dydg3m8rw24c35v4qa9c1hzs"; # Hash of the patch itself
               };
             };
           };
