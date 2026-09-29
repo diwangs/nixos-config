@@ -69,6 +69,7 @@
       # store rather than relying on Zed's runtime-downloaded adapters.
       agent_servers = {
         "codex-acp" = {
+          type = "custom";
           command = lib.getExe pkgs.codex-acp;
           env = {
             CODEX_PATH = lib.getExe pkgs.codex;
@@ -81,6 +82,7 @@
           };
         };
         "claude-code-acp" = {
+          type = "custom";
           command = lib.getExe pkgs.claude-agent-acp;
           env.CLAUDE_CODE_EXECUTABLE = lib.getExe pkgs.claude-code;
         };
