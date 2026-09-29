@@ -97,6 +97,7 @@ rec {
         "${config.home.homeDirectory}/.codeql"
         "${config.home.homeDirectory}/.docker/buildx"
 
+        "${config.home.homeDirectory}/Codes"
         "."
       ];
 
