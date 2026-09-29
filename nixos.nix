@@ -35,7 +35,7 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_2_6_hardenedOverlay
+    .linuxKernel_7_2_7_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     # self.inputs.nix-vscode-extensions.overlays.default
@@ -51,6 +51,7 @@
     # overlays and supersedes the claude-desktop-side DbusSecretPortal workaround
     # below (patch/oo7.nix, still disabled). See package/overlay/oo7.nix.
     (import ./package/overlay/oo7.nix)
+    (import ./package/overlay/codex/overlay.nix)
     (import ./package/overlay/codex-acp/overlay.nix)
     # Patches for YubiKey 5.7
     (import ./package/overlay/yubikey-agent.nix)
