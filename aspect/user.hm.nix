@@ -1,7 +1,7 @@
 { config, ... }:
 let
   # pivSshPubKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAlqJuT2Lkccq5Q3Jkc8msxn9FQ1tvtP4i/fvTIpBrjUAB/RayymoXWLQUly3o9ytPcJK1PDI/EuxbdjmxKEaSI=";
-  pivSshPubKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN8rN7/MkdOAlx+eovs/7wxAN1Lb9PnaeLESTAm0EB55";
+  pivSshPubKey = (import ./ssh-pubkeys.nix).diwangsPiv;
 in
 {
   # Use SSH key in `yubikey-agent` to sign git commits

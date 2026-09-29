@@ -37,6 +37,17 @@
       inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
     };
 
+    # Declarative encrypted VM images and ephemeral-root persistence.
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    impermanence = {
+      url = "github:nix-community/impermanence";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
+
     # Flatpak
     nix-flatpak.url = "https://flakehub.com/f/gmodena/nix-flatpak/*";
 
@@ -84,6 +95,8 @@
       nixpkgs-stable,
       home-manager,
       agenix,
+      disko,
+      impermanence,
       nix-flatpak,
       nix-zed-extensions,
       hermes-agent,
@@ -122,6 +135,44 @@
     {
       formatter.${system} = treefmtEval.config.build.wrapper;
       checks.${system}.nixfmt = treefmtEval.config.build.check self;
+
+      # One instance output: first installs unsigned and generates keys into
+      # /run, then uses the os-secret bundle for all later signed generations.
+      nixosConfigurations.sentinel-netx5 = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit
+            disko
+            impermanence
+            allowedUnfree
+            os-secret
+            agenix
+            lanzaboote
+            ;
+        };
+        modules = [
+          ./host/sentinel-netx5.nix
+          ./nixos.headless.nix
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.backupFileExtension = "bak";
+            home-manager.extraSpecialArgs = {
+              inherit
+                agenix
+                os-secret
+                allowedUnfree
+                self
+                ;
+            };
+            home-manager.users.diwangs.imports = [
+              ./host/sentinel-netx5-diwangs.hm.nix
+              ./home-manager.devbox.nix
+            ];
+          }
+        ];
+      };
 
       # nixos-rebuild switch --flake path#hostname
       nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
