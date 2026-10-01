@@ -139,9 +139,9 @@ in
 {
 
   # Latest stable from anthraxx
-  # Pinned before Linux 7.2: that release can hang indefinitely during
-  # shutdown/restart while tearing down Thunderbolt DisplayPort tunnels.
-  # Before updating, verify the domain-reference-leak fix is included:
+  # Linux 7.2 can hang indefinitely during shutdown/restart while tearing down
+  # Thunderbolt DisplayPort tunnels; the fix is backported in
+  # thunderbolt-dp-tunnel.nix. Drop it once a 7.2.x release includes:
   # https://lore.kernel.org/r/20260823-b4-tbt-fixes-v2-3-26a18a426c9f@kernel.org
   # Regression: https://github.com/torvalds/linux/commit/f5cc545f59699549adbaa4084149f8247865a51d
   linuxKernel_7_2_7_hardenedOverlay = (

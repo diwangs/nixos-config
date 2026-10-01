@@ -144,7 +144,13 @@
         # NOTE: as on 7.1.5, this breaks `bpf-restrict-fs`
       };
     }
-  ];
+  ]
+  # Backported Thunderbolt DP tunnel shutdown-hang fix (7.2.x only)
+  ++ import ./package/overlay/kernel/thunderbolt-dp-tunnel.nix {
+    inherit lib;
+    inherit (pkgs) fetchpatch;
+    kernel = pkgs.linuxKernel.kernels.linux_7_2;
+  };
 
   # Enabling LSM
   security.apparmor.enable = true;
