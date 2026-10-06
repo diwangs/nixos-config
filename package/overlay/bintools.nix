@@ -20,6 +20,15 @@
     }
   );
 
+  # LLVM 22.1.8: lld <= 21 built with GCC 16 emits broken symbols on `ld -r`,
+  # breaking LTO kernel builds in objtool ("bad .discard.annotate_insn entry").
+  # Fixed upstream in 22.1.8; backport for 18-21: NixOS/nixpkgs#568680
+  llvm22 = pkgs.overrideCC pkgs.llvmPackages_22.stdenv (
+    pkgs.llvmPackages_22.stdenv.cc.override {
+      inherit (pkgs.llvmPackages_22) bintools;
+    }
+  );
+
   # LLVM 20.1.6: one version behind, works as of 6.17.11
   llvm20 = pkgs.overrideCC pkgs.llvmPackages_20.stdenv (
     pkgs.llvmPackages_20.stdenv.cc.override {

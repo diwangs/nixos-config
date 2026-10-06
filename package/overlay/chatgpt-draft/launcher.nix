@@ -47,6 +47,10 @@ writeShellApplication {
       requiredResourcePaths+=("$requiredResourcePath")
     done
 
+    if [[ -d "$CHATGPT_RESOURCES_SOURCE/tectonic" ]]; then
+      requiredResourcePaths+=("$CHATGPT_RESOURCES_SOURCE/tectonic")
+    fi
+
     if [[ ! -f "$resourcesPath/.complete" ]]; then
       exec {stagingWriterLockFd}> "$stagingLockPath"
       flock --shared "$stagingWriterLockFd"
