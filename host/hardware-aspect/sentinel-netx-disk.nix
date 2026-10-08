@@ -88,7 +88,7 @@ in
         override =
           args:
           prev.vmTools.override (
-            (builtins.removeAttrs args [ "kernel" ])
+            (removeAttrs args [ "kernel" ])
             // {
               kernel = config.boot.kernelPackages.kernel;
               kernelModules = args.kernel;
