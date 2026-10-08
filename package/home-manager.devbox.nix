@@ -142,6 +142,7 @@
                 ".git"
                 ".agents"
                 ".codex"
+                ".aws"
               ]
             )
             [
@@ -168,6 +169,7 @@
               ".git" = "write";
               ".agents" = "write";
               ".codex" = "write";
+              ".aws" = "write";
             };
           };
         network.enabled = true;
