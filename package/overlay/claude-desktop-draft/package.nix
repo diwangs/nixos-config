@@ -14,6 +14,7 @@
   nspr,
   mesa,
   alsa-lib,
+  pipewire,
   libxkbcommon,
   libx11,
   libxcb,
@@ -80,18 +81,18 @@ let
 
   unwrapped = stdenvNoCC.mkDerivation (finalAttrs: {
     pname = "claude-desktop";
-    version = "1.26832.0";
+    version = "2.26454.2";
 
     src =
       if stdenvNoCC.hostPlatform.system == "x86_64-linux" then
         fetchurl {
           url = "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${finalAttrs.version}_amd64.deb";
-          hash = "sha256-K8bw1BCbtDswdpbhEo31P785PvmPlHp4aZSGQkUCRdc=";
+          hash = "sha256-slGgIkqGNYdPM1mN+O2JUrQn+EgV7llYDMAi1r2yQw8=";
         }
       else if stdenvNoCC.hostPlatform.system == "aarch64-linux" then
         fetchurl {
           url = "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${finalAttrs.version}_arm64.deb";
-          hash = "sha256-woEP1oskEPgyboCkVXPS8+e81RqvgQ2a6S08CXih1VM=";
+          hash = "sha256-MLL4VNfMRCK0Po858HVzyH95gWBRl3ZiYtiBU8fpk4s=";
         }
       else
         throw "Unsupported system: ${stdenvNoCC.hostPlatform.system}";
@@ -110,6 +111,7 @@ let
       mesa
       libglvnd
       alsa-lib
+      pipewire
       libxkbcommon
       libx11
       libxcb
