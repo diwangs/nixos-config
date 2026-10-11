@@ -129,7 +129,7 @@
       sandbox_mode = "danger-full-access";
       approval_policy = "never"; # was "on-request"
       # approvals_reviewer = "auto_review";
-      model = "gpt-6-sol";
+      model = "gpt-6.1-sol";
       model_reasoning_effort = "medium";
       hooks.PreToolUse = [
         {
