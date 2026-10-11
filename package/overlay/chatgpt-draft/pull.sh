@@ -13,7 +13,7 @@ set -euo pipefail
 PR=551713
 UPSTREAM_REPO="NixOS/nixpkgs"
 PKG_PATH="pkgs/by-name/ch/chatgpt"
-FILES=(package.nix source.json launcher.nix update.sh)
+FILES=(package.nix source.json launcher.nix tmpfiles.conf update.sh)
 OBSOLETE_FILES=(source.nix)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,12 +38,17 @@ info "head: $owner/$repo@$branch ($head)"
 pinned=""
 [[ -f "$REV_FILE" ]] && pinned="$(cat "$REV_FILE")"
 
-if [[ "$pinned" == "$head" ]]; then
+missing_files=false
+for f in "${FILES[@]}"; do
+  [[ -f "$SCRIPT_DIR/$f" ]] || missing_files=true
+done
+
+if [[ "$pinned" == "$head" && "$missing_files" == false ]]; then
   info "Already at $head — no new commit, nothing to pull."
   exit 0
 fi
 
-info "Head moved (${pinned:-<none>} -> $head); pulling $PKG_PATH..."
+info "Syncing (${pinned:-<none>} -> $head); pulling $PKG_PATH..."
 staging_dir="$(mktemp -d)"
 trap 'rm -rf -- "$staging_dir"' EXIT
 

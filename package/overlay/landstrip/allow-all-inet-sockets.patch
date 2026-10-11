@@ -9,7 +9,7 @@ that, so this adds one.
 
   * config/policy: new `allowAllInetSockets` field threaded into
     `NetworkAccess::Restricted`, plus an `allows_all_inet_sockets()` predicate.
-    When set, `restricts_bind_tcp` and `restricts_connect_tcp` report false so
+    When set, `restricts_bind_ip` and `restricts_connect_tcp` report false so
     the port allowlists stop applying.
   * seccomp filter: `build_errno_filter` splits the old single `needs_network`
     flag into `restrict_inet_socket_types` and `restrict_packet_netlink`, so
@@ -21,10 +21,12 @@ that, so this adds one.
 Not upstreamable as-is (it is a policy-surface addition, not a bug fix), so it
 lives here. See package/overlay/landstrip/overlay.nix.
 
-diff -ruN a/README.md b/README.md
+Rebased for 0.19.12: preserve localhost binding support and skip its datagram
+send mediation when allowAllInetSockets is enabled.
+
 --- a/README.md
 +++ b/README.md
-@@ -44,6 +44,7 @@
+@@ -24,6 +24,7 @@
    },
    "network": {
      "allowNetwork": false,
@@ -32,20 +34,19 @@ diff -ruN a/README.md b/README.md
      "allowLocalBinding": false
    }
  }
-@@ -52,6 +53,9 @@
- Pass policies with `-p, --policy <FILE>`. Later policies merge over earlier
- ones. Platform behavior and limits are documented in the manual.
+@@ -38,6 +39,9 @@
+ See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for policy rules,
+ merged-policy inspection, CLI options, and platform limits.
  
 +On Linux, `network.allowAllInetSockets` permits all AF_INET and AF_INET6
 +sockets without changing Unix-socket policy.
 +
- ## Development
+ ## Integrations
  
- ```sh
-diff -ruN a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
+ - [Node.js API](packages/landstrip-api/README.md): native binary access and trap types.
 --- a/packages/landstrip/src/config.rs
 +++ b/packages/landstrip/src/config.rs
-@@ -52,6 +52,7 @@
+@@ -75,6 +75,7 @@
  #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
  pub(crate) struct SandboxNetwork {
      pub(crate) allow_network: bool,
@@ -53,114 +54,25 @@ diff -ruN a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
      pub(crate) allow_local_binding: bool,
      pub(crate) allow_all_unix_sockets: bool,
      #[serde(deserialize_with = "deserialize_paths")]
-diff -ruN a/packages/landstrip/src/platform/linux/filter.rs b/packages/landstrip/src/platform/linux/filter.rs
---- a/packages/landstrip/src/platform/linux/filter.rs
-+++ b/packages/landstrip/src/platform/linux/filter.rs
-@@ -39,15 +39,19 @@
- 
- pub(super) fn build_errno_filter(
-     syscalls: &NotificationSyscalls,
--    needs_network: bool,
-+    restrict_inet_socket_types: bool,
-+    restrict_packet_netlink: bool,
-     unix_sockets: UnixSocketFilter,
- ) -> Result<Option<BpfProgram>> {
-     let mut errno_rules = RuleMap::new();
--    if needs_network {
--        add_socket_family_filter(&mut errno_rules, syscalls.socket)?;
--        add_unix_socket_filters(&mut errno_rules, syscalls.socket, unix_sockets)?;
-+    if restrict_inet_socket_types {
-+        add_inet_socket_type_filters(&mut errno_rules, syscalls.socket)?;
-         add_network_bypass_filters(&mut errno_rules, syscalls)?;
-     }
-+    if restrict_packet_netlink {
-+        add_packet_netlink_filters(&mut errno_rules, syscalls.socket)?;
-+    }
-+    add_unix_socket_filters(&mut errno_rules, syscalls.socket, unix_sockets)?;
-     if errno_rules.is_empty() {
-         return Ok(None);
-     }
-@@ -315,7 +319,7 @@
-     }
- }
- 
--pub(super) fn add_socket_family_filter(rules: &mut RuleMap, socket: i64) -> Result<()> {
-+pub(super) fn add_inet_socket_type_filters(rules: &mut RuleMap, socket: i64) -> Result<()> {
-     let stream = u64::try_from(libc::SOCK_STREAM).map_err(|_| LandstripError::IntegerTooLarge)?;
-     let tcp = u64::try_from(libc::IPPROTO_TCP).map_err(|_| LandstripError::IntegerTooLarge)?;
- 
-@@ -375,6 +379,10 @@
-         )?;
-     }
- 
-+    Ok(())
-+}
-+
-+fn add_packet_netlink_filters(rules: &mut RuleMap, socket: i64) -> Result<()> {
-     for domain in [libc::AF_PACKET, libc::AF_NETLINK] {
-         let domain = u64::try_from(domain).map_err(|_| LandstripError::IntegerTooLarge)?;
-         add_conditional_rule(
-diff -ruN a/packages/landstrip/src/platform/linux/seccomp.rs b/packages/landstrip/src/platform/linux/seccomp.rs
---- a/packages/landstrip/src/platform/linux/seccomp.rs
-+++ b/packages/landstrip/src/platform/linux/seccomp.rs
-@@ -243,7 +243,12 @@
- 
-     let syscalls = NotificationSyscalls::new();
-     let restricted = !policy.network_access.is_unrestricted();
--    let errno = build_errno_filter(&syscalls, restricted, unix_sockets)?;
-+    let errno = build_errno_filter(
-+        &syscalls,
-+        restricted && !policy.network_access.allows_all_inet_sockets(),
-+        restricted,
-+        unix_sockets,
-+    )?;
-     let io_uring = Some(build_io_uring_deny(&syscalls)?);
- 
-     let mut notify_syscalls: Vec<i64> = Vec::new();
-@@ -911,6 +916,11 @@
-     next_query_id: &mut u64,
- ) -> SysResult<NotificationResult> {
-     let socket = target_socket(request)?;
-+    if policy.network_access.allows_all_inet_sockets()
-+        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
-+    {
-+        return Ok(NotificationResult::Continue);
-+    }
- 
-     match socket.info.kind() {
-         SocketKind::Tcp => {
-@@ -973,6 +983,11 @@
-     next_query_id: &mut u64,
- ) -> SysResult<NotificationResult> {
-     let socket = target_socket(request)?;
-+    if policy.network_access.allows_all_inet_sockets()
-+        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
-+    {
-+        return Ok(NotificationResult::Continue);
-+    }
- 
-     match socket.info.kind() {
-         SocketKind::Tcp => {
-diff -ruN a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
 --- a/packages/landstrip/src/policy.rs
 +++ b/packages/landstrip/src/policy.rs
-@@ -176,6 +176,7 @@
+@@ -179,6 +179,7 @@
  pub(crate) enum NetworkAccess {
      Unrestricted,
      Restricted {
 +        allow_all_inet_sockets: bool,
          connect_tcp_ports: Vec<u16>,
-         bind: TcpBindAccess,
+         bind: IpBindAccess,
          unix_socket_access: UnixSocketAccess,
-@@ -227,6 +228,7 @@
+@@ -230,6 +231,7 @@
          matches!(
              self,
              Self::Restricted {
 +                allow_all_inet_sockets: false,
-                 bind: TcpBindAccess::Deny,
+                 bind: IpBindAccess::Deny,
                  ..
              }
-@@ -235,7 +237,23 @@
+@@ -238,7 +240,23 @@
  
      #[cfg(target_os = "linux")]
      pub(crate) fn restricts_connect_tcp(&self) -> bool {
@@ -185,11 +97,100 @@ diff -ruN a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
      }
  
      #[cfg(target_os = "linux")]
-@@ -504,6 +522,7 @@
-         TcpBindAccess::Deny
+@@ -540,6 +558,7 @@
+         IpBindAccess::Deny
      };
      Ok(NetworkAccess::Restricted {
 +        allow_all_inet_sockets: network.allow_all_inet_sockets,
          connect_tcp_ports,
          bind,
          unix_socket_access,
+--- a/packages/landstrip/src/platform/linux/filter.rs
++++ b/packages/landstrip/src/platform/linux/filter.rs
+@@ -39,16 +39,20 @@
+ 
+ pub(super) fn build_errno_filter(
+     syscalls: &NotificationSyscalls,
+-    needs_network: bool,
++    restrict_inet_socket_types: bool,
++    restrict_packet_netlink: bool,
+     allow_local_binding: bool,
+     unix_sockets: UnixSocketFilter,
+ ) -> Result<Option<BpfProgram>> {
+     let mut errno_rules = RuleMap::new();
+-    if needs_network {
+-        add_socket_family_filter(&mut errno_rules, syscalls.socket, allow_local_binding)?;
+-        add_unix_socket_filters(&mut errno_rules, syscalls.socket, unix_sockets)?;
++    if restrict_inet_socket_types {
++        add_inet_socket_filter(&mut errno_rules, syscalls.socket, allow_local_binding)?;
+         add_network_bypass_filters(&mut errno_rules, syscalls)?;
+     }
++    if restrict_packet_netlink {
++        add_packet_netlink_filters(&mut errno_rules, syscalls.socket)?;
++    }
++    add_unix_socket_filters(&mut errno_rules, syscalls.socket, unix_sockets)?;
+     if errno_rules.is_empty() {
+         return Ok(None);
+     }
+@@ -418,13 +422,7 @@
+     Ok(())
+ }
+ 
+-pub(super) fn add_socket_family_filter(
+-    rules: &mut RuleMap,
+-    socket: i64,
+-    allow_local_binding: bool,
+-) -> Result<()> {
+-    add_inet_socket_filter(rules, socket, allow_local_binding)?;
+-
++fn add_packet_netlink_filters(rules: &mut RuleMap, socket: i64) -> Result<()> {
+     for domain in [libc::AF_PACKET, libc::AF_NETLINK] {
+         let domain = u64::try_from(domain).map_err(|_| LandstripError::IntegerTooLarge)?;
+         add_conditional_rule(
+--- a/packages/landstrip/src/platform/linux/seccomp.rs
++++ b/packages/landstrip/src/platform/linux/seccomp.rs
+@@ -243,9 +243,18 @@
+ 
+     let syscalls = NotificationSyscalls::new();
+     let restricted = !policy.network_access.is_unrestricted();
+-    let allow_local_binding = policy.network_access.allows_local_binding();
++    // Unrestricted INET sockets need neither the localhost broker nor its
++    // datagram send filters, even when allowLocalBinding is also enabled.
++    let allow_local_binding = policy.network_access.allows_local_binding()
++        && !policy.network_access.allows_all_inet_sockets();
+     let handoff_by_pidfd = restricted && allow_local_binding;
+-    let errno = build_errno_filter(&syscalls, restricted, allow_local_binding, unix_sockets)?;
++    let errno = build_errno_filter(
++        &syscalls,
++        restricted && !policy.network_access.allows_all_inet_sockets(),
++        restricted,
++        allow_local_binding,
++        unix_sockets,
++    )?;
+     let io_uring = Some(build_io_uring_deny(&syscalls)?);
+ 
+     let mut notify_syscalls: Vec<i64> = Vec::new();
+@@ -923,6 +932,11 @@
+     next_query_id: &mut u64,
+ ) -> SysResult<NotificationResult> {
+     let socket = target_socket(request)?;
++    if policy.network_access.allows_all_inet_sockets()
++        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
++    {
++        return Ok(NotificationResult::Continue);
++    }
+ 
+     match socket.info.kind() {
+         SocketKind::Tcp | SocketKind::Udp => {
+@@ -985,6 +999,11 @@
+     next_query_id: &mut u64,
+ ) -> SysResult<NotificationResult> {
+     let socket = target_socket(request)?;
++    if policy.network_access.allows_all_inet_sockets()
++        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
++    {
++        return Ok(NotificationResult::Continue);
++    }
+ 
+     match socket.info.kind() {
+         SocketKind::Tcp => {

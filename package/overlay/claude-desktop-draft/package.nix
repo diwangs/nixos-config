@@ -79,6 +79,11 @@ let
     libglvnd
   ];
 
+  ### OVMF.fd only ships ${fwPrefix}_{CODE,VARS}.fd, with fwPrefix = AAVMF on aarch64
+  fwPrefix = if stdenvNoCC.hostPlatform.isAarch64 then "AAVMF" else "OVMF";
+  ovmfCode = "${OVMF.fd}/FV/${fwPrefix}_CODE.fd";
+  ovmfVars = "${OVMF.fd}/FV/${fwPrefix}_VARS.fd";
+
   unwrapped = stdenvNoCC.mkDerivation (finalAttrs: {
     pname = "claude-desktop";
     version = "2.26454.2";
@@ -137,17 +142,6 @@ let
 
       ### For keyring support
       libsecret
-
-      ### For Cowork QEMU
-      qemu_kvm
-      OVMF.fd
-
-      ### For extensions
-      python3
-      nodejs
-
-      ### For sso login
-      xdg-utils
     ];
 
     unpackPhase = ''
@@ -190,8 +184,8 @@ let
       fi
 
       substituteInPlace "$coworkJs" \
-        --replace-fail '/usr/share/OVMF/OVMF_CODE_4M.fd' '${OVMF.fd}/FV/OVMF_CODE.fd' \
-        --replace-fail '/usr/share/OVMF/OVMF_CODE.fd' '${OVMF.fd}/FV/OVMF_CODE.fd' \
+        --replace-fail '/usr/share/OVMF/OVMF_CODE_4M.fd' '${ovmfCode}' \
+        --replace-fail '/usr/share/OVMF/OVMF_CODE.fd' '${ovmfCode}' \
         --replace-fail '/usr/libexec/virtiofsd' '${virtiofsd}/bin/virtiofsd' \
         --replace-fail '/usr/bin/virtiofsd' '${virtiofsd}/bin/virtiofsd'
 
@@ -285,12 +279,12 @@ let
       ];
 
     extraBuildCommands = ''
-      ### OVMF firmware
-      mkdir -p "$out/usr/share/OVMF"
-      ln -s ${OVMF.fd}/FV/OVMF_CODE.fd  "$out/usr/share/OVMF/OVMF_CODE.fd"
-      ln -s ${OVMF.fd}/FV/OVMF_CODE.fd  "$out/usr/share/OVMF/OVMF_CODE_4M.fd"
-      ln -s ${OVMF.fd}/FV/OVMF_VARS.fd  "$out/usr/share/OVMF/OVMF_VARS.fd"
-      ln -s ${OVMF.fd}/FV/OVMF_VARS.fd  "$out/usr/share/OVMF/OVMF_VARS_4M.fd"
+      ### ${fwPrefix} firmware (the app picks the name from process.arch)
+      mkdir -p "$out/usr/share/${fwPrefix}"
+      ln -s ${ovmfCode} "$out/usr/share/${fwPrefix}/${fwPrefix}_CODE.fd"
+      ln -s ${ovmfCode} "$out/usr/share/${fwPrefix}/${fwPrefix}_CODE_4M.fd"
+      ln -s ${ovmfVars} "$out/usr/share/${fwPrefix}/${fwPrefix}_VARS.fd"
+      ln -s ${ovmfVars} "$out/usr/share/${fwPrefix}/${fwPrefix}_VARS_4M.fd"
 
       ### virtiofsd fallback paths
       mkdir -p "$out/usr/libexec" "$out/usr/bin"
@@ -302,12 +296,6 @@ let
       ln -sf ${lib.getExe git} "$out/usr/bin/git"
       ln -sf ${openssh}/bin/ssh "$out/usr/bin/ssh"
       ln -sf ${procps}/bin/pgrep "$out/usr/bin/pgrep"
-    ''
-    + lib.optionalString (stdenvNoCC.hostPlatform.isAarch64) ''
-      ### AAVMF firmware (used when process.arch = "arm64")
-      mkdir -p "$out/usr/share/AAVMF"
-      ln -s ${OVMF.fd}/FV/AAVMF_CODE.fd  "$out/usr/share/AAVMF/AAVMF_CODE.fd"
-      ln -s ${OVMF.fd}/FV/AAVMF_VARS.fd  "$out/usr/share/AAVMF/AAVMF_VARS.fd"
     '';
 
     extraBwrapArgs = [
