@@ -8,7 +8,7 @@
   lib,
   landstripPolicyBase, # shared sandbox policy, defined in aspect/secret.hm.nix
   landstripPolicyFile, # landstripPolicyBase materialized to JSON, also from aspect/secret.hm.nix
-  mkCodexBashLandstripHook, # shared hook builder, also from aspect/secret.hm.nix
+  mkAgentBashLandstripHook, # shared hook builder, also from aspect/secret.hm.nix
   ...
 }:
 {
@@ -124,56 +124,9 @@
           AWS_BEARER_TOKEN_BEDROCK = "exclude";
         };
       };
-      # Keep Codex's process sandbox while delegating filesystem and socket
-      # policy to the Landstrip wrapper installed by the hooks below.
-      default_permissions = "Profile-based";
-      permissions."Profile-based" = {
-        description = "Bubblewrap process isolation with Landstrip filesystem and socket policy based on selected profile.";
-        # Reopen the ordinary FHS trees for Landstrip, along with explicit
-        # metadata opt-outs that prevent Codex from creating synthetic mask
-        # targets in system-owned directories. Excludes special fs directories
-        # such as `/sys`, `/proc`, and `/dev`.
-        filesystem =
-          lib.genAttrs (lib.concatMap
-            (
-              root:
-              [ root ]
-              ++ map (name: "${root}/${name}") [
-                ".git"
-                ".agents"
-                ".codex"
-                ".aws"
-              ]
-            )
-            [
-              "/boot"
-              "/usr"
-              "/var"
-              "/etc"
-              "/run"
-              "/tmp"
-              "/root"
-              "/home"
-            ]
-          ) (_: "write")
-          // {
-            ":root" = "read";
-
-            # `/dev` itself stays bwrap's minimal device tree. Reopen only the
-            # host shared-memory mount, whose access is still mediated by
-            # Landstrip. Explicit project metadata writes keep Landstrip, rather
-            # than Codex's automatic workspace carveouts, authoritative there.
-            "/dev/shm" = "write";
-            ":workspace_roots" = {
-              "." = "write";
-              ".git" = "write";
-              ".agents" = "write";
-              ".codex" = "write";
-              ".aws" = "write";
-            };
-          };
-        network.enabled = true;
-      };
+      # Bash hooks enforce Bubblewrap and Landstrip independently of Codex's
+      # sandbox mode, including full access. Native apply_patch is blocked below.
+      sandbox_mode = "danger-full-access";
       approval_policy = "never"; # was "on-request"
       # approvals_reviewer = "auto_review";
       model = "gpt-6-sol";
@@ -192,16 +145,16 @@
             }
           ];
         }
-        (mkCodexBashLandstripHook {
+        (mkAgentBashLandstripHook {
           policyFile = landstripPolicyFile;
           scriptName = "codex-bash-landstrip-wrap";
-          statusMessage = "Entering Landstrip sandbox";
+          statusMessage = "Entering Bubblewrap and Landstrip sandbox";
         })
       ];
     };
     context = ''
       # Sandbox
-      - Bubblewrap provides user/PID namespaces and a fresh /proc
+      - Bash hooks provide Bubblewrap user/PID/IPC namespaces, minimal /dev, and fresh /proc, including in full access mode
       - Landstrip restricts filesystem access and allowlists AF_UNIX socket paths
       - Landstrip leaves AF_INET and AF_INET6 sockets unrestricted
 
@@ -225,7 +178,7 @@
           state."${config.home.homeDirectory}/.codex/config.toml:pre_tool_use:1:0".enabled =
             false;
           PreToolUse = [
-            (mkCodexBashLandstripHook {
+            (mkAgentBashLandstripHook {
               # The Docker-compatible Podman API deliberately crosses the
               # Landstrip filesystem boundary: the rootless service runs
               # outside the agent sandbox with the user's authority. Keep this
@@ -240,7 +193,7 @@
                     }
                   );
               scriptName = "codex-bash-landstrip-docker-wrap";
-              statusMessage = "Entering Docker-capable Landstrip sandbox";
+              statusMessage = "Entering Docker-capable Bubblewrap and Landstrip sandbox";
             })
           ];
         };
@@ -261,122 +214,54 @@
     		dst="$HOME/.claude/settings.json"
     		run rm -f "$dst"
     		run install -Dm600 ${
-        (pkgs.formats.json { }).generate "claude-code-settings.json" (
-          let
-            # Landstrip to Claude Code policy translation
-            toClaudeGlobs =
-              path:
-              let
-                anchored = if lib.hasPrefix "/" path then "/${path}" else path;
-              in
-              [
-                anchored
-                "${anchored}/**"
-              ];
+        (pkgs.formats.json { }).generate "claude-code-settings.json" {
+          "$schema" = "https://json.schemastore.org/claude-code-settings.json";
+          permissions.defaultMode = "bypassPermissions";
+          skipDangerousModePermissionPrompt = true;
+          tui = "fullscreen";
+          sandbox.enabled = false;
+          autoMemoryEnabled = false;
+          context = ''
+            @~/.codex/AGENTS.md
+            Only Bash is permitted. Use shell commands for reading, searching,
+            editing, and other operations; all other tools are blocked.
+          '';
+          env = {
+            CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
+            CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
+              unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(KEY|SECRET|PASSWORD|^AWS_BEARER_TOKEN_BEDROCK$)')
+              exec ${pkgs.bashInteractive}/bin/bash "$@"
+            ''}/bin/bash";
+            CLAUDE_BASH_NO_LOGIN = "1";
+          };
 
-            /*
-              Special handling for home directory
-
-              Landstrip policy is specificity-centric. Claude Code policy
-              is flat deny -> ask -> allow path. Landstrip's home policy can't
-              be applied directly to Claude Code. We therefore turn the home
-              directory from deny to allow, and create a new explicit denylist
-              to restrict sensitive directory (okay and bad apps) under home.
-            */
-            landstripReadDenyGlobs = lib.concatMap toClaudeGlobs (
-              builtins.filter (
-                p: p != config.home.homeDirectory
-              ) landstripPolicyBase.filesystem.denyRead
-            );
-            runtimeAgenixReadDenyGlobs = toClaudeGlobs "/run/user/*/agenix.d";
-            landstripWriteDenyGlobs = lib.concatMap toClaudeGlobs landstripPolicyBase.filesystem.denyWrite;
-
-            homeSecretGlobs = [
-              "~/.age-identity" # Direct children dotfiles
-              "~/.aws/**"
-              "~/.ssh/**"
-              "~/.gnupg/**"
-
-              "~/Desktop/**"
-              "~/Documents/**"
-              "~/Downloads/**"
-              "~/Music/**"
-              "~/Pictures/**"
-              "~/Videos/**"
-            ];
-
-            # Read-only: readable (not in Read deny), but not directly editable.
-            homeReadOnlyGlobs = [
-              "~/.claude/settings.json"
-              "~/.claude/settings.local.json"
-            ];
-          in
-          {
-            "$schema" = "https://json.schemastore.org/claude-code-settings.json";
-            defaultMode = "auto";
-            tui = "fullscreen";
-            sandbox.enabled = false;
-            autoMemoryEnabled = false;
-            context = ''
-              @~/.codex/AGENTS.md
-            '';
-            env = {
-              CLAUDE_CODE_ENABLE_AUTO_MODE = "1";
-              CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
-              CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
-                unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(KEY|SECRET|PASSWORD|^AWS_BEARER_TOKEN_BEDROCK$)')
-                exec ${pkgs.bashInteractive}/bin/bash "$@"
-              ''}/bin/bash";
-              CLAUDE_BASH_NO_LOGIN = "1";
-            };
-            permissions.deny =
-              (map (g: "Read(${g})") (
-                landstripReadDenyGlobs ++ runtimeAgenixReadDenyGlobs ++ homeSecretGlobs
-              ))
-              ++ (map (g: "Edit(${g})") (
-                landstripReadDenyGlobs
-                ++ runtimeAgenixReadDenyGlobs
-                ++ landstripWriteDenyGlobs
-                ++ homeSecretGlobs
-                ++ homeReadOnlyGlobs
-              ));
-
-            # Use landstrip for Bash tool but not for ! shell-mode. Any rewrite
-            # error denies the call rather than running it unsandboxed.
-            # Note: per-command nesting means a model `cd`/`export` does not
-            # persist across tool calls (chain within a single command instead)
-            hooks.PreToolUse = [
-              {
-                matcher = "Bash";
-                hooks = [
-                  {
-                    type = "command";
-                    command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
-                      result="$(${lib.getExe pkgs.jq} -c --arg prefix ${lib.escapeShellArg "${
-                        # Use a policy file rather than Landstrip's policy-on-stdin mode so
-                        # wrapped commands (notably apply_patch) retain their original stdin.
-                        pkgs.writeShellScript "agent-landstrip-run" ''
-                          if [ "$#" -eq 0 ]; then
-                            printf '%s\n' "landstrip runner: missing command" >&2
-                            exit 64
-                          fi
-
-                          exec ${lib.getExe pkgs.landstrip} run -p ${landstripPolicyFile} -- \
-                            ${lib.getExe pkgs.tini} -s -- "$@"
-                        ''
-                      } ${pkgs.bashInteractive}/bin/bash -c "} '.tool_input as $ti | ($ti.command // "") as $c | if $c == "" then empty else { hookSpecificOutput: { hookEventName: "PreToolUse", updatedInput: ($ti + { command: ($prefix + ($c | @sh)) }) } } end' 2>/dev/null)" || {
-                        printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
-                        exit 0
-                      }
-                      [ -n "$result" ] && printf '%s' "$result"
+          # Deny every other tool, including MCP and newly introduced tools.
+          # PreToolUse decisions also apply in bypassPermissions mode.
+          hooks.PreToolUse = [
+            {
+              matcher = "*";
+              hooks = [
+                {
+                  type = "command";
+                  command = "${pkgs.writeShellScript "claude-non-bash-block" ''
+                    if ${lib.getExe pkgs.jq} -e '.tool_name == "Bash"' >/dev/null 2>&1; then
                       exit 0
-                    ''}";
-                  }
-                ];
-              }
-            ];
-          }
-        )
+                    fi
+                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash is permitted because it runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
+                  ''}";
+                  timeout = 10;
+                }
+              ];
+            }
+            # Tool calls are wrapped; interactive ! shell-mode is outside this hook.
+            # Nesting means cd/export do not persist between tool calls.
+            (mkAgentBashLandstripHook {
+              policyFile = landstripPolicyFile;
+              scriptName = "claude-bash-landstrip-wrap";
+              statusMessage = "Entering Bubblewrap and Landstrip sandbox";
+            })
+          ];
+        }
       } "$dst"
      	'';
 

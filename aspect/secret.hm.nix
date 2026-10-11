@@ -12,9 +12,9 @@ rec {
   /*
     landstrip sandbox policy for CLI agent bash tool
 
-    This replaces Claude Code's built-in bubblewrap sandbox and runs inside
-    Codex's bubblewrap process sandbox. Landlock-based filesystem policy has
-    the following advantages over bind-mount path masking:
+    This replaces Claude Code's built-in bubblewrap sandbox. Both agents' Bash
+    hooks run Landstrip inside the same Bubblewrap process sandbox.
+    Landlock-based filesystem policy has the following advantages over bind-mount path masking:
     - Does not require creation of empty files or device nodes to satisfy
       bind-mount requirement. Claude Code is bad at cleaning up after itself.
     - Does not break programs that require non-character device nodes, such
@@ -22,9 +22,10 @@ rec {
     - Does not break programs that require non-symlink files, such as `zsh`
       dotfiles and `/run/wrappers`, which would hard-fail on bind.
 
-    Codex's outer bubblewrap instance keeps its user/PID namespaces, fresh
-    /proc, and process hardening. It exposes the host filesystem read-write so
-    this Landstrip policy remains the sole path and socket policy.
+    The shared hook runner creates user/PID/IPC namespaces, fresh /proc, and a
+    minimal /dev with host /dev/shm restored. The host root is bound writable
+    so Landstrip enforces ordinary file access. This protection applies even
+    when Codex runs in full access or Claude Code bypasses permissions.
 
     The cost of this is it requires Landlock LSM in the kernel, but it seems
     to be available on all machines that I use.
@@ -143,10 +144,10 @@ rec {
     (pkgs.formats.json { }).generate "agent-landstrip-policy.json"
       _module.args.landstripPolicyBase;
 
-  # Codex hook shared by the base and opt-in profiles. Keep it beside the
+  # Bash hook shared by Codex, Claude Code, and opt-in profiles. Keep it beside the
   # Landstrip policy inputs it wraps so consumers only provide the selected
   # materialized policy and presentation details.
-  _module.args.mkCodexBashLandstripHook =
+  _module.args.mkAgentBashLandstripHook =
     {
       policyFile,
       scriptName,
@@ -159,7 +160,7 @@ rec {
           type = "command";
           command = "${pkgs.writeShellScript scriptName ''
             deny() {
-              printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"landstrip wrap hook failed; refusing to run unsandboxed"}}'
+              printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Bubblewrap/Landstrip wrap hook failed; refusing to run unsandboxed"}}'
               exit 0
             }
 
@@ -173,7 +174,18 @@ rec {
                     exit 64
                   fi
 
-                  exec ${lib.getExe pkgs.landstrip} run -p ${policyFile} -- \
+                  # Delegate ordinary file access to Landstrip. Mount the minimal
+                  # /dev and fresh /proc after the root bind, restoring only host
+                  # shared memory beneath /dev.
+                  exec ${lib.getExe pkgs.bubblewrap} \
+                    --new-session --die-with-parent \
+                    --unshare-user --unshare-pid --unshare-ipc \
+                    --bind / / \
+                    --dev /dev \
+                    --bind-try /dev/shm /dev/shm \
+                    --proc /proc \
+                    --cap-drop ALL \
+                    -- ${lib.getExe pkgs.landstrip} run -p ${policyFile} -- \
                     ${lib.getExe pkgs.tini} -s -- "$@"
                 ''
               } ${pkgs.bashInteractive}/bin/bash -c "} \
