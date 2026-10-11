@@ -120,6 +120,8 @@
         "codeql"
         "claude-code"
         "claude-desktop"
+        "claude-science"
+        "claude-science-unwrapped"
         "chatgpt"
 
         # VSCode and some unfree extensions

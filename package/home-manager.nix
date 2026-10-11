@@ -45,6 +45,7 @@
 
       # Agentic
       claude-desktop
+      claude-science
       chatgpt
       hermes-desktop
       # cua-driver: installed system-wide via services.cua-driver (nixos.nix)
