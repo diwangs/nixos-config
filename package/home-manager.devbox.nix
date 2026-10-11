@@ -131,6 +131,12 @@
       # approvals_reviewer = "auto_review";
       model = "gpt-6.1-sol";
       model_reasoning_effort = "medium";
+      tui.status_line = [
+        "model-with-reasoning"
+        "current-dir"
+        "context-used"
+        "five-hour-limit"
+      ];
       hooks.PreToolUse = [
         {
           matcher = "^apply_patch$";
