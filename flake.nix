@@ -33,8 +33,6 @@
     agenix = {
       url = "github:ryantm/agenix";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-      inputs.darwin.follows = ""; # not on macOS, drop the nix-darwin dep
     };
 
     # Declarative encrypted VM images and ephemeral-root persistence.
