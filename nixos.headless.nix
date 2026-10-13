@@ -19,8 +19,8 @@
   ];
   nixpkgs.overlays = [
     (import ./package/overlay/landstrip/overlay.nix)
-    (import ./package/overlay/codex/overlay.nix)
-    (import ./package/overlay/codex-acp/overlay.nix)
+    # (import ./package/overlay/codex/overlay.nix)
+    # (import ./package/overlay/codex-acp/overlay.nix)
   ];
   nixpkgs.config.allowUnfreePredicate =
     pkg: builtins.elem (lib.getName pkg) allowedUnfree;

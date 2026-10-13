@@ -39,6 +39,7 @@
     directories = [
       "/etc/nixos"
       "/etc/systemd/network"
+      "/var/lib/containers"
       "/var/lib/nixos"
       "/var/lib/systemd"
       {
@@ -112,6 +113,7 @@
     };
   };
   services.qemuGuest.enable = true;
+  virtualisation.podman.enable = true;
   services.openssh = {
     enable = true;
     # Do not persist /etc/ssh itself: that hides NixOS's generated sshd_config
