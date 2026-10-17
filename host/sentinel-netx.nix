@@ -59,18 +59,24 @@
       "/var/lib/pcrlock.d"
       "/var/log"
       "/var/cache"
+    ];
+    # User-scoped persistence treats the home directory as a permissions
+    # boundary. A system-level .cache entry copies its root-owned backing
+    # parent's permissions onto /home/diwangs during every activation.
+    users.diwangs.directories = [
       {
-        directory = "/home/diwangs/.cache";
-        user = "diwangs";
-        group = "users";
+        directory = ".cache";
         mode = "0700";
       }
     ];
   };
 
-  # Disko creates the cache subvolume as root. Give Home Manager's cache
-  # mount to the user before its activation service writes into it.
+  # Impermanence preserves existing backing-directory permissions, and Disko
+  # creates subvolumes as root. Repair both homes and the cache before Home
+  # Manager activation, including installations affected by the old entry.
   systemd.tmpfiles.rules = [
+    "d /persist/states/home/diwangs 0700 diwangs users - -"
+    "d /persist/caches/home/diwangs 0700 diwangs users - -"
     "d /persist/caches/home/diwangs/.cache 0700 diwangs users - -"
   ];
 

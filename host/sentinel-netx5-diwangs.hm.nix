@@ -5,7 +5,8 @@
   ...
 }:
 let
-  ageIdentityCredential = os-secret.systemd-creds.sentinel-netx5-diwangs.ageIdentity;
+  ageIdentityCredential =
+    os-secret.systemd-creds.sentinel-netx5-diwangs.ageIdentity;
 in
 {
   home.username = "diwangs";
@@ -16,11 +17,17 @@ in
 
   # User-scoped credential: encrypt with --uid=diwangs --with-key=host+tpm2.
   age.enable = true;
+  age.secrets."token/access-nova.json".file = os-secret.token."access-nova.json";
   age.identityPaths = lib.mkForce [
     "/run/user/${toString config.home.uid}/credentials/agenix.service/age-identity"
   ];
   systemd.user.services.agenix.Service.SetCredentialEncrypted =
     ageIdentityCredential;
+
+  # This headless host has no Secret Service keyring for aws-vault's cache.
+  home.sessionVariables.AWS_VAULT_BACKEND = "file";
+  # ECS-server mode rejects terminal prompts even for profiles without MFA.
+  home.sessionVariables.AWS_VAULT_PROMPT = "ykman";
 
   assertions = [
     {

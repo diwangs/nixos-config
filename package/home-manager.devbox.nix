@@ -17,6 +17,8 @@
     fnm # Node.js version manager 					(`fnm exec --using=24`)
     # uv # Python environment manager       (`uv run`)
     docker-client # Docker CLI, to be used with Podman
+    aws-vault # STS credential broker through ECS servers
+    yubikey-manager # Supplies aws-vault's built-in non-terminal ykman driver
 
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
@@ -25,6 +27,31 @@
     # Little tools
     jq # JSON parser
   ];
+
+  # AWS CLI and aws-vault; role profiles need the host's agenix declaration.
+  # Usage: aws-vault exec --ecs-server <profile> -- codex
+  # With the file backend, omit --lazy to unlock the cache before Codex starts.
+  # ykman is only invoked when an MFA token is requested.
+  programs.awscli = {
+    enable = true;
+    settings =
+      lib.optionalAttrs (builtins.hasAttr "token/access-nova.json" config.age.secrets)
+        {
+          "profile nova" = {
+            credential_process = "${pkgs.coreutils}/bin/cat /run/user/${toString config.home.uid}/agenix/token/access-nova.json";
+          };
+          "profile mantle" = {
+            source_profile = "nova";
+            role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle";
+            region = "us-east-1";
+          };
+          "profile mantle-tf" = {
+            source_profile = "nova";
+            role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-tf";
+            region = "us-east-2";
+          };
+        };
+  };
 
   # Dev
   programs.gh.enable = true;

@@ -41,7 +41,6 @@
       ansible
       sshpass
       ansible-lint
-      aws-vault # STS credential broker through ECS servers
 
       # Agentic
       claude-desktop
@@ -84,29 +83,8 @@
     lfs.enable = true;
   };
 
-  # AWS CLI and `aws-vault`
-  # Usage:
-  # `aws-vault exec --ecs-server --lazy <profile> -- codex`
+  # The desktop uses the login keyring for aws-vault's cache.
   home.sessionVariables.AWS_VAULT_SECRET_SERVICE_COLLECTION_NAME = "login";
-  programs.awscli = {
-    enable = true;
-    settings = {
-      "profile nova" = {
-        credential_process = "/run/current-system/sw/bin/cat /run/user/1000/agenix/token/access-nova.json";
-      };
-      # Role profiles exported by aws-vault for the user-facing profiles below.
-      "profile mantle" = {
-        source_profile = "nova";
-        role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle";
-        region = "us-east-1";
-      };
-      "profile mantle-tf" = {
-        source_profile = "nova";
-        role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-tf";
-        region = "us-east-2";
-      };
-    };
-  };
 
   # GUI IDE: Zed
   programs.zed-editor = {
