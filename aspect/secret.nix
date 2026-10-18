@@ -17,13 +17,12 @@
   services.oo7.enable = true;
   services.gnome.gnome-keyring.enable = false;
 
-  # TODO: this is user secrets, move to HM
-  # Drop-in to oo7-daemon to enable auto-unlock via agenix at login
-  systemd.user.services.oo7-daemon = {
-    after = [ "agenix.service" ];
-    wants = [ "agenix.service" ];
-    serviceConfig.ImportCredential = ""; # Don't use systemd-creds yet
-    # Make sure there's a file called `oo7.keyring-encryption-password` here
-    environment.CREDENTIALS_DIRECTORY = "/run/user/1000/agenix/paladin-iii";
-  };
+  # oo7 imports oo7.keyring-encryption-password from the user credstore
+  # (upstream ImportCredential=); the encrypted blob is local, not in Nix.
+  # Enroll: systemd-ask-password -n | systemd-creds encrypt --user \
+  #   --with-key=host+tpm2 --name=oo7.keyring-encryption-password - \
+  #   ~/.config/credstore.encrypted/oo7.keyring-encryption-password
+  systemd.user.tmpfiles.rules = [
+    "d %h/.config/credstore.encrypted 0700 - - -"
+  ];
 }

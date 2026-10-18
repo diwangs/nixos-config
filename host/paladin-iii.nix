@@ -95,6 +95,36 @@
   systemd.services.agenix-install-secrets.serviceConfig.SetCredentialEncrypted =
     os-secret.systemd-creds.paladin-iii.ageIdentity;
 
+  # systemd-creds host key: root resets every boot, so restore the same key
+  # (TPM-sealed) before any user manager decrypts host+tpm2 credentials.
+  # To replace it:
+  # systemd-creds encrypt -T -p --name=credential-secret /var/lib/systemd/credential.secret -
+  systemd.services.credential-host-secret = {
+    description = "Restore systemd-creds host key";
+    wantedBy = [ "sysinit.target" ];
+    before = [
+      "sysinit.target"
+      "systemd-user-sessions.service"
+    ];
+    after = [
+      "local-fs.target"
+      "tpm2.target"
+    ];
+    unitConfig.DefaultDependencies = false;
+    path = [ pkgs.diffutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      SetCredentialEncrypted = os-secret.systemd-creds.paladin-iii.credentialSecret;
+    };
+    # systemd only accepts a 0400 regular file with a single link.
+    script = ''
+      src="$CREDENTIALS_DIRECTORY/credential-secret"
+      dst=/var/lib/systemd/credential.secret
+      cmp -s "$src" "$dst" || install -D -m 0400 -o root -g root "$src" "$dst"
+    '';
+  };
+
   # Root secrets (decrypts to `/run/agenix/*`)
   age.secrets."paladin-iii/secure-boot/GUID".file =
     os-secret.paladin-iii.secure-boot.GUID;

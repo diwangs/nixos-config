@@ -327,11 +327,11 @@
     },
     "os-secret": {
       "locked": {
-        "lastModified": 1791949620,
-        "narHash": "sha256-LNc5Kkk1Lqmmeg+X+49Z7fW8b2vNz4IxsIZ2h9xXutU=",
+        "lastModified": 1792346360,
+        "narHash": "sha256-+IqRjTKR7Kyyxal/3y+QPeui1wplgSSSrCN4EjWD9ME=",
         "ref": "refs/heads/main",
-        "rev": "f839bf1c5eed8bb4375e01716e2fdbc56e7f74ea",
-        "revCount": 27,
+        "rev": "1cc112150903b9122ce3a417b43b674be3b27236",
+        "revCount": 30,
         "type": "git",
         "url": "ssh://git@github.com/diwangs/os-secret.git"
       },
