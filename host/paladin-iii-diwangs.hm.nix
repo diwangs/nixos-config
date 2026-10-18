@@ -45,6 +45,9 @@ in
       "*" = {
         ForwardAgent = true;
         IdentityAgent = "/run/user/1000/yubikey-agent/yubikey-agent.sock";
+        # Keep idle sessions (e.g. Zed remote) alive through proxies/NAT
+        ServerAliveInterval = 60;
+        ServerAliveCountMax = 3;
       };
     };
   };
