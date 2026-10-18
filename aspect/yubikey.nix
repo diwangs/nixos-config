@@ -2,6 +2,8 @@
   # For Yubikey
   services.pcscd.enable = true; # conflicts with gpg's scdaemon
   services.udev.packages = [ pkgs.yubikey-personalization ];
+  # age identity plugin for editing secrets (agenix CLI is in aspect/secret.nix)
+  environment.systemPackages = [ pkgs.age-plugin-yubikey ];
 
   # nixos-hardware's framework-13 profile enables fprintd, which materialises
   # two auth paths that never reach `pam_u2f`: the `gdm-fingerprint` service

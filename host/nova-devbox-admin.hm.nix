@@ -12,6 +12,9 @@
   # Secrets it can decrypt
   age.secrets."token/bedrock".file = os-secret.token.bedrock;
 
+  # No Secret Service on this rootless host; keyring elsewhere (oo7)
+  programs.codex.settings.cli_auth_credentials_store = "file";
+
   # Headless tools that NixOS provides system-wide on the laptop
   home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
   home.sessionPath = [ "$HOME/.local/bin" ];

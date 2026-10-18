@@ -24,8 +24,6 @@ in
   systemd.user.services.agenix.Service.SetCredentialEncrypted =
     ageIdentityCredential;
 
-  # This headless host has no Secret Service keyring for aws-vault's cache.
-  home.sessionVariables.AWS_VAULT_BACKEND = "file";
   # ECS-server mode rejects terminal prompts even for profiles without MFA.
   home.sessionVariables.AWS_VAULT_PROMPT = "ykman";
 

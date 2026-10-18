@@ -8,7 +8,7 @@
     ./aspect/secret.hm.nix
     ./aspect/shell.hm.nix
 
-    ./package/home-manager.devbox.nix
+    ./package/home-manager.headless.nix
   ];
 
   programs.home-manager.enable = true;

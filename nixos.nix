@@ -6,27 +6,24 @@
   self,
   lib,
   pkgs,
-  agenix,
-  allowedUnfree,
   cua,
   nix-flatpak,
   ...
 }@args:
 {
   imports = [
-    agenix.nixosModules.default
+    # Strict subset: locale, user, shell, secret (incl. oo7), agenix, nix
+    # settings, unfree predicate, and the headless home-manager profile
+    ./nixos.headless.nix
+
     cua.nixosModules.cua-driver
     nix-flatpak.nixosModules.nix-flatpak
 
     ./aspect/audio.nix
-    ./aspect/locale.nix
     ./aspect/network.nix
     ./aspect/power.nix
-    ./aspect/user.nix
     ./aspect/desktop.nix
     ./aspect/virtualisation.nix
-    ./aspect/secret.nix
-    ./aspect/shell.nix
     ./aspect/yubikey.nix
 
     ./package/nixos.nix
@@ -40,17 +37,12 @@
 
     # self.inputs.nix-vscode-extensions.overlays.default
     self.inputs.nix-zed-extensions.overlays.default
-    (import ./package/overlay/landstrip/overlay.nix)
     (import ./package/overlay/hermes-desktop/overlay.nix {
       hermes-agent = self.inputs.hermes-agent;
     })
-    # oo7 → git main. Both the content-type reject (aws-vault "application/json")
-    # and the digit-leading portal-token panic (hung Claude Desktop on startup)
-    # are now fixed upstream, so we build oo7 from a pinned main commit rather
-    # than hand-patching. Replaces the former oo7/json.nix + oo7/portal-token.nix
-    # overlays and supersedes the claude-desktop-side DbusSecretPortal workaround
-    # below (patch/oo7.nix, still disabled). See package/overlay/oo7.nix.
-    (import ./package/overlay/oo7.nix)
+    # oo7 → git main lives in nixos.headless.nix. It supersedes the
+    # claude-desktop-side DbusSecretPortal workaround below (patch/oo7.nix,
+    # still disabled). See package/overlay/oo7.nix.
     # (import ./package/overlay/codex/overlay.nix)
     # (import ./package/overlay/codex-acp/overlay.nix)
     # Patches for YubiKey 5.7
@@ -92,19 +84,9 @@
 
   ];
 
-  nix.settings.experimental-features = [
-    "nix-command"
-    "flakes"
-  ];
-
-  # Whitelist unfree packages
-  # Define here instead of flake.nix to avoid replacing the whole pkgs
-  nixpkgs.config.allowUnfreePredicate =
-    pkg: builtins.elem (lib.getName pkg) allowedUnfree;
-
   # Project-local `/sandbox` choices override user settings. Managed settings
   # have higher precedence, keeping Claude's bubblewrap sandbox disabled in
-  # favor of the Landstrip wrapper configured in home-manager.devbox.nix.
+  # favor of the Landstrip wrapper configured in home-manager.headless.nix.
   environment.etc."claude-code/managed-settings.json".text = builtins.toJSON {
     sandbox.enabled = false;
   };
@@ -155,8 +137,7 @@
     kernel = pkgs.linuxKernel.kernels.linux_7_2;
   };
 
-  # Enabling LSM
-  security.apparmor.enable = true;
+  # Enabling LSM (AppArmor is enabled in nixos.headless.nix)
   security.lsm = [ "lockdown" ];
   # Confidentiality broke `bpf` due to `bpf_probe_read_kernel`
   boot.kernelParams = [ "lockdown=integrity" ];
@@ -165,9 +146,8 @@
   services.logrotate.checkConfig = false;
   security.rtkit.enable = true;
 
-  # nix-ld: for packages that hasn't been nixified
-  # e.g., `uv`-managed Python, `fnm`-managed Node
-  programs.nix-ld.enable = true;
+  # nix-ld (enabled in nixos.headless.nix): for packages that hasn't been
+  # nixified e.g., `uv`-managed Python, `fnm`-managed Node
   # programs.nix-ld.libraries = with pkgs; [
   # 	libusb1			# For firmware updates with SuzyQ
   # ];

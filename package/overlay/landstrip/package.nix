@@ -12,7 +12,7 @@
   no C dependency), so this needs no pkg-config/libseccomp buildInputs.
 
   Also consumed by the Claude Code Bash-tool wrapper in
-  ../../home-manager.devbox.nix (CLAUDE_CODE_SHELL -> landstrip -p <policy> -- bash).
+  ../../home-manager.headless.nix (CLAUDE_CODE_SHELL -> landstrip -p <policy> -- bash).
   OpenCode fetches its own copy through the opencode-landstrip npm plugin, so this
   package only serves Claude Code.
 */

@@ -25,7 +25,7 @@
   imports = [
     # Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
     # TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
-    ./home-manager.devbox.nix
+    ./home-manager.headless.nix
   ];
 
   home.packages =
@@ -71,7 +71,7 @@
         		'')
     ];
 
-  # Dev (OpenCode, direnv, and gh live in home-manager.devbox.nix)
+  # Dev (OpenCode, direnv, and gh live in home-manager.headless.nix)
   programs.java = {
     # Aside from installing jdk (latest LTS), this sets JAVA_HOME
     enable = true;
@@ -153,9 +153,6 @@
       terraform
     ];
   };
-
-  # CLI Agent overrides
-  programs.codex.settings.cli_auth_credentials_store = lib.mkForce "keyring";
 
   # IDE: VSCode official
   # programs.vscode = {

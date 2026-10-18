@@ -168,7 +168,6 @@
             };
             home-manager.users.diwangs.imports = [
               ./host/sentinel-netx5-diwangs.hm.nix
-              ./home-manager.devbox.nix
             ];
           }
         ];
@@ -261,7 +260,7 @@
           modules = [
             { home.uid = 1000; }
             ./host/nova-devbox-admin.hm.nix # User-specific
-            ./home-manager.devbox.nix # Portable (devbox)
+            ./home-manager.headless.nix # Portable (devbox)
           ];
         }
       );

@@ -1,5 +1,5 @@
 # Home packages and programs shared between the laptop and rootless devboxes
-# (imported by package/home-manager.nix and home-manager.devbox.nix).
+# (imported by package/home-manager.nix and home-manager.headless.nix).
 # Keep this list headless: no desktop, dconf, Flatpak, or system-service
 # assumptions — and no laptop-only specialArgs (`secrets`, `pkgs-stable`).
 {
@@ -139,7 +139,7 @@
       '';
     };
     settings = {
-      cli_auth_credentials_store = lib.mkDefault "file"; # keyring in desktop
+      cli_auth_credentials_store = lib.mkDefault "keyring"; # oo7 Secret Service
       allow_login_shell = false; # Preserve Codex tool shims in PATH
       shell_environment_policy = {
         ignore_default_excludes = true;
@@ -256,8 +256,9 @@
           autoMemoryEnabled = false;
           context = ''
             @~/.codex/AGENTS.md
-            Only Bash is permitted. Use shell commands for reading, searching,
-            editing, and other operations; all other tools are blocked.
+            Only Bash, AskUserQuestion, and ExitPlanMode are permitted. Use shell
+            commands for reading, searching, editing, and other operations; all
+            other tools are blocked.
           '';
           env = {
             CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
@@ -268,7 +269,8 @@
             CLAUDE_BASH_NO_LOGIN = "1";
           };
 
-          # Deny every other tool, including MCP and newly introduced tools.
+          # Deny every other tool except AskUserQuestion and ExitPlanMode (no side
+          # effects outside the sandbox), including MCP and newly introduced tools.
           # PreToolUse decisions also apply in bypassPermissions mode.
           hooks.PreToolUse = [
             {
@@ -277,10 +279,10 @@
                 {
                   type = "command";
                   command = "${pkgs.writeShellScript "claude-non-bash-block" ''
-                    if ${lib.getExe pkgs.jq} -e '.tool_name == "Bash"' >/dev/null 2>&1; then
+                    if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
                       exit 0
                     fi
-                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash is permitted because it runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
+                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash (plus AskUserQuestion and ExitPlanMode) is permitted because Bash runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
                   ''}";
                   timeout = 10;
                 }

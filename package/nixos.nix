@@ -38,7 +38,7 @@ in
   # System packages: packages that is run by the root user sans sudo
   # e.g. systemd units, gdm, etc.
   environment.systemPackages = with pkgs; [
-    git # required for flakes
+    # git: required for flakes, installed by nixos.headless.nix
 
     # For firmware things
     fw-ectool # This is the same as tree's ectool

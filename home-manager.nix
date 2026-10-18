@@ -2,7 +2,7 @@
 { nix-zed-extensions, ... }: {
   imports = [
     # Shared with rootless devboxes (shell + headless packages/agents)
-    ./home-manager.devbox.nix
+    ./home-manager.headless.nix
 
     ./aspect/desktop.hm.nix
     ./aspect/user.hm.nix

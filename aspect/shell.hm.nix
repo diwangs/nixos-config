@@ -1,5 +1,5 @@
 # Shell configuration shared between the laptop and rootless devboxes
-# (imported by home-manager.devbox.nix, which the laptop entry also
+# (imported by home-manager.headless.nix, which the laptop entry also
 # imports). Keep this file devbox-safe: no desktop, dconf, or NixOS-module
 # assumptions.
 { config, ... }: {

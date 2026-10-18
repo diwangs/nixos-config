@@ -3,14 +3,14 @@
   programs.ssh.enableAskPassword = true; # export SSH_ASKPASS
   services.gnome.gcr-ssh-agent.enable = false; # disable GCR SSH agent (25.11)
 
-  # agenix CLI + YubiKey plugin for editing/encrypting secrets on this host
+  # agenix CLI for editing/encrypting secrets on this host (the YubiKey
+  # plugin is laptop-only, see aspect/yubikey.nix)
   age.identityPaths = [
     "/run/credentials/agenix-install-secrets.service/age-identity"
   ];
   environment.systemPackages = [
     agenix.packages.${pkgs.stdenv.hostPlatform.system}.default
     pkgs.age # NOTE: don't use `rage` since it hasn't supported pq keys yet
-    pkgs.age-plugin-yubikey
   ];
 
   # oo7: Secret Portal and Secret Service for session secrets

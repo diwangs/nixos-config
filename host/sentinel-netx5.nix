@@ -1,7 +1,6 @@
 # The same instance configuration installs unsigned, then switches to its
 # os-secret-backed Secure Boot bundle when that input becomes available.
 {
-  agenix,
   lanzaboote,
   lib,
   os-secret,
@@ -27,7 +26,6 @@ in
 {
   imports = [
     ./sentinel-netx.nix
-    agenix.nixosModules.default
     lanzaboote.nixosModules.lanzaboote
   ];
 
@@ -72,10 +70,6 @@ in
       crypttabExtraOpts = lib.optionals hasSecureBootBundle [ "tpm2-device=auto" ];
     };
   };
-
-  age.identityPaths = lib.optionals hasSecureBootBundle [
-    "/run/credentials/agenix-install-secrets.service/age-identity"
-  ];
 
   assertions = lib.optionals hasSecureBootBundle [
     {
