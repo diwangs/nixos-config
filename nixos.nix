@@ -32,7 +32,7 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_2_8_hardenedOverlay
+    .linuxKernel_7_2_10_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     # self.inputs.nix-vscode-extensions.overlays.default
@@ -129,13 +129,13 @@
         # NOTE: as on 7.1.5, this breaks `bpf-restrict-fs`
       };
     }
-  ]
+  ];
   # Backported Thunderbolt DP tunnel shutdown-hang fix (7.2.x only)
-  ++ import ./package/overlay/kernel/thunderbolt-dp-tunnel.nix {
-    inherit lib;
-    inherit (pkgs) fetchpatch;
-    kernel = pkgs.linuxKernel.kernels.linux_7_2;
-  };
+  # ++ import ./package/overlay/kernel/thunderbolt-dp-tunnel.nix {
+  #   inherit lib;
+  #   inherit (pkgs) fetchpatch;
+  #   kernel = pkgs.linuxKernel.kernels.linux_7_2;
+  # };
 
   # Enabling LSM (AppArmor is enabled in nixos.headless.nix)
   security.lsm = [ "lockdown" ];

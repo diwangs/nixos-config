@@ -27,8 +27,6 @@ in
   ];
 
   # Secrets it can decrypt
-  age.secrets."paladin-iii/oo7.keyring-encryption-password".file =
-    os-secret.paladin-iii."oo7.keyring-encryption-password";
   age.secrets."network/ssh-hosts".file = os-secret.network.ssh-hosts;
   age.secrets."token/access-nova.json".file = os-secret.token."access-nova.json";
   age.secrets."token/bedrock".file = os-secret.token.bedrock;

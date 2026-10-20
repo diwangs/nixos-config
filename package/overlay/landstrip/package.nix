@@ -8,8 +8,10 @@
   sidestepping the whole class of bwrap bind-mount/namespace bugs the previous
   `claude-code.nix` overlay worked around.
 
-  Pure-Rust (edition 2024, rust >= 1.85; `landlock` and `seccompiler` crates carry
-  no C dependency), so this needs no pkg-config/libseccomp buildInputs.
+  Rust (edition 2024, rust >= 1.85). The `landlock` and `seccompiler` crates carry
+  no C dependency, but since 0.19.19 the `openssl` crate is pulled in with its
+  `vendored` feature; OPENSSL_NO_VENDOR links nixpkgs' OpenSSL instead of
+  building one from source (which also needs perl).
 
   Also consumed by the Claude Code Bash-tool wrapper in
   ../../home-manager.headless.nix (CLAUDE_CODE_SHELL -> landstrip -p <policy> -- bash).
@@ -21,10 +23,12 @@
   lib,
   rustPlatform,
   fetchFromGitHub,
+  pkg-config,
+  openssl,
 }:
 
 let
-  version = "0.19.12";
+  version = "0.19.19";
 in
 rustPlatform.buildRustPackage {
   pname = "landstrip";
@@ -34,12 +38,16 @@ rustPlatform.buildRustPackage {
     owner = "landstrip";
     repo = "landstrip";
     tag = version;
-    hash = "sha256-Za8DALLSjk6OWfeim25uLS+th+DyDog9P3TnU6ffVfM=";
+    hash = "sha256-nW94Q9Z5yWg9ye8v7s9RM03nxDUNwbsjCTVXc/7LI7k=";
   };
 
   cargoRoot = "packages/landstrip";
   buildAndTestSubdir = "packages/landstrip";
-  cargoHash = "sha256-hxZ3EBe9KkpAxlLeitCohunOICqfVDzviudPexDVqkY=";
+  cargoHash = "sha256-OEfTI1piyYu2H0Z79e92bfggxM6TU6mfNBsyVeiBOvc=";
+
+  nativeBuildInputs = [ pkg-config ];
+  buildInputs = [ openssl ];
+  env.OPENSSL_NO_VENDOR = 1;
 
   # The test suite exercises live Landlock/seccomp enforcement and needs a
   # real kernel, which the Nix build sandbox does not provide.

@@ -272,6 +272,7 @@ stdenv.mkDerivation (finalAttrs: {
       moraxyc
       mdaniels5757
     ];
+    broken = stdenv.hostPlatform.isMusl;
     platforms = lib.attrNames finalAttrs.passthru.sources;
     sourceProvenance = with lib.sourceTypes; [ binaryNativeCode ];
     mainProgram = if isDarwin then "ChatGPT" else "chatgpt";
