@@ -17,8 +17,8 @@
     fnm # Node.js version manager 					(`fnm exec --using=24`)
     # uv # Python environment manager       (`uv run`)
     docker-client # Docker CLI, to be used with Podman
-    aws-vault # STS credential broker through ECS servers
-    yubikey-manager # Supplies aws-vault's built-in non-terminal ykman driver
+    minikube
+    kubectl
 
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
@@ -26,6 +26,8 @@
 
     # Little tools
     jq # JSON parser
+    aws-vault # STS credential broker through ECS servers
+    yubikey-manager # Supplies aws-vault's built-in non-terminal ykman driver
   ];
 
   # AWS CLI and aws-vault; role profiles need the host's agenix declaration.
