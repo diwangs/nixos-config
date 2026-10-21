@@ -18,7 +18,6 @@
     # uv # Python environment manager       (`uv run`)
     docker-client # Docker CLI, to be used with Podman
     minikube
-    kubectl
 
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
