@@ -11,6 +11,53 @@
   mkAgentBashLandstripHook, # shared hook builder, also from aspect/secret.hm.nix
   ...
 }:
+let
+  # Shared opt-in policy for both agents. The rootless Podman service runs
+  # outside Landstrip with the user's authority; allow only its specific socket.
+  dockerLandstripPolicyFile =
+    (pkgs.formats.json { }).generate "agent-landstrip-docker-policy.json"
+      (
+        lib.recursiveUpdate landstripPolicyBase {
+          network.allowUnixSockets = landstripPolicyBase.network.allowUnixSockets ++ [
+            "/run/user/${toString config.home.uid}/podman/podman.sock"
+          ];
+        }
+      );
+
+  claudeProfiles = rec {
+    docker.env.AGENT_SANDBOX_PROFILE = "docker";
+    # Use Mantle with the caller's AWS credential chain (including aws-vault), without
+    # putting credentials in the Nix store or changing the normal Claude login.
+    bedrock.env = {
+      # Disable Invoke API routing even if inherited from the shell or user settings.
+      CLAUDE_CODE_USE_BEDROCK = "0";
+      CLAUDE_CODE_USE_MANTLE = "1";
+      AWS_REGION = "us-east-1";
+    };
+    bedrock-docker = lib.recursiveUpdate bedrock docker;
+  };
+  claudeProfileFiles = lib.mapAttrs (
+    name: settings:
+    (pkgs.formats.json { }).generate "claude-${name}-settings.json" settings
+  ) claudeProfiles;
+
+  claudeBashHookCommands =
+    lib.mapAttrs
+      (
+        name: policyFile:
+        (builtins.head
+          (mkAgentBashLandstripHook {
+            inherit policyFile;
+            scriptName = "claude-bash-landstrip-${name}-wrap";
+            statusMessage = "Entering Bubblewrap and Landstrip sandbox";
+          }).hooks
+        ).command
+      )
+      {
+        default = landstripPolicyFile;
+        docker = dockerLandstripPolicyFile;
+      };
+in
 {
   home.packages = with pkgs; [
     # Runtime environment (or environment manager)
@@ -213,19 +260,7 @@
             false;
           PreToolUse = [
             (mkAgentBashLandstripHook {
-              # The Docker-compatible Podman API deliberately crosses the
-              # Landstrip filesystem boundary: the rootless service runs
-              # outside the agent sandbox with the user's authority. Keep this
-              # exception opt-in and socket-specific.
-              policyFile =
-                (pkgs.formats.json { }).generate "agent-landstrip-docker-policy.json"
-                  (
-                    lib.recursiveUpdate landstripPolicyBase {
-                      network.allowUnixSockets = landstripPolicyBase.network.allowUnixSockets ++ [
-                        "/run/user/${toString config.home.uid}/podman/podman.sock"
-                      ];
-                    }
-                  );
+              policyFile = dockerLandstripPolicyFile;
               scriptName = "codex-bash-landstrip-docker-wrap";
               statusMessage = "Entering Docker-capable Bubblewrap and Landstrip sandbox";
             })
@@ -243,6 +278,14 @@
     enable = true;
     settings = { }; # Defined below to make it writable
   };
+
+  # Select a profile at launch: claude --settings ~/.claude/profiles/docker.json
+  home.file = lib.mapAttrs' (
+    name: source:
+    lib.nameValuePair ".claude/profiles/${name}.json" {
+      inherit source;
+    }
+  ) claudeProfileFiles;
 
   home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     		dst="$HOME/.claude/settings.json"
@@ -291,11 +334,29 @@
             }
             # Tool calls are wrapped; interactive ! shell-mode is outside this hook.
             # Nesting means cd/export do not persist between tool calls.
-            (mkAgentBashLandstripHook {
-              policyFile = landstripPolicyFile;
-              scriptName = "claude-bash-landstrip-wrap";
-              statusMessage = "Entering Bubblewrap and Landstrip sandbox";
-            })
+            {
+              matcher = "^Bash$";
+              hooks = [
+                {
+                  type = "command";
+                  # Hook lists merge across settings sources. Dispatch here so
+                  # exactly one wrapper rewrites each Bash command, even when
+                  # --settings selects an opt-in profile.
+                  command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
+                    case "''${AGENT_SANDBOX_PROFILE:-default}" in
+                      default) exec ${claudeBashHookCommands.default} ;;
+                      docker) exec ${claudeBashHookCommands.docker} ;;
+                      *)
+                        printf '%s\n' 'Unknown AGENT_SANDBOX_PROFILE; refusing to run unsandboxed' >&2
+                        exit 2
+                        ;;
+                    esac
+                  ''}";
+                  timeout = 10;
+                  statusMessage = "Entering Bubblewrap and Landstrip sandbox";
+                }
+              ];
+            }
           ];
         }
       } "$dst"
