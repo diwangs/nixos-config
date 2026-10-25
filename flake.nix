@@ -11,8 +11,7 @@
 
     # Secure Boot
     lanzaboote = {
-      # Post-v1.1 revision with Framework firmware-builtin key enrollment.
-      url = "github:nix-community/lanzaboote/6183ac79eadb079a1e72fa2c60915601be669100";
+      url = "github:nix-community/lanzaboote/v1.2.0"; # includeFirmwareBuiltinKeys (Framework)
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -134,7 +133,19 @@
     in
     {
       formatter.${system} = treefmtEval.config.build.wrapper;
-      checks.${system}.nixfmt = treefmtEval.config.build.check self;
+      checks.${system} = {
+        nixfmt = treefmtEval.config.build.check self;
+        # obs-frame-mcp = self.packages.${system}.obs-frame-mcp;
+        # obs-background-extension = self.packages.${system}.obs-background-extension;
+      };
+      # packages.${system} = {
+      #   obs-frame-mcp =
+      #     (pkgs.extend (import ./package/overlay/obs-frame-mcp/overlay.nix))
+      #     .obs-frame-mcp;
+      #   obs-background-extension =
+      #     (pkgs.extend (import ./package/overlay/obs-background-extension/overlay.nix))
+      #     .obs-background-extension;
+      # };
 
       # One instance output: first installs unsigned and generates keys into
       # /run, then uses the os-secret bundle for all later signed generations.

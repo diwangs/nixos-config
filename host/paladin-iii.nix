@@ -9,6 +9,9 @@
 }:
 {
   imports = [
+    # ../package/overlay/obs-frame-mcp/paladin-iii.nix
+    # ../package/overlay/obs-background-extension/nixos.nix
+
     # Laptop hardware
     # Semi-portable configs
     lanzaboote.nixosModules.lanzaboote
@@ -42,7 +45,7 @@
     lanzaboote = {
       enable = true;
       pkiBundle = "/run/agenix/paladin-iii/secure-boot";
-      configurationLimit = 5; # Limit is 8. Each initrd is ~62MB;
+      configurationLimit = 4; # Limit is 4 since lanzaboote 1.2.0. Each initrd is ~62MB;
       autoGenerateKeys.enable = false; # Use through agenix instead
       autoEnrollKeys = {
         enable = true;
@@ -76,15 +79,12 @@
   # TPM-based systemd-creds: machine-id
   # `lanzaboote` reads `/boot/loader/credentials` and store them in
   # `/run/credentials/@encrypted`, which are then read by `systemd-creds` to
-  # feed PID 1 (hardcodes `system.machine_id` name)
+  # feed PID 1 (hardcodes `system.machine_id` name). Since systemd 262, PID 1
+  # Base64-decodes these, so install the Base64 text as-is (like pcrlock's).
   system.activationScripts.machineIdCredential.text = ''
     if ${pkgs.util-linux}/bin/mountpoint --quiet /boot; then
       ${pkgs.coreutils}/bin/install -D -m 0600 \
-        ${
-          pkgs.runCommandLocal "system.machine_id.cred" { } ''
-            ${pkgs.coreutils}/bin/base64 --decode ${pkgs.writeText "system.machine_id.cred.base64" os-secret.systemd-creds.paladin-iii.machineIdBase64} > "$out"
-          ''
-        } \
+        ${pkgs.writeText "system.machine_id.cred" os-secret.systemd-creds.paladin-iii.machineIdBase64} \
         /boot/loader/credentials/system.machine_id.cred
     fi
   '';

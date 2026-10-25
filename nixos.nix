@@ -27,6 +27,7 @@
     ./aspect/yubikey.nix
 
     ./package/nixos.nix
+    ./package/overlay/kernel/module-certificates.nix
     ./package/flatpak.nix
   ];
 
@@ -50,10 +51,6 @@
     (import ./package/overlay/age-plugin-yubikey/overlay.nix)
 
     (import ./package/overlay/key-rack/overlay.nix)
-
-    # Dogfood the Linux packaging from nixpkgs PR #551713 as `pkgs.chatgpt`.
-    # Vendored files are synced by package/overlay/chatgpt-draft/pull.sh.
-    (import ./package/overlay/chatgpt-draft/overlay.nix)
 
     # Claude Science (prebuilt Bun binary), see package/overlay/claude-science.
     (import ./package/overlay/claude-science/overlay.nix)

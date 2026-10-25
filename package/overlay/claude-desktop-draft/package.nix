@@ -3,13 +3,9 @@
   fetchurl,
   stdenvNoCC,
   buildFHSEnv,
-
-  ### Tools
   dpkg,
   autoPatchelfHook,
   makeWrapper,
-
-  ### Electron/Chromium
   nss,
   nspr,
   mesa,
@@ -32,72 +28,48 @@
   cairo,
   expat,
   glib,
-  systemd,
-
-  ### OpenGL dispatch (Chromium dlopens libEGL.so.1 at runtime)
+  systemdLibs,
   libglvnd,
-
-  ### For virtiofsd
-  libseccomp,
-  libcap_ng,
-
-  ### For keyring support
   libsecret,
-
-  ### For Cowork QEMU
   qemu_kvm,
   OVMF,
-
-  ### For Cowork VM virtiofsd (nixpkgs instead of bundled)
   virtiofsd,
-
-  ### For ASAR patching
   asar,
-
-  ### For extensions
   python3,
   nodejs,
-
-  ### Sso login
   xdg-utils,
-
-  ### Optional host tools Cowork / Code features may exec by absolute path
   git,
   openssh,
   procps,
-
-  ### Force a specific password store backend (e.g. "gnome-libsecret" for Hyprland /
-  ### other non-GNOME sessions where Chromium does not auto-select a backend).
-  ### Leave null on GNOME/KDE with a working Secret Service / portal.
   passwordStore ? null,
 }:
 
 let
-  ### Libraries Chromium may dlopen rather than DT_NEEDED-link
+  # Libraries Chromium may dlopen rather than DT_NEEDED-link
   runtimeLibs = [
     libsecret
     libglvnd
   ];
 
-  ### OVMF.fd only ships ${fwPrefix}_{CODE,VARS}.fd, with fwPrefix = AAVMF on aarch64
+  # OVMF.fd only ships ${fwPrefix}_{CODE,VARS}.fd, with fwPrefix = AAVMF on aarch64
   fwPrefix = if stdenvNoCC.hostPlatform.isAarch64 then "AAVMF" else "OVMF";
   ovmfCode = "${OVMF.fd}/FV/${fwPrefix}_CODE.fd";
   ovmfVars = "${OVMF.fd}/FV/${fwPrefix}_VARS.fd";
 
   unwrapped = stdenvNoCC.mkDerivation (finalAttrs: {
     pname = "claude-desktop";
-    version = "2.26454.2";
+    version = "2.37337.1";
 
     src =
       if stdenvNoCC.hostPlatform.system == "x86_64-linux" then
         fetchurl {
           url = "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${finalAttrs.version}_amd64.deb";
-          hash = "sha256-slGgIkqGNYdPM1mN+O2JUrQn+EgV7llYDMAi1r2yQw8=";
+          hash = "sha256-QXRbCRTw/1FjGh/xu0A7g2v1yZWEXMpnQt05vKOi2hQ=";
         }
       else if stdenvNoCC.hostPlatform.system == "aarch64-linux" then
         fetchurl {
           url = "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${finalAttrs.version}_arm64.deb";
-          hash = "sha256-MLL4VNfMRCK0Po858HVzyH95gWBRl3ZiYtiBU8fpk4s=";
+          hash = "sha256-rW8doqEUIV0qc8U8GploH5wLvhSLkvkG1jWy7+2DXNw=";
         }
       else
         throw "Unsupported system: ${stdenvNoCC.hostPlatform.system}";
@@ -110,7 +82,7 @@ let
     ];
 
     buildInputs = [
-      ### Electron/Chromium
+      # Electron/Chromium
       nss
       nspr
       mesa
@@ -134,13 +106,9 @@ let
       cairo
       expat
       glib
-      systemd
+      systemdLibs
 
-      ### Bundled virtiofsd
-      libseccomp
-      libcap_ng
-
-      ### For keyring support
+      # For keyring support
       libsecret
     ];
 
@@ -157,6 +125,11 @@ let
 
       mkdir -p $out
       mv usr/* $out
+
+      # Drop bundled virtiofsd, we use nixpkgs virtiofsd instead
+      # (patched into app.asar in postFixup + provided in FHSEnv).
+      # This avoids needing libseccomp/libcap_ng for autoPatchelf.
+      rm -f $out/lib/claude-desktop/resources/virtiofsd
 
       runHook postInstall
     '';
@@ -279,19 +252,19 @@ let
       ];
 
     extraBuildCommands = ''
-      ### ${fwPrefix} firmware (the app picks the name from process.arch)
+      # $fwPrefix firmware (the app picks the name from process.arch)
       mkdir -p "$out/usr/share/${fwPrefix}"
       ln -s ${ovmfCode} "$out/usr/share/${fwPrefix}/${fwPrefix}_CODE.fd"
       ln -s ${ovmfCode} "$out/usr/share/${fwPrefix}/${fwPrefix}_CODE_4M.fd"
       ln -s ${ovmfVars} "$out/usr/share/${fwPrefix}/${fwPrefix}_VARS.fd"
       ln -s ${ovmfVars} "$out/usr/share/${fwPrefix}/${fwPrefix}_VARS_4M.fd"
 
-      ### virtiofsd fallback paths
+      # virtiofsd fallback paths
       mkdir -p "$out/usr/libexec" "$out/usr/bin"
       ln -sf ${virtiofsd}/bin/virtiofsd "$out/usr/libexec/virtiofsd"
       ln -sf ${virtiofsd}/bin/virtiofsd "$out/usr/bin/virtiofsd"
 
-      ### Absolute-path helpers some app code still probes under /usr/bin
+      # Absolute-path helpers some app code still probes under /usr/bin
       mkdir -p "$out/usr/bin"
       ln -sf ${lib.getExe git} "$out/usr/bin/git"
       ln -sf ${openssh}/bin/ssh "$out/usr/bin/ssh"
@@ -312,7 +285,7 @@ let
 
     runScript = "${unwrapped}/bin/claude-desktop";
 
-    ### Avoid orphaned Electron after the launcher / nix run exits
+    # Avoid orphaned Electron after the launcher / nix run exits
     dieWithParent = true;
   };
 in

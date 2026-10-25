@@ -45,7 +45,7 @@
       # Agentic
       claude-desktop
       claude-science
-      chatgpt
+      chatgpt # Linux packaging upstreamed in https://github.com/NixOS/nixpkgs/pull/551713
       hermes-desktop
       # cua-driver: installed system-wide via services.cua-driver (nixos.nix)
       # github-copilot-cli 		# Agentic LLM in the CLI

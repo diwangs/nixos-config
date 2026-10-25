@@ -23,7 +23,6 @@
       timeout = 3;
     };
     initrd = {
-      systemd.enable = true;
       systemd.tpm2.enable = true;
       availableKernelModules = [
         "virtio_pci"

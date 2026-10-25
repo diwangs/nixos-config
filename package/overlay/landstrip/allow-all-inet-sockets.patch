@@ -15,20 +15,22 @@ that, so this adds one.
     flag into `restrict_inet_socket_types` and `restrict_packet_netlink`, so
     AF_PACKET/AF_NETLINK stay denied and the Unix-socket filters stay installed
     even when INET socket-type and TCP Fast Open restrictions are dropped.
-  * broker: the connect/bind notification handlers short-circuit to
-    `NotificationResult::Continue` for AF_INET/AF_INET6 targets.
+  * broker: the connect/bind notification handlers short-circuit (connect
+    continues, bind is granted) for AF_INET/AF_INET6 targets.
 
 Not upstreamable as-is (it is a policy-surface addition, not a bug fix), so it
 lives here. See package/overlay/landstrip/overlay.nix.
 
-Rebased for 0.19.19: seccomp.rs became the seccomp/ module (handlers now live
-in seccomp/network.rs) and filter rules moved onto FilterBuilder methods.
-Still preserves localhost binding support and skips its datagram send
-mediation when allowAllInetSockets is enabled.
+Rebased for 0.20.11: the errno filter is now assembled in FilterSet::new
+(filter.rs) rather than run_broker, and upstream already installs the Unix
+socket filters unconditionally. The bind short-circuit grants via SocketGrant to
+match how upstream now brokers unrestricted binds.
 
+diff --git a/README.md b/README.md
+index 34c2dea..e670850 100644
 --- a/README.md
 +++ b/README.md
-@@ -24,6 +24,7 @@ grants for the executable and its dependencies.
+@@ -24,6 +24,7 @@ executable and its dependencies.
    },
    "network": {
      "allowNetwork": false,
@@ -36,31 +38,56 @@ mediation when allowAllInetSockets is enabled.
      "allowLocalBinding": false
    }
  }
-@@ -38,6 +39,9 @@ npx landstrip doctor
- See [landstrip(1)](packages/landstrip/man/man1/landstrip.1) for CLI options,
- policy rules, and platform limits.
+@@ -40,6 +41,9 @@ policy rules, platform limits, denial reporting, and the trap transport. For
+ TypeScript APIs, install
+ [`@landstrip/landstrip-api`](packages/landstrip-api/README.md).
  
 +On Linux, `network.allowAllInetSockets` permits all AF_INET and AF_INET6
 +sockets without changing Unix-socket policy.
 +
- ## Integrations
+ ## Packages
  
- - [Node.js API](packages/landstrip-api/README.md)
+ | Directory                                                    | Contents        | License           |
+diff --git a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
+index 07c1f33..ea71b1b 100644
 --- a/packages/landstrip/src/config.rs
 +++ b/packages/landstrip/src/config.rs
-@@ -74,6 +74,7 @@ pub(crate) struct SandboxFilesystem {
+@@ -125,6 +125,7 @@ pub(crate) struct SandboxFilesystem {
  #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
  pub(crate) struct SandboxNetwork {
      pub(crate) allow_network: bool,
 +    pub(crate) allow_all_inet_sockets: bool,
      pub(crate) allow_local_binding: bool,
      pub(crate) allow_all_unix_sockets: bool,
-     #[serde(deserialize_with = "deserialize_paths")]
+     pub(crate) allow_unix_sockets: Vec<PathSelector>,
+diff --git a/packages/landstrip/src/platform/linux/filter.rs b/packages/landstrip/src/platform/linux/filter.rs
+index f8cbc2d..98c769f 100644
 --- a/packages/landstrip/src/platform/linux/filter.rs
 +++ b/packages/landstrip/src/platform/linux/filter.rs
-@@ -130,16 +130,20 @@ impl FilterBuilder {
+@@ -142,9 +142,18 @@ impl FilterSet {
+         notify_syscalls: &[i64],
+     ) -> Result<Self> {
+         let restricted = !policy.network_access.is_unrestricted();
+-        let allow_local_binding = policy.network_access.allows_local_binding();
++        let allow_all_inet = policy.network_access.allows_all_inet_sockets();
++        // Unrestricted INET sockets need neither the localhost broker nor its
++        // datagram send filters, even when allowLocalBinding is also enabled.
++        let allow_local_binding = policy.network_access.allows_local_binding() && !allow_all_inet;
+         let unix_sockets = policy.network_access.unix_socket_access().into();
+-        let errno = build_errno_filter(syscalls, restricted, allow_local_binding, unix_sockets)?;
++        let errno = build_errno_filter(
++            syscalls,
++            restricted && !allow_all_inet,
++            restricted,
++            allow_local_binding,
++            unix_sockets,
++        )?;
+         let eperm = build_io_uring_deny(syscalls)?;
+         let mut clone3_builder = FilterBuilder::new();
+         clone3_builder.add_unconditional(libc::SYS_clone3);
+@@ -175,15 +184,19 @@ impl FilterSet {
  
- pub(super) fn build_errno_filter(
+ fn build_errno_filter(
      syscalls: &NotificationSyscalls,
 -    needs_network: bool,
 +    restrict_inet_socket_types: bool,
@@ -71,7 +98,6 @@ mediation when allowAllInetSockets is enabled.
      let mut builder = FilterBuilder::new();
 -    if needs_network {
 -        builder.add_socket_family_filter(syscalls.socket, allow_local_binding)?;
--        builder.add_unix_socket_filters(syscalls.socket, unix_sockets)?;
 +    if restrict_inet_socket_types {
 +        builder.add_inet_socket_filter(syscalls.socket, allow_local_binding)?;
          builder.add_network_bypass_filters(syscalls)?;
@@ -79,11 +105,10 @@ mediation when allowAllInetSockets is enabled.
 +    if restrict_packet_netlink {
 +        builder.add_packet_netlink_filters(syscalls.socket)?;
 +    }
-+    builder.add_unix_socket_filters(syscalls.socket, unix_sockets)?;
+     builder.add_unix_socket_filters(syscalls.socket, unix_sockets)?;
      if builder.is_empty() {
          return Ok(None);
-     }
-@@ -431,13 +435,7 @@ impl FilterBuilder {
+@@ -493,13 +506,7 @@ impl FilterBuilder {
          Ok(())
      }
  
@@ -98,47 +123,44 @@ mediation when allowAllInetSockets is enabled.
          for domain in [libc::AF_PACKET, libc::AF_NETLINK] {
              let domain = u64::try_from(domain).map_err(|_| LandstripError::IntegerTooLarge)?;
              self.add_conditional_rule(
+diff --git a/packages/landstrip/src/platform/linux/seccomp/mod.rs b/packages/landstrip/src/platform/linux/seccomp/mod.rs
+index 1244acd..90f1f6a 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/mod.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/mod.rs
-@@ -226,9 +226,18 @@ pub(super) fn run_broker(
+@@ -247,7 +247,9 @@ pub(super) fn run_broker(
  
      let syscalls = NotificationSyscalls::new();
      let restricted = !policy.network_access.is_unrestricted();
 -    let allow_local_binding = policy.network_access.allows_local_binding();
-+    // Unrestricted INET sockets need neither the localhost broker nor its
-+    // datagram send filters, even when allowLocalBinding is also enabled.
++    // Mirrors FilterSet::new: allowAllInetSockets skips the localhost broker.
 +    let allow_local_binding = policy.network_access.allows_local_binding()
 +        && !policy.network_access.allows_all_inet_sockets();
      let handoff_by_pidfd = restricted && allow_local_binding;
--    let errno = build_errno_filter(&syscalls, restricted, allow_local_binding, unix_sockets)?;
-+    let errno = build_errno_filter(
-+        &syscalls,
-+        restricted && !policy.network_access.allows_all_inet_sockets(),
-+        restricted,
-+        allow_local_binding,
-+        unix_sockets,
-+    )?;
-     let io_uring = Some(build_io_uring_deny(&syscalls)?);
  
-     let mut notify_syscalls: Vec<i64> = Vec::new();
+     let mut notify_syscalls = Vec::new();
+diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
+index fc1a923..3221580 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
-@@ -144,6 +144,11 @@ pub(super) fn handle_bind(
-     next_query_id: &mut u64,
+@@ -182,6 +182,14 @@ pub(super) fn handle_bind(
+     denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
-     let socket = target_socket(request)?;
+     let socket = TargetSocket::try_from(request)?;
 +    if policy.network_access.allows_all_inet_sockets()
 +        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
 +    {
-+        return Ok(NotificationResult::Continue);
++        return Ok(NotificationResult::grant(SocketGrant::new(
++            socket,
++            libc::bind,
++        )));
 +    }
  
      match socket.info.kind() {
          SocketKind::Tcp | SocketKind::Udp => {
-@@ -206,6 +211,11 @@ pub(super) fn handle_connect(
-     next_query_id: &mut u64,
+@@ -237,6 +245,11 @@ pub(super) fn handle_connect(
+     denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
-     let socket = target_socket(request)?;
+     let socket = TargetSocket::try_from(request)?;
 +    if policy.network_access.allows_all_inet_sockets()
 +        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
 +    {
@@ -147,17 +169,19 @@ mediation when allowAllInetSockets is enabled.
  
      match socket.info.kind() {
          SocketKind::Tcp => {
+diff --git a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
+index c5d53c6..1b4f178 100644
 --- a/packages/landstrip/src/policy.rs
 +++ b/packages/landstrip/src/policy.rs
-@@ -179,6 +179,7 @@ pub(crate) enum ReadAccess {
- pub(crate) enum NetworkAccess {
-     Unrestricted,
+@@ -250,6 +250,7 @@ pub(crate) enum NetworkAccess {
+         unix_socket_access: UnixSocketAccess,
+     },
      Restricted {
 +        allow_all_inet_sockets: bool,
          connect_tcp_ports: Vec<u16>,
          bind: IpBindAccess,
          unix_socket_access: UnixSocketAccess,
-@@ -230,6 +231,7 @@ impl NetworkAccess {
+@@ -301,6 +302,7 @@ impl NetworkAccess {
          matches!(
              self,
              Self::Restricted {
@@ -165,7 +189,7 @@ mediation when allowAllInetSockets is enabled.
                  bind: IpBindAccess::Deny,
                  ..
              }
-@@ -238,7 +240,23 @@ impl NetworkAccess {
+@@ -309,7 +311,24 @@ impl NetworkAccess {
  
      #[cfg(target_os = "linux")]
      pub(crate) fn restricts_connect_tcp(&self) -> bool {
@@ -179,6 +203,7 @@ mediation when allowAllInetSockets is enabled.
 +        )
 +    }
 +
++    #[cfg(target_os = "linux")]
 +    pub(crate) fn allows_all_inet_sockets(&self) -> bool {
 +        matches!(
 +            self,
@@ -190,11 +215,11 @@ mediation when allowAllInetSockets is enabled.
      }
  
      #[cfg(target_os = "linux")]
-@@ -583,6 +601,7 @@ fn lower_network_policy(
-         IpBindAccess::Deny
-     };
-     Ok(NetworkAccess::Restricted {
-+        allow_all_inet_sockets: network.allow_all_inet_sockets,
-         connect_tcp_ports,
-         bind,
-         unix_socket_access,
+@@ -827,6 +846,7 @@ impl PolicyResolver {
+             IpBindAccess::Deny
+         };
+         Ok(NetworkAccess::Restricted {
++            allow_all_inet_sockets: network.allow_all_inet_sockets,
+             connect_tcp_ports,
+             bind,
+             unix_socket_access,

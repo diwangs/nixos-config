@@ -37,7 +37,7 @@ in
     lanzaboote = {
       enable = true;
       pkiBundle = if hasSecureBootBundle then encryptedBundle else bootstrapBundle;
-      configurationLimit = 5;
+      configurationLimit = 4; # Measured Boot limit since lanzaboote 1.2.0
       # Lanzaboote intentionally installs unsigned files only for generation
       # one. It must refuse unsigned files once os-secret is the key source.
       allowUnsigned = !hasSecureBootBundle;
