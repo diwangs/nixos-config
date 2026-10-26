@@ -105,6 +105,8 @@ rec {
       # write: denied by default, re-deny if ancestor is allowed
       allowWrite = [
         "/dev/null"
+        # Bubblewrap provides private PTYs; tmux needs read/write access to them.
+        "/dev/pts"
         "/dev/shm"
         "/tmp"
 
