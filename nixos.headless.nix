@@ -25,6 +25,10 @@
     "nix-command"
     "flakes"
   ];
+  # Skip the global registry download; nixosSystem already pins `nixpkgs` in
+  # the system registry. Also avoids Nix's PID-named temp symlink in
+  # ~/.cache/nix colliding with stale ones under the agent PID namespace.
+  nix.settings.flake-registry = "";
   nixpkgs.overlays = [
     (import ./package/overlay/landstrip/overlay.nix)
     # oo7 → git main (aws-vault content type + portal token fixes). See

@@ -9,9 +9,6 @@
 }:
 {
   imports = [
-    # ../package/overlay/obs-frame-mcp/paladin-iii.nix
-    # ../package/overlay/obs-background-extension/nixos.nix
-
     # Laptop hardware
     # Semi-portable configs
     lanzaboote.nixosModules.lanzaboote
