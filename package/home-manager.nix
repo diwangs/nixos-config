@@ -22,12 +22,6 @@
   ...
 }:
 {
-  imports = [
-    # Shared with rootless devboxes (fnm/uv/jq, direnv, gh, Claude Code, Codex)
-    # TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
-    ./home-manager.headless.nix
-  ];
-
   home.packages =
     with pkgs;
     [
@@ -45,7 +39,7 @@
       # Agentic
       claude-desktop
       claude-science
-      chatgpt # Linux packaging upstreamed in https://github.com/NixOS/nixpkgs/pull/551713
+      chatgpt
       hermes-desktop
       # cua-driver: installed system-wide via services.cua-driver (nixos.nix)
       # github-copilot-cli 		# Agentic LLM in the CLI

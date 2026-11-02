@@ -143,7 +143,7 @@
   services.logrotate.checkConfig = false;
   security.rtkit.enable = true;
 
-  # nix-ld (enabled in nixos.headless.nix): for packages that hasn't been
+  # nix-ld (enabled in package/nixos.headless.nix): for packages that hasn't been
   # nixified e.g., `uv`-managed Python, `fnm`-managed Node
   # programs.nix-ld.libraries = with pkgs; [
   # 	libusb1			# For firmware updates with SuzyQ

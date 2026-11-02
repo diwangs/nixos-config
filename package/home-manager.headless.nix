@@ -1,5 +1,6 @@
-# Home packages and programs shared between the laptop and rootless devboxes
-# (imported by package/home-manager.nix and home-manager.headless.nix).
+# Home packages and programs shared between the laptop and rootless devboxes,
+# imported by home-manager.headless.nix (which home-manager.nix layers
+# package/home-manager.nix on top of).
 # Keep this list headless: no desktop, dconf, Flatpak, or system-service
 # assumptions — and no laptop-only specialArgs (`secrets`, `pkgs-stable`).
 {
@@ -61,6 +62,7 @@ in
 {
   home.packages = with pkgs; [
     # Runtime environment (or environment manager)
+    # TODO: change `fnm` to `viteplus` when available to have similar workflow with `uv`
     fnm # Node.js version manager 					(`fnm exec --using=24`)
     # uv # Python environment manager       (`uv run`)
     docker-client # Docker CLI, to be used with Podman

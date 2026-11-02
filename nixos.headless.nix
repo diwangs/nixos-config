@@ -3,7 +3,6 @@
 # Requires the home-manager NixOS module, loaded per host in flake.nix.
 {
   lib,
-  pkgs,
   agenix,
   allowedUnfree,
   ...
@@ -16,6 +15,8 @@
     ./aspect/user.nix
     ./aspect/secret.nix
     ./aspect/shell.nix
+
+    ./package/nixos.headless.nix
   ];
 
   # Shell + headless packages/agents; the laptop's home-manager.nix extends it
@@ -41,13 +42,4 @@
     pkg: builtins.elem (lib.getName pkg) allowedUnfree;
 
   security.apparmor.enable = true;
-  programs.nix-ld.enable = true;
-  environment.systemPackages = with pkgs; [
-    cloud-utils
-    cryptsetup
-    git
-    jq
-    nano
-    rsync
-  ];
 }
