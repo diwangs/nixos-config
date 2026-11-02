@@ -98,6 +98,11 @@ in
             role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-tf";
             region = "us-east-2";
           };
+          "profile mantle-eks" = {
+            source_profile = "nova";
+            role_arn = "arn:aws:iam::995133654082:role/diwangs-mantle-eks";
+            region = "us-east-2";
+          };
         };
   };
 
