@@ -9,7 +9,12 @@ in
     # Downstream policy extension: permit every AF_INET/AF_INET6 socket while
     # retaining AF_UNIX pathname mediation. The patch header documents what it
     # touches and why it stays downstream.
-    patches = (old.patches or [ ]) ++ [ ./allow-all-inet-sockets.patch ];
+    patches = (old.patches or [ ]) ++ [
+      ./allow-all-inet-sockets.patch
+      # Bug fix: brokered unix bind leaked `/proc/self/fd/N/...` into
+      # getsockname(2), breaking go-plugin (Terraform providers).
+      ./unix-bind-real-path.patch
+    ];
 
     # `-F0` forbids fuzzy context matching, so a landstrip release that reworks
     # any of the patched regions fails loudly at patch time instead of quietly

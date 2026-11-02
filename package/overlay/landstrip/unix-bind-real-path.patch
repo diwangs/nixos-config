@@ -1,0 +1,81 @@
+Bind brokered Unix sockets at their real path, not the broker's fd path.
+
+The seccomp broker performs `bind(2)` for the child and rewrites `sun_path`
+to `/proc/self/fd/<dirfd>/<name>` so the bind lands in the directory it just
+authorized. The kernel records `sun_path` verbatim, so the child's
+`getsockname(2)` then returns that broker-local path. Programs that advertise
+their listener address to another process break: go-plugin (Terraform /
+OpenTofu providers) prints `/proc/self/fd/11/plugin…` in its handshake and the
+parent's `connect(2)` fails with ENOENT.
+
+  * broker: `handle_unix_bind` binds at the resolved absolute label when the
+    child shares the broker's root and the label's parent is still the inode
+    the anchor pins; otherwise it keeps the anchor path. A directory swapped
+    between that check and the bind is the accepted residual race.
+
+Candidate for upstream as a bug fix. See package/overlay/landstrip/overlay.nix.
+
+diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
+index 3221580..ff80697 100644
+--- a/packages/landstrip/src/platform/linux/seccomp/network.rs
++++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
+@@ -2,7 +2,7 @@
+ // Copyright (c) 2026 Jarkko Sakkinen
+ 
+ use super::error::{BrokerError, SysResult};
+-use super::grant::{Grant, SocketGrant};
++use super::grant::{Anchor, Grant, SocketGrant};
+ use super::notify::NotificationResult;
+ use super::process::{MissingTarget, TargetProcess};
+ use super::supervise::{Denial, Denials};
+@@ -489,8 +489,8 @@ fn handle_unix_bind(
+     {
+         return Err(BrokerError::PolicyDenied);
+     }
+-    let broker_path = anchor.path()?;
+-    socket.rewrite_unix_path(Path::new(OsStr::from_bytes(broker_path.as_bytes())))?;
++    let broker_path = unix_bind_path(&target.label, target.root.as_fd(), &anchor)?;
++    socket.rewrite_unix_path(&broker_path)?;
+ 
+     Ok(NotificationResult::grant(SocketGrant {
+         sock: socket.sock,
+@@ -500,6 +500,39 @@ fn handle_unix_bind(
+     }))
+ }
+ 
++/// Path the broker binds on behalf of the target.
++///
++/// The kernel records `sun_path` verbatim, so binding through the anchor's
++/// `/proc/self/fd/N/<name>` leaks that broker-local path into the target's
++/// `getsockname(2)`. Programs that advertise their listener address to a peer
++/// (e.g. go-plugin / Terraform providers) then hand out a path the peer cannot
++/// dial. Prefer the resolved absolute path when the target shares the
++/// broker's root and its parent is still the directory the anchor pins;
++/// otherwise fall back to the anchor path.
++fn unix_bind_path(label: &Path, root: BorrowedFd<'_>, anchor: &Anchor) -> SysResult<PathBuf> {
++    let max_path = mem::size_of::<libc::sockaddr_un>() - mem::size_of::<libc::sa_family_t>();
++    let shares_root = same_inode(root, Path::new("/"));
++    let same_parent = label
++        .parent()
++        .is_some_and(|parent| same_inode(anchor.dir.as_fd(), parent));
++    if label.is_absolute()
++        && label.as_os_str().len() < max_path
++        && shares_root
++        && same_parent
++    {
++        return Ok(label.to_path_buf());
++    }
++    let broker_path = anchor.path()?;
++    Ok(PathBuf::from(OsStr::from_bytes(broker_path.as_bytes())))
++}
++
++fn same_inode(left: BorrowedFd<'_>, right: &Path) -> bool {
++    let (Ok(stat), Ok(right)) = (fstat(left), fs::metadata(right)) else {
++        return false;
++    };
++    stat.st_dev == right.dev() && stat.st_ino == right.ino()
++}
++
+ fn authorize_unix_path(
+     policy: &AccessPolicy,
+     target: &Path,
