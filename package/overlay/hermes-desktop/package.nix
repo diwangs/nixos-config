@@ -2,6 +2,7 @@
   hermes-agent,
   electron,
   lib,
+  nodejs_26,
   pkgs,
   runCommandLocal,
   stdenv,
@@ -41,8 +42,18 @@ let
     exit 1
   '';
 
+  # Hermes builds with an official Node release binary that autoPatchelfHook
+  # rewrites. That non-PIE executable gains an overlapping program header
+  # segment and segfaults before main, which breaks the renderer's npm steps.
+  # Rebuild Hermes' npm helpers on nixpkgs' source-built Node of the same
+  # major version; its pinned npm still comes from Hermes.
+  hermesNpmLib = pkgs.callPackage "${hermes-agent}/nix/lib.nix" {
+    pmPackages.node = nodejs_26;
+  };
+
   upstream = hermes-agent.packages.${system}.desktop.override {
     pkgs = hermesPkgs;
+    inherit hermesNpmLib;
     inherit electron;
     hermesAgent = hermes-placeholder;
     extraEnv.HERMES_DESKTOP_PASSWORD_STORE = "gnome-libsecret";

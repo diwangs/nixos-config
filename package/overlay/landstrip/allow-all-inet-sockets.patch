@@ -26,6 +26,9 @@ Rebased for 0.20.11: the errno filter is now assembled in FilterSet::new
 socket filters unconditionally. The bind short-circuit grants via SocketGrant to
 match how upstream now brokers unrestricted binds.
 
+Rebased for 0.20.17: `NetworkAccess::Restricted` is now built in
+policy/resolver.rs rather than policy.rs.
+
 diff --git a/README.md b/README.md
 index 34c2dea..e670850 100644
 --- a/README.md
@@ -49,10 +52,10 @@ index 34c2dea..e670850 100644
  
  | Directory                                                    | Contents        | License           |
 diff --git a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
-index 07c1f33..ea71b1b 100644
+index 167fd37..2f03d7f 100644
 --- a/packages/landstrip/src/config.rs
 +++ b/packages/landstrip/src/config.rs
-@@ -125,6 +125,7 @@ pub(crate) struct SandboxFilesystem {
+@@ -147,6 +147,7 @@ pub(crate) struct SandboxFilesystem {
  #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
  pub(crate) struct SandboxNetwork {
      pub(crate) allow_network: bool,
@@ -139,10 +142,10 @@ index 1244acd..90f1f6a 100644
  
      let mut notify_syscalls = Vec::new();
 diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
-index fc1a923..3221580 100644
+index 509d3d6..257717c 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
-@@ -182,6 +182,14 @@ pub(super) fn handle_bind(
+@@ -199,6 +199,14 @@ pub(super) fn handle_bind(
      denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
      let socket = TargetSocket::try_from(request)?;
@@ -157,7 +160,7 @@ index fc1a923..3221580 100644
  
      match socket.info.kind() {
          SocketKind::Tcp | SocketKind::Udp => {
-@@ -237,6 +245,11 @@ pub(super) fn handle_connect(
+@@ -254,6 +262,11 @@ pub(super) fn handle_connect(
      denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
      let socket = TargetSocket::try_from(request)?;
@@ -170,10 +173,10 @@ index fc1a923..3221580 100644
      match socket.info.kind() {
          SocketKind::Tcp => {
 diff --git a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
-index c5d53c6..1b4f178 100644
+index 5c31098..cbc149b 100644
 --- a/packages/landstrip/src/policy.rs
 +++ b/packages/landstrip/src/policy.rs
-@@ -250,6 +250,7 @@ pub(crate) enum NetworkAccess {
+@@ -375,6 +375,7 @@ pub(crate) enum NetworkAccess {
          unix_socket_access: UnixSocketAccess,
      },
      Restricted {
@@ -181,7 +184,7 @@ index c5d53c6..1b4f178 100644
          connect_tcp_ports: Vec<u16>,
          bind: IpBindAccess,
          unix_socket_access: UnixSocketAccess,
-@@ -301,6 +302,7 @@ impl NetworkAccess {
+@@ -426,6 +427,7 @@ impl NetworkAccess {
          matches!(
              self,
              Self::Restricted {
@@ -189,7 +192,7 @@ index c5d53c6..1b4f178 100644
                  bind: IpBindAccess::Deny,
                  ..
              }
-@@ -309,7 +311,24 @@ impl NetworkAccess {
+@@ -434,7 +436,24 @@ impl NetworkAccess {
  
      #[cfg(target_os = "linux")]
      pub(crate) fn restricts_connect_tcp(&self) -> bool {
@@ -215,7 +218,11 @@ index c5d53c6..1b4f178 100644
      }
  
      #[cfg(target_os = "linux")]
-@@ -827,6 +846,7 @@ impl PolicyResolver {
+diff --git a/packages/landstrip/src/policy/resolver.rs b/packages/landstrip/src/policy/resolver.rs
+index 1ecf75a..2e9d0a3 100644
+--- a/packages/landstrip/src/policy/resolver.rs
++++ b/packages/landstrip/src/policy/resolver.rs
+@@ -670,6 +670,7 @@ impl PolicyResolver {
              IpBindAccess::Deny
          };
          Ok(NetworkAccess::Restricted {

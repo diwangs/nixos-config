@@ -40,14 +40,20 @@
   virtualisation = {
     containers = {
       enable = true;
-      storage.settings = {
-        storage = {
+      storage = {
+        settings.storage = {
           driver = "overlay";
-          runroot = "/run/containers/storage";
-          graphroot = "/var/lib/containers/storage";
-          rootless_storage_path = "/tmp/containers-$USER";
           options.overlay.mountopt = "nodev,metacopy=on";
         };
+        # Rootful-only paths; in the shared settings they would also
+        # redirect rootless podman away from its per-user storage.
+        rootful.settings.storage = {
+          runroot = "/run/containers/storage";
+          graphroot = "/var/lib/containers/storage";
+        };
+        # Per-user storage; unlike graphroot, this expands $USER.
+        # Runroot keeps its default under $XDG_RUNTIME_DIR.
+        rootless.settings.storage.rootless_storage_path = "/tmp/containers-$USER";
       };
     };
     oci-containers.backend = "podman";

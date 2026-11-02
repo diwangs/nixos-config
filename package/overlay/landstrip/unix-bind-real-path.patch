@@ -16,10 +16,10 @@ parent's `connect(2)` fails with ENOENT.
 Candidate for upstream as a bug fix. See package/overlay/landstrip/overlay.nix.
 
 diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
-index 3221580..ff80697 100644
+index 257717c..ac42b91 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
-@@ -2,7 +2,7 @@
+@@ -2,17 +2,20 @@
  // Copyright (c) 2026 Jarkko Sakkinen
  
  use super::error::{BrokerError, SysResult};
@@ -28,19 +28,32 @@ index 3221580..ff80697 100644
  use super::notify::NotificationResult;
  use super::process::{MissingTarget, TargetProcess};
  use super::supervise::{Denial, Denials};
-@@ -489,8 +489,8 @@ fn handle_unix_bind(
-     {
-         return Err(BrokerError::PolicyDenied);
+ use crate::policy::{AccessPolicy, UnixPathAccess, UnixSocketAccess};
+ use crate::trap::NetworkOperation;
++use nix::sys::stat::fstat;
+ use std::ffi::OsStr;
++use std::fs;
+ use std::mem;
+ use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+ use std::os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+ use std::os::unix::ffi::OsStrExt;
++use std::os::unix::fs::MetadataExt;
+ use std::path::{Path, PathBuf};
+ 
+ pub(super) type SocketAddrCall =
+@@ -553,8 +556,8 @@ fn handle_unix_bind(
+             None,
+         );
      }
 -    let broker_path = anchor.path()?;
 -    socket.rewrite_unix_path(Path::new(OsStr::from_bytes(broker_path.as_bytes())))?;
 +    let broker_path = unix_bind_path(&target.label, target.root.as_fd(), &anchor)?;
 +    socket.rewrite_unix_path(&broker_path)?;
- 
-     Ok(NotificationResult::grant(SocketGrant {
+     let grant = SocketGrant {
          sock: socket.sock,
-@@ -500,6 +500,39 @@ fn handle_unix_bind(
-     }))
+         addr: socket.addr,
+@@ -576,6 +579,39 @@ fn handle_unix_bind(
+     Ok(NotificationResult::grant(grant))
  }
  
 +/// Path the broker binds on behalf of the target.
@@ -76,6 +89,6 @@ index 3221580..ff80697 100644
 +    stat.st_dev == right.dev() && stat.st_ino == right.ino()
 +}
 +
- fn authorize_unix_path(
-     policy: &AccessPolicy,
-     target: &Path,
+ impl IpEndpoint {
+     fn parse(addr: &[u8], domain: i32) -> SysResult<Self> {
+         match (domain, i32::from(SockAddrFamily::try_from(addr)?)) {
