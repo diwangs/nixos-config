@@ -23,11 +23,8 @@
         favorite-apps = [
           "org.gnome.Nautilus.desktop" # Files
           "org.gnome.Console.desktop"
-          # "code.desktop"
-          # "t3code.desktop"
           "dev.zed.Zed.desktop"
-          # "com.anthropic.Claude.desktop"
-          "hermes.desktop"
+          "com.nousresearch.hermes.desktop"
           "md.obsidian.Obsidian.desktop"
           "app.zen_browser.zen.desktop"
           "com.bitwarden.desktop.desktop"
