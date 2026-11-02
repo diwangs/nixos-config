@@ -300,9 +300,9 @@ in
           autoMemoryEnabled = false;
           context = ''
             @~/.codex/AGENTS.md
-            Only Bash, AskUserQuestion, and ExitPlanMode are permitted. Use shell
-            commands for reading, searching, editing, and other operations; all
-            other tools are blocked.
+            Only Bash, Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode
+            are permitted. Use shell commands for reading, searching, editing, and
+            other operations; all other tools are blocked.
           '';
           env = {
             CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
@@ -314,7 +314,10 @@ in
           };
 
           # Deny every other tool except AskUserQuestion and ExitPlanMode (no side
-          # effects outside the sandbox), including MCP and newly introduced tools.
+          # effects outside the sandbox), TaskStop (only stops background tasks),
+          # ToolSearch (only loads tool schemas; loaded tools still hit this hook) and
+          # Agent (subagent tool calls pass through this same hook), including MCP
+          # and newly introduced tools.
           # PreToolUse decisions also apply in bypassPermissions mode.
           hooks.PreToolUse = [
             {
@@ -323,10 +326,10 @@ in
                 {
                   type = "command";
                   command = "${pkgs.writeShellScript "claude-non-bash-block" ''
-                    if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
+                    if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
                       exit 0
                     fi
-                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash (plus AskUserQuestion and ExitPlanMode) is permitted because Bash runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
+                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash (plus Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode) is permitted because Bash runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
                   ''}";
                   timeout = 10;
                 }
