@@ -16,7 +16,6 @@
   programs.codex.settings.cli_auth_credentials_store = "file";
 
   # Headless tools that NixOS provides system-wide on the laptop
-  home.sessionVariables.EDITOR = "nano"; # laptop: code-wait (system)
   home.sessionPath = [ "$HOME/.local/bin" ];
   home.packages = with pkgs; [
     nano

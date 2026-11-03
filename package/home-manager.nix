@@ -58,11 +58,6 @@
     ]
     ++ [
       pkgs-stable.codeql # Pin CodeQL. Also prevents download from vscode plugin
-      # Small script to launch VSCode from Claude Code CLI
-      (pkgs.writeShellScriptBin "code-wait" ''
-        			exec ${pkgs.vscode}/bin/code --wait "$@" \
-        				2> >(grep -v "is not in the list of known options, but still passed to Electron/Chromium" >&2)
-        		'')
     ];
 
   # Dev (OpenCode, direnv, and gh live in home-manager.headless.nix)
@@ -80,7 +75,8 @@
   # The desktop uses the login keyring for aws-vault's cache.
   home.sessionVariables.AWS_VAULT_SECRET_SERVICE_COLLECTION_NAME = "login";
 
-  # GUI IDE: Zed
+  # GUI IDE: Zed (also $EDITOR, e.g. for Claude)
+  home.sessionVariables.EDITOR = "zeditor --wait";
   programs.zed-editor = {
     package = lib.mkForce pkgs.zed-editor; # force, since in devbox it's empty
     installRemoteServer = lib.mkForce false; # GUI needs no server symlink

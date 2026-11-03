@@ -176,6 +176,16 @@ in
     };
   };
 
+  # CLI Editor: neovim (default $EDITOR; the desktop overrides it with Zed)
+  home.sessionVariables.EDITOR = lib.mkDefault "nvim";
+  programs.neovim = {
+    enable = true;
+
+    # New defaults
+    withPython3 = false;
+    withRuby = false;
+  };
+
   # CLI agent: Codex
   programs.codex = {
     enable = true;
@@ -371,74 +381,4 @@ in
         }
       } "$dst"
      	'';
-
-  # CLI Agent: OpenCode
-  # Deprecated; kept for reference, not deleted. (Line-commented rather than
-  # /* */ because embedded globs like "/run/user/*/agenix/**" contain a
-  # literal `*/` that would close a block comment early.)
-  # programs.opencode = {
-  #   enable = true;
-  #   extraPackages = [ pkgs.nixd ];
-  #   settings = {
-  #     autoupdate = false;
-  #     lsp = true;
-  #     plugin = [ "opencode-landstrip" ];
-  #     permission = {
-  #       "*" = "allow";
-  #       # Mirrors the bash sandbox below (xdg.configFile "opencode/sandbox.json"):
-  #       # deny the whole home directory by default and re-allow only the same
-  #       # few safe subtrees, rather than a short blocklist of specific secret
-  #       # dirs. External paths (this is the only place they're gated: it's
-  #       # checked, with the absolute path, before and independently of
-  #       # `read`/`edit` — whose own patterns are worktree-relative and never
-  #       # observe an absolute path at all).
-  #       #
-  #       # Granularity note: every query here is "immediate children of some
-  #       # directory D", and a configured pattern's `*`/`**` both expand to the
-  #       # same unbounded regex wildcard (no single- vs. multi-segment
-  #       # distinction) — so, unlike the bash sandbox, a lone top-level dotfile
-  #       # can't be carved out of the deny without reopening all of home's top
-  #       # level to listing. The bash sandbox's `~/.gitconfig` exception is
-  #       # therefore intentionally dropped here: it stays denied.
-  #       external_directory = {
-  #         "*" = "allow";
-  #         "~/**" = "deny";
-  #         "~/.config/**" = "allow";
-  #         "~/.local/share/**" = "allow";
-  #         "~/.local/share/opencode/**" = "deny"; # antipattern: secrets in `share`
-  #         "~/.cache/**" = "allow";
-  #         "/nix/secret/**" = "deny"; # agenix host key
-  #         "/run/agenix/**" = "deny"; # decrypted agenix secrets (nixos module)
-  #         "/run/user/*/agenix/**" = "deny"; # decrypted agenix secrets (home-manager module)
-  #       };
-  #     };
-  #   };
-  #   tui.plugin = [ "opencode-landstrip/tui" ];
-  # };
-  #
-  # # Config for bash tool landstrip sandbox. Derived from the shared base policy
-  # # in aspect/secret.hm.nix (single source of truth) with OpenCode's deltas:
-  # # direct network is denied by default (the opencode-landstrip plugin runs an
-  # # in-process proxy for per-domain filtering) and unix sockets are restricted to
-  # # the nix daemon; it also protects its own config + auth token from writes.
-  # # The list orderings below are chosen to keep the emitted JSON byte-equivalent
-  # # to the previous inline definition.
-  # #
-  # # NOTE: at this current version, there is a bypass intended to make session-
-  # # level exception by doing the syscall twice. Re-check in the future if there
-  # # is a more user-dependent authorization flow.
-  # xdg.configFile."opencode/sandbox.json".text = builtins.toJSON (
-  #   lib.recursiveUpdate landstripPolicyBase {
-  #     network.allowNetwork = false; # plugin proxy handles per-domain filtering
-  #     network.allowAllUnixSockets = false;
-  #     filesystem.denyRead = landstripPolicyBase.filesystem.denyRead ++ [
-  #       "~/.local/share/opencode/auth.json" # antipattern: secrets in `share`
-  #     ];
-  #     filesystem.denyWrite = [
-  #       "~/.config/opencode/sandbox.json"
-  #       ".opencode/sandbox.json"
-  #     ]
-  #     ++ landstripPolicyBase.filesystem.denyWrite;
-  #   }
-  # );
 }
