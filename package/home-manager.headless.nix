@@ -203,6 +203,9 @@ in
           "$@"
       '';
     };
+    # The ChatGPT desktop app persists its UI state (e.g., the Chat/Codex tab) to
+    # `[desktop]` in config.toml and rolls the change back if the write fails.
+    mutableSettings = true;
     settings = {
       cli_auth_credentials_store = lib.mkDefault "keyring"; # oo7 Secret Service
       allow_login_shell = false; # Preserve Codex tool shims in PATH
@@ -236,7 +239,7 @@ in
             {
               type = "command";
               command = "${pkgs.writeShellScript "codex-apply-patch-landstrip-block" ''
-                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch tool disabled. Bypasses sandbox. Retry through bash tool. Accepts same patch as argument or stdin."}}'
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool disabled, bypasses sandbox. Retry through Bash, has sandbox hook."}}'
               ''}";
               timeout = 10;
               statusMessage = "Routing patch through Landstrip";
@@ -293,7 +296,79 @@ in
   # CLI agent: Claude Code
   programs.claude-code = {
     enable = true;
-    settings = { }; # Defined below to make it writable
+    # Merge into a writable settings.json so changes Claude Code persists (e.g.,
+    # via /config) survive activation. Declared values below take precedence.
+    mutableSettings = true;
+    settings = {
+      permissions.defaultMode = "bypassPermissions";
+      skipDangerousModePermissionPrompt = true;
+      tui = "fullscreen";
+      sandbox.enabled = false;
+      autoMemoryEnabled = false;
+      context = ''
+        @~/.codex/AGENTS.md
+        Only Bash, Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode
+        are permitted. Use shell commands for reading, searching, editing, and
+        other operations; all other tools are blocked.
+      '';
+      env = {
+        CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
+        CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
+          unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(KEY|SECRET|PASSWORD|^AWS_BEARER_TOKEN_BEDROCK$)')
+          exec ${pkgs.bashInteractive}/bin/bash "$@"
+        ''}/bin/bash";
+        CLAUDE_BASH_NO_LOGIN = "1";
+      };
+
+      # Deny every other tool except AskUserQuestion and ExitPlanMode (no side
+      # effects outside the sandbox), TaskStop (only stops background tasks),
+      # ToolSearch (only loads tool schemas; loaded tools still hit this hook) and
+      # Agent (subagent tool calls pass through this same hook), including MCP
+      # and newly introduced tools.
+      # PreToolUse decisions also apply in bypassPermissions mode.
+      hooks.PreToolUse = [
+        {
+          matcher = "*";
+          hooks = [
+            {
+              type = "command";
+              command = "${pkgs.writeShellScript "claude-non-bash-block" ''
+                if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
+                  exit 0
+                fi
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool disabled, bypasses sandbox. Retry through Bash, has sandbox hook."}}'
+              ''}";
+              timeout = 10;
+            }
+          ];
+        }
+        # Tool calls are wrapped; interactive ! shell-mode is outside this hook.
+        # Nesting means cd/export do not persist between tool calls.
+        {
+          matcher = "^Bash$";
+          hooks = [
+            {
+              type = "command";
+              # Hook lists merge across settings sources. Dispatch here so
+              # exactly one wrapper rewrites each Bash command, even when
+              # --settings selects an opt-in profile.
+              command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
+                case "''${AGENT_SANDBOX_PROFILE:-default}" in
+                  default) exec ${claudeBashHookCommands.default} ;;
+                  docker) exec ${claudeBashHookCommands.docker} ;;
+                  *)
+                    printf '%s\n' 'Unknown AGENT_SANDBOX_PROFILE; refusing to run unsandboxed' >&2
+                    exit 2
+                    ;;
+                esac
+              ''}";
+              timeout = 10;
+              statusMessage = "Entering Bubblewrap and Landstrip sandbox";
+            }
+          ];
+        }
+      ];
+    };
   };
 
   # Select a profile at launch: claude --settings ~/.claude/profiles/docker.json
@@ -303,82 +378,4 @@ in
       inherit source;
     }
   ) claudeProfileFiles;
-
-  home.activation.claudeSettings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    		dst="$HOME/.claude/settings.json"
-    		run rm -f "$dst"
-    		run install -Dm600 ${
-        (pkgs.formats.json { }).generate "claude-code-settings.json" {
-          "$schema" = "https://json.schemastore.org/claude-code-settings.json";
-          permissions.defaultMode = "bypassPermissions";
-          skipDangerousModePermissionPrompt = true;
-          tui = "fullscreen";
-          sandbox.enabled = false;
-          autoMemoryEnabled = false;
-          context = ''
-            @~/.codex/AGENTS.md
-            Only Bash, Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode
-            are permitted. Use shell commands for reading, searching, editing, and
-            other operations; all other tools are blocked.
-          '';
-          env = {
-            CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
-            CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
-              unset $(${pkgs.coreutils}/bin/env | ${pkgs.coreutils}/bin/cut -d= -f1 | ${pkgs.gnugrep}/bin/grep -Ei '(KEY|SECRET|PASSWORD|^AWS_BEARER_TOKEN_BEDROCK$)')
-              exec ${pkgs.bashInteractive}/bin/bash "$@"
-            ''}/bin/bash";
-            CLAUDE_BASH_NO_LOGIN = "1";
-          };
-
-          # Deny every other tool except AskUserQuestion and ExitPlanMode (no side
-          # effects outside the sandbox), TaskStop (only stops background tasks),
-          # ToolSearch (only loads tool schemas; loaded tools still hit this hook) and
-          # Agent (subagent tool calls pass through this same hook), including MCP
-          # and newly introduced tools.
-          # PreToolUse decisions also apply in bypassPermissions mode.
-          hooks.PreToolUse = [
-            {
-              matcher = "*";
-              hooks = [
-                {
-                  type = "command";
-                  command = "${pkgs.writeShellScript "claude-non-bash-block" ''
-                    if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
-                      exit 0
-                    fi
-                    printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Only Bash (plus Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode) is permitted because Bash runs inside Bubblewrap and Landstrip. Use Bash with shell commands (such as cat, rg, sed, or patch) for this operation; all other tools are blocked."}}'
-                  ''}";
-                  timeout = 10;
-                }
-              ];
-            }
-            # Tool calls are wrapped; interactive ! shell-mode is outside this hook.
-            # Nesting means cd/export do not persist between tool calls.
-            {
-              matcher = "^Bash$";
-              hooks = [
-                {
-                  type = "command";
-                  # Hook lists merge across settings sources. Dispatch here so
-                  # exactly one wrapper rewrites each Bash command, even when
-                  # --settings selects an opt-in profile.
-                  command = "${pkgs.writeShellScript "claude-bash-landstrip-wrap" ''
-                    case "''${AGENT_SANDBOX_PROFILE:-default}" in
-                      default) exec ${claudeBashHookCommands.default} ;;
-                      docker) exec ${claudeBashHookCommands.docker} ;;
-                      *)
-                        printf '%s\n' 'Unknown AGENT_SANDBOX_PROFILE; refusing to run unsandboxed' >&2
-                        exit 2
-                        ;;
-                    esac
-                  ''}";
-                  timeout = 10;
-                  statusMessage = "Entering Bubblewrap and Landstrip sandbox";
-                }
-              ];
-            }
-          ];
-        }
-      } "$dst"
-     	'';
 }
