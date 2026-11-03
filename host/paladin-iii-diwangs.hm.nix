@@ -4,26 +4,16 @@
   os-secret,
   ...
 }:
-let
-  ageIdentityCredential = os-secret.systemd-creds.paladin-iii-diwangs.ageIdentity;
-in
 {
-  home.username = "diwangs";
   home.stateVersion = "25.05";
+  home.username = "diwangs";
   home.uid = 1000;
 
   # User-scoped credential: encrypt with --user --with-key=host+tpm2.
+  systemd.user.services.agenix.Service.SetCredentialEncrypted =
+    os-secret.systemd-creds.paladin-iii-diwangs.ageIdentity;
   age.identityPaths = lib.mkForce [
     "/run/user/${toString config.home.uid}/credentials/agenix.service/age-identity"
-  ];
-  systemd.user.services.agenix.Service.SetCredentialEncrypted =
-    ageIdentityCredential;
-
-  assertions = [
-    {
-      assertion = lib.hasPrefix "age-identity:" ageIdentityCredential;
-      message = "paladin-iii-diwangs's credential must be named age-identity";
-    }
   ];
 
   # Secrets it can decrypt

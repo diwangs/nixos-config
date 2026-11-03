@@ -5,10 +5,6 @@
   ...
 }:
 rec {
-  age.identityPaths = [
-    "${config.home.homeDirectory}/.age-identity-pq"
-  ];
-
   /*
     landstrip sandbox policy for CLI agent bash tool
 

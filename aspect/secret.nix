@@ -5,9 +5,6 @@
 
   # agenix CLI for editing/encrypting secrets on this host (the YubiKey
   # plugin is laptop-only, see aspect/yubikey.nix)
-  age.identityPaths = [
-    "/run/credentials/agenix-install-secrets.service/age-identity"
-  ];
   environment.systemPackages = [
     agenix.packages.${pkgs.stdenv.hostPlatform.system}.default
     pkgs.age # NOTE: don't use `rage` since it hasn't supported pq keys yet

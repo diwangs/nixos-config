@@ -86,12 +86,6 @@
     fi
   '';
 
-  # TPM-sealed age identity, exposed only to agenix's private credential mount.
-  # To replace it:
-  # systemd-creds encrypt -T -p --name=age-identity <plaintext-identity> -
-  systemd.services.agenix-install-secrets.serviceConfig.SetCredentialEncrypted =
-    os-secret.systemd-creds.paladin-iii.ageIdentity;
-
   # systemd-creds host key: root resets every boot, so restore the same key
   # (TPM-sealed) before any user manager decrypts host+tpm2 credentials.
   # To replace it:
@@ -122,6 +116,15 @@
     '';
   };
 
+  # TPM-sealed age identity, exposed only to agenix's private credential mount.
+  # To replace it:
+  # systemd-creds encrypt -T -p --name=age-identity <plaintext-identity> -
+  systemd.services.agenix-install-secrets.serviceConfig.SetCredentialEncrypted =
+    os-secret.systemd-creds.paladin-iii.ageIdentity;
+  age.identityPaths = [
+    "/run/credentials/agenix-install-secrets.service/age-identity"
+  ];
+
   # Root secrets (decrypts to `/run/agenix/*`)
   age.secrets."paladin-iii/secure-boot/GUID".file =
     os-secret.paladin-iii.secure-boot.GUID;
@@ -139,9 +142,6 @@
     os-secret.paladin-iii.secure-boot.keys.db."db.pem";
   age.secrets."paladin-iii/measured-boot/fido2-fde-salt.luks".file =
     os-secret.paladin-iii.measured-boot."fido2-fde-salt.luks";
-
-  # age.secrets."paladin-iii/hashed-password".file =
-  #   os-secret.paladin-iii.hashed-password;
 
   # Consumed by ensure-printers (hardware/peripherals/printer.nix)
   age.secrets."network/malone-360-printer-uri".file =
