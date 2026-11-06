@@ -268,7 +268,7 @@ in
       bedrock = {
         model_provider = "amazon-bedrock";
         model_providers.amazon-bedrock.aws.region = "us-east-1";
-        model = "openai.gpt-5.6-sol"; # openai prefix
+        model = "openai.gpt-6.1-sol"; # openai prefix
       };
 
       # Opt-in access to the Docker-compatible rootless Podman API.
