@@ -33,7 +33,7 @@
 
   nixpkgs.overlays = [
     (import ./package/overlay/kernel/kernel.nix args)
-    .linuxKernel_7_2_10_hardenedOverlay
+    .linuxKernel_7_3_1_hardenedOverlay
     (import ./package/overlay/fwupd/fwupd-pcrlock.nix)
 
     # self.inputs.nix-vscode-extensions.overlays.default
@@ -91,7 +91,7 @@
   # Replace stdenv with Clang/LLVM and compile with NixOS' hardening
   # This enables Clang-specific features (CFI) but disables GCC plugins (entropy, randstruct, structleak, and stackleak)
   boot.kernelPackages =
-    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_2
+    pkgs.hardenedLinuxPackagesFor pkgs.linuxKernel.kernels.linux_7_3
       (old: {
         stdenv = pkgs.withCFlags [
           "-Wno-unused-command-line-argument"
@@ -131,7 +131,7 @@
   # ++ import ./package/overlay/kernel/thunderbolt-dp-tunnel.nix {
   #   inherit lib;
   #   inherit (pkgs) fetchpatch;
-  #   kernel = pkgs.linuxKernel.kernels.linux_7_2;
+  #   kernel = pkgs.linuxKernel.kernels.linux_7_3;
   # };
 
   # Enabling LSM (AppArmor is enabled in nixos.headless.nix)
