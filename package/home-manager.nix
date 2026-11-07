@@ -57,7 +57,7 @@
       # mbelib						# sdrangel: decode AMBe (e.g., C4FM, D-STAR, DMR)
     ]
     ++ [
-      pkgs-stable.codeql # Pin CodeQL. Also prevents download from vscode plugin
+      pkgs-stable.codeql # Pin CodeQL.
     ];
 
   # Dev (OpenCode, direnv, and gh live in home-manager.headless.nix)
@@ -78,32 +78,47 @@
   # GUI IDE: Zed (also $EDITOR, e.g. for Claude)
   home.sessionVariables.EDITOR = "zeditor --wait";
   programs.zed-editor = {
-    package = lib.mkForce pkgs.zed-editor; # force, since in devbox it's empty
-    installRemoteServer = lib.mkForce false; # GUI needs no server symlink
-    # Keep this client-specific
+    package = lib.mkForce pkgs.zed-editor; # force, to change value in headless
+    installRemoteServer = lib.mkForce false; # force too
+    # Keep this on the client
     userSettings = {
       edit_predictions.mode = "subtle";
 
-      # Right dock width of 250p fit 80-columned code perfectly on 1080p width
-      project_panel.default_width = 250;
-      git_panel.default_width = 250;
-      collaboration_panel.default_width = 250;
-      outline_panel.default_width = 250;
+      # Right dock width that leaves space for 80 cols on 1080p potrait
+      project_panel.default_width = 220;
+      git_panel.default_width = 220;
+      collaboration_panel.default_width = 220;
+      outline_panel.default_width = 220;
+
+      # Bottom dock height that shows 24 rows on 1080p potrait
+      terminal.default_height = 520;
+      # 261106: Apparently debug panel has no such setting?
 
       # Don't show ACP terminal response in card
       agent.expand_terminal_card = false;
     };
   };
 
-  # Zed persists dock widths in its state DB (~/.local/share/zed/db/*-stable),
+  # Nix-built (not auto-downloaded) Zed extensions. Server-pushed on connect.
+  programs.zed-editor-extensions = {
+    enable = true;
+    packages = with pkgs.zed-extensions; [
+      nix
+      latex
+      terraform
+    ];
+  };
+
+  # Zed persists dock sizes in its state DB (~/.local/share/zed/db/*-stable),
   # not in settings.json — which is a read-only store symlink anyway. The
-  # `default_width` above is only a seed: it applies when no row exists, so a
-  # single accidental drag pins that panel forever and no `switch` undoes it.
-  # Drop those rows at login to make the widths above authoritative again.
+  # `default_width`/`default_height` above are only seeds: they apply when no
+  # row exists, so a single accidental drag pins that panel forever and no
+  # `switch` undoes it.
+  # Drop those rows at login to make the sizes above authoritative again.
   # NOTE: only meaningful while Zed is closed; a running Zed re-serializes
   # panel state from memory on exit, overwriting whatever we delete here.
   systemd.user.services.zed-reset-dock-width = {
-    Unit.Description = "Reset Zed sidebar widths to the declarative defaults";
+    Unit.Description = "Reset Zed dock sizes to the declarative defaults";
     Service = {
       Type = "oneshot";
       ExecStart = toString (
@@ -111,9 +126,10 @@
           set -eu
           # Panel names are Zed's `persistent_name()`, which is the struct name
           # and NOT the settings key: `collaboration_panel` is `CollabPanel`.
-          panels="'ProjectPanel', 'GitPanel', 'CollabPanel', 'OutlinePanel'"
+          panels="'ProjectPanel', 'GitPanel', 'CollabPanel', 'OutlinePanel',
+            'TerminalPanel'"
           # Keys are `<workspace_id>:<PanelName>`, so match on the suffix to
-          # cover every workspace. Other panels (terminal, agent) are left be.
+          # cover every workspace. Other panels (e.g. agent) are left be.
           for db in "$HOME"/.local/share/zed/db/*-stable/db.sqlite; do
             [ -e "$db" ] || continue
             # Absent on a first-run DB whose migrations have not yet applied.
@@ -131,102 +147,4 @@
     };
     Install.WantedBy = [ "default.target" ];
   };
-
-  # Nix-built (not auto-downloaded) Zed extensions. Also reaches nova-devbox:
-  # remote_extensions on the SSH remote is a live mirror of this client's
-  # extensions/installed, pushed on every connect.
-  programs.zed-editor-extensions = {
-    enable = true;
-    packages = with pkgs.zed-extensions; [
-      nix
-      latex
-      terraform
-    ];
-  };
-
-  # IDE: VSCode official
-  # programs.vscode = {
-  #   enable = true;
-  #   mutableExtensionsDir = false;
-  #   profiles.default = {
-  #     enableUpdateCheck = false;
-  #     enableExtensionUpdateCheck = false;
-  #     keybindings = [
-  #       {
-  #         key = "ctrl+g"; # Conflicts with Codex and Claude Code CLI
-  #         command = "-workbench.action.terminal.goToRecentDirectory";
-  #         # Technically there's a when clause here, but we don't really need
-  #         # the other one either.
-  #       }
-  #     ];
-  #     extensions =
-  #       with pkgs.vscode-extensions;
-  #       [
-  #         # DevEx
-  #         mkhl.direnv
-  #         ms-vscode-remote.remote-ssh # Unfree
-
-  #         # Language support
-  #         bbenoist.nix
-  #         unifiedjs.vscode-mdx
-  #         redhat.ansible
-  #         redhat.vscode-yaml
-  #         ms-python.python
-  #         ms-python.vscode-python-envs
-  #         # ms-python.vscode-pylance			# Unfree
-  #         ms-pyright.pyright
-  #         ms-azuretools.vscode-containers
-
-  #         # Jupyter
-  #         ms-toolsai.jupyter
-  #         ms-toolsai.jupyter-renderers
-  #         ms-toolsai.jupyter-keymap
-  #         ms-toolsai.vscode-jupyter-cell-tags
-  #         ms-toolsai.vscode-jupyter-slideshow
-
-  #         # Agents integration
-  #         anthropic.claude-code # Unfree
-  #       ]
-  #       ++ (with pkgs.nix-vscode-extensions.vscode-marketplace-release; [
-  #         openai.chatgpt
-  #         github.vscode-codeql # Unfree
-  #       ]);
-  #     userSettings = {
-  #       "update.mode" = "none";
-  #       "editor.tabSize" = 2;
-  #       "editor.minimap.enabled" = false;
-  #       "extensions.autoUpdate" = "off";
-  #       "extensions.autoCheckUpdates" = false;
-  #       "terminal.integrated.defaultProfile.linux" = "zsh";
-  #       "terminal.integrated.initialHint" = false;
-  #       "redhat.telemetry.enabled" = false;
-
-  #       # Copilot
-  #       "window.commandCenter" = false;
-  #       "editor.inlineSuggest.enabled" = false; # Trigger with Alt + \
-  #       # Modify with `editor.inlineSuggest.trigger`
-  #       # "chat.commandCenter.enabled" = false;
-  #       "chat.viewSessions.orientation" = "stacked";
-  #       # "github.copilot.nextEditSuggestions.enabled" = false; # Red and green boxes
-
-  #       # Extension: direnv
-  #       "direnv.restart.automatic" = false;
-
-  #       # Extension: Claude Code
-  #       "claudeCode.useTerminal" = true;
-  #       "claudeCode.preferredLocation" = "panel";
-  #       # "claudeCode.disableLoginPrompt" = true;
-
-  #       # Extension: Container
-  #       "containers.containerClient" = "com.microsoft.visualstudio.containers.podman";
-  #       "containers.orchestratorClient" =
-  #         "com.microsoft.visualstudio.orchestrators.podmancompose";
-
-  #       # Extension: CodeQL
-  #       "codeQL.githubDatabase.download" = "never";
-  #       "codeQL.runningQueries.memory" = 8192;
-  #     };
-  #   };
-  # };
-
 }
