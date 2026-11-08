@@ -24,6 +24,14 @@
     ./hardware-aspect/printer.nix
   ];
 
+  # Device-specific values for the disk layout in hardware-aspect/disk.nix
+  hardwareAspect.disk = {
+    bootFsUuid = "02CE-E779";
+    rootFsUuid = "5f6d2a11-566c-42ed-ba66-4a5284b1636b";
+    rootPartUuid = "72fe2dd9-bd67-4f30-89fd-4a247bf16114"; # For LUKS
+    swapSizeMiB = 64 * 1024; # NOTE: GNOME system manager uses GB, not GiB
+  };
+
   hardware = {
     # Enable non-free firmware (Qualcomm NCM865, Radeon, NPU, etc.)
     # This is defined in `not-detected.nix`, but let's define explicitly
