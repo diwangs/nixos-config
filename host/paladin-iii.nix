@@ -147,27 +147,15 @@
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
   # Yubikey FIDO2 PAM
-  # Register a new key with `pamu2fcfg`, then add its four fields - keyHandle,
-  # publicKey, coseType, options - as another list below. pam_u2f keeps only
+  # Credentials live in ./identity/u2f.nix. pam_u2f keeps only
   # the *last* authfile line matching a user, so a user's credentials are
   # merged onto one colon-separated line at build time: a second `diwangs:`
   # line would silently shadow the first, not extend it.
   environment.etc."u2f_keys".text = lib.concatLines (
-    lib.mapAttrsToList
-      (
-        user: creds:
-        lib.concatStringsSep ":" ([ user ] ++ map (lib.concatStringsSep ",") creds)
-      )
-      {
-        diwangs = [
-          [
-            "JT7oDmOJtCf5YOf9eyBBpKnApK2VnjpnvKp0kFv9pKWWr3ePPteBVxkNp3q5ZNQJFfjj22apnataR5qBzmmGjdFsIhwXFjRwiz8xR0eP4jD9VuEnJyG6PRC492i36qKhgCKfNoY8q4Rx5HQzQMe21hJ1RjKGOwfMvOaEQ1Li3BY="
-            "sqzKcs2g+LQ2ptOI6dbFkBlqfEfWAjnigNjpMuxQnRQ="
-            "eddsa"
-            "+presence+pin"
-          ]
-        ];
-      }
+    lib.mapAttrsToList (
+      user: creds:
+      lib.concatStringsSep ":" ([ user ] ++ map (lib.concatStringsSep ",") creds)
+    ) (import ./identity/u2f.nix)
   );
 
   # TPM-sealed age identity, exposed only to agenix's private credential mount.

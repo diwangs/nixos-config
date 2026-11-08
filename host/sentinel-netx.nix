@@ -141,7 +141,7 @@
     };
   };
   users.users.diwangs.openssh.authorizedKeys.keys = [
-    (import ../aspect/ssh-pubkeys.nix).diwangsPiv
+    (import ./identity/ssh.nix).diwangsPiv
   ];
   security.sudo.wheelNeedsPassword = false;
 }

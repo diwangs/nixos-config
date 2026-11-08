@@ -21,6 +21,9 @@
   age.secrets."token/access-nova.json".file = os-secret.token."access-nova.json";
   age.secrets."token/bedrock".file = os-secret.token.bedrock;
 
+  # Sign git commits with the YubiKey PIV key (see aspect/user.hm.nix)
+  programs.git.signing.key = "key::${(import ./identity/ssh.nix).diwangsPiv}";
+
   # SSH config
   programs.ssh = {
     enable = true;

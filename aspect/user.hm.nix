@@ -1,17 +1,18 @@
-{ config, ... }:
+{ config, lib, ... }:
 let
-  # pivSshPubKey = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAlqJuT2Lkccq5Q3Jkc8msxn9FQ1tvtP4i/fvTIpBrjUAB/RayymoXWLQUly3o9ytPcJK1PDI/EuxbdjmxKEaSI=";
-  pivSshPubKey = (import ./ssh-pubkeys.nix).diwangsPiv;
+  # Set per user in host/*.hm.nix, e.g. "key::ssh-ed25519 AAAA..."
+  signingKey = config.programs.git.signing.key;
 in
 {
   # Use SSH key in `yubikey-agent` to sign git commits
-  xdg.configFile."git/allowed_signers".text = "* ${pivSshPubKey}\n";
+  xdg.configFile."git/allowed_signers" = lib.mkIf (signingKey != null) {
+    text = "* ${lib.removePrefix "key::" signingKey}\n";
+  };
   programs.git = {
     signing = {
       # SSH-based signing via the YubiKey PIV key served by yubikey-agent
       # (ssh-keygen -Y sign goes through SSH_AUTH_SOCK; pinentry per session)
       format = "ssh";
-      key = "key::${pivSshPubKey}";
     };
     settings = {
       # Lets `git log --show-signature` verify our own signatures
