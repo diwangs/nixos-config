@@ -185,6 +185,7 @@
           inherit agenix; # for the CLI package in aspect/secret.nix
           inherit os-secret; # .age file paths in aspect/secret.nix
           inherit lanzaboote;
+          inherit impermanence;
           inherit nixos-hardware;
           inherit nix-flatpak;
           inherit allowedUnfree;

@@ -4,6 +4,7 @@
   pkgs,
   os-secret,
   lanzaboote,
+  impermanence,
   nixos-hardware,
   ...
 }:
@@ -12,6 +13,7 @@
     # Laptop hardware
     # Semi-portable configs
     lanzaboote.nixosModules.lanzaboote
+    impermanence.nixosModules.impermanence
     nixos-hardware.nixosModules.framework-13-7040-amd
 
     ./hardware-aspect/mainboard-7040.nix
@@ -22,15 +24,16 @@
     ./hardware-aspect/printer.nix
   ];
 
-  # Enable non-free firmware (Qualcomm NCM865, Radeon, NPU, etc.)
-  # This is defined in `not-detected.nix`, but let's define explicitly
-  hardware.enableRedistributableFirmware = lib.mkDefault true;
+  hardware = {
+    # Enable non-free firmware (Qualcomm NCM865, Radeon, NPU, etc.)
+    # This is defined in `not-detected.nix`, but let's define explicitly
+    enableRedistributableFirmware = lib.mkDefault true;
+    sensor.iio.enable = true; # auto-brightness
 
-  # Sensors for auto-brightness
-  hardware.sensor.iio.enable = true;
-
-  # Framework Laptop are x86-only (for now...)
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+    # Peripherals
+    hackrf.enable = true;
+    wooting.enable = true; # unfree
+  };
 
   # Lanzaboote replaces the systemd-boot module and signs the boot chain.
   boot = {
@@ -42,7 +45,7 @@
     lanzaboote = {
       enable = true;
       pkiBundle = "/run/agenix/paladin-iii/secure-boot";
-      configurationLimit = 4; # Limit is 4 since lanzaboote 1.2.0. Each initrd is ~62MB;
+      configurationLimit = 4; # Limit is 4 since lanzaboote 1.2.0.
       autoGenerateKeys.enable = false; # Use through agenix instead
       autoEnrollKeys = {
         enable = true;
@@ -66,12 +69,63 @@
     ];
   };
 
-  networking.hostName = "paladin-iii";
-  networking.hostId = "cafebabe";
+  # Ephemeral root: bind-mount persistent subvolumes (hardware-aspect/disk.nix)
+  # into place. machine-id comes from a TPM credential, so it is not persisted.
+  environment.persistence."/persist/states" = {
+    hideMounts = true;
+    # The only non-critical warning is that /var/lib/nixos is not persisted.
+    # Userborn keeps UIDs/GIDs stable by reading the existing /etc/passwd and
+    # /etc/group, which reset-root wipes, so accounts without a fixed uid/gid
+    # are renumbered from scratch every boot. The numbers only shift when the
+    # declared accounts change (e.g., a service added or removed); files those
+    # accounts own on persistent storage would then have stale owners. diwangs
+    # has a fixed uid. To fix properly: persist /var/lib/nixos (its own
+    # subvolume) and set services.userborn.passwordFilesLocation to it.
+    # Warnings are on if any entry enables them, so both entries disable them.
+    enableWarnings = false;
+    directories = [
+      "/etc/nixos"
+      "/etc/NetworkManager/system-connections"
+      "/var/lib/bluetooth"
+      "/var/lib/boltd"
+      "/var/lib/systemd"
+      {
+        directory = "/home/diwangs";
+        user = "diwangs";
+        group = "users";
+        mode = "0700";
+      }
+    ];
+  };
 
-  # Peripherals
-  hardware.hackrf.enable = true;
-  hardware.wooting.enable = true; # This requires unfree license
+  environment.persistence."/persist/caches" = {
+    hideMounts = true;
+    enableWarnings = false; # See the /var/lib/nixos note above
+    directories = [
+      "/var/cache"
+      "/var/lib/flatpak"
+      "/var/lib/pcrlock.d"
+      "/var/log"
+    ];
+    # User-scoped persistence treats the home directory as a permissions
+    # boundary. A system-level .cache entry copies its root-owned backing
+    # parent's permissions onto /home/diwangs during every activation.
+    users.diwangs.directories = [
+      {
+        directory = ".cache";
+        mode = "0700";
+      }
+    ];
+  };
+
+  # Impermanence preserves existing backing-directory permissions, and the
+  # /persist parents are created as root. Repair both homes and the cache
+  # before Home Manager activation.
+  systemd.tmpfiles.rules = [
+    "d /persist/states/home/diwangs 0700 diwangs users - -"
+    "d /persist/caches/home/diwangs 0700 diwangs users - -"
+    "d /persist/caches/home/diwangs/.cache 0700 diwangs users - -"
+  ];
 
   # TPM-based systemd-creds: machine-id
   # `lanzaboote` reads `/boot/loader/credentials` and store them in
@@ -85,6 +139,36 @@
         /boot/loader/credentials/system.machine_id.cred
     fi
   '';
+
+  networking.hostName = "paladin-iii";
+  networking.hostId = "cafebabe";
+
+  # Framework Laptop are x86-only (for now...)
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+
+  # Yubikey FIDO2 PAM
+  # Register a new key with `pamu2fcfg`, then add its four fields - keyHandle,
+  # publicKey, coseType, options - as another list below. pam_u2f keeps only
+  # the *last* authfile line matching a user, so a user's credentials are
+  # merged onto one colon-separated line at build time: a second `diwangs:`
+  # line would silently shadow the first, not extend it.
+  environment.etc."u2f_keys".text = lib.concatLines (
+    lib.mapAttrsToList
+      (
+        user: creds:
+        lib.concatStringsSep ":" ([ user ] ++ map (lib.concatStringsSep ",") creds)
+      )
+      {
+        diwangs = [
+          [
+            "JT7oDmOJtCf5YOf9eyBBpKnApK2VnjpnvKp0kFv9pKWWr3ePPteBVxkNp3q5ZNQJFfjj22apnataR5qBzmmGjdFsIhwXFjRwiz8xR0eP4jD9VuEnJyG6PRC492i36qKhgCKfNoY8q4Rx5HQzQMe21hJ1RjKGOwfMvOaEQ1Li3BY="
+            "sqzKcs2g+LQ2ptOI6dbFkBlqfEfWAjnigNjpMuxQnRQ="
+            "eddsa"
+            "+presence+pin"
+          ]
+        ];
+      }
+  );
 
   # TPM-sealed age identity, exposed only to agenix's private credential mount.
   # To replace it:
@@ -116,28 +200,4 @@
   # Consumed by ensure-printers (hardware/peripherals/printer.nix)
   age.secrets."network/malone-360-printer-uri".file =
     os-secret.network.malone-360-printer-uri;
-
-  # Yubikey FIDO2 PAM
-  # Register a new key with `pamu2fcfg`, then add its four fields - keyHandle,
-  # publicKey, coseType, options - as another list below. pam_u2f keeps only
-  # the *last* authfile line matching a user, so a user's credentials are
-  # merged onto one colon-separated line at build time: a second `diwangs:`
-  # line would silently shadow the first, not extend it.
-  environment.etc."u2f_keys".text = lib.concatLines (
-    lib.mapAttrsToList
-      (
-        user: creds:
-        lib.concatStringsSep ":" ([ user ] ++ map (lib.concatStringsSep ",") creds)
-      )
-      {
-        diwangs = [
-          [
-            "JT7oDmOJtCf5YOf9eyBBpKnApK2VnjpnvKp0kFv9pKWWr3ePPteBVxkNp3q5ZNQJFfjj22apnataR5qBzmmGjdFsIhwXFjRwiz8xR0eP4jD9VuEnJyG6PRC492i36qKhgCKfNoY8q4Rx5HQzQMe21hJ1RjKGOwfMvOaEQ1Li3BY="
-            "sqzKcs2g+LQ2ptOI6dbFkBlqfEfWAjnigNjpMuxQnRQ="
-            "eddsa"
-            "+presence+pin"
-          ]
-        ];
-      }
-  );
 }

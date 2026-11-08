@@ -62,75 +62,103 @@ in
     "d /var/lib/portables  0700 root root -"
   ];
 
+  # Persistent storage: each subvolume is mounted under /persist in initrd, and
+  # impermanence bind-mounts it into place (see host/paladin-iii.nix). The
+  # /persist parents live on the ephemeral root, so anything persisted must
+  # have its own subvolume here: loose files under /persist are wiped.
+
   # States: persistent, snapshoted data
-  fileSystems."/etc/nixos" = {
+  fileSystems."/persist/states/etc/nixos" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@nixos" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/etc/NetworkManager/system-connections" = {
+  fileSystems."/persist/states/etc/NetworkManager/system-connections" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@network" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/var/lib/bluetooth" = {
+  fileSystems."/persist/states/var/lib/bluetooth" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@bluetooth" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/var/lib/boltd" = {
+  fileSystems."/persist/states/var/lib/boltd" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@thunderbolt" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/home/diwangs" = {
+  fileSystems."/persist/states/home/diwangs" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@home" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  # Mounted in initrd so random-seed, credentials, and pcrlock see it
-  fileSystems."/var/lib/systemd" = {
+  # Backing mount is in initrd, but impermanence bind-mounts /var/lib/systemd
+  # only in stage 2 (before local-fs.target). random-seed and pcrlock wait for
+  # it via RequiresMountsFor (see measured-boot.nix for the pcrlock units).
+  fileSystems."/persist/states/var/lib/systemd" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=states/@systemd" ] ++ defaultMountOptions;
     neededForBoot = true;
   };
 
-  # Caches: persistent, non-snapshoted data
+  # Mounted directly: the store must exist before any bind mount
   fileSystems."/nix" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=caches/@nix" ] ++ defaultMountOptions;
   };
 
-  fileSystems."/var/cache" = {
+  # Caches: persistent, non-snapshoted data
+  fileSystems."/persist/caches/var/log" = {
+    device = "/dev/disk/by-uuid/${root-partition-uuid}";
+    fsType = "btrfs";
+    options = [ "subvol=caches/@log" ] ++ defaultMountOptions;
+    neededForBoot = true;
+  };
+
+  fileSystems."/persist/caches/var/cache" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=caches/@varcache" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/home/diwangs/.cache" = {
+  fileSystems."/persist/caches/home/diwangs/.cache" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=caches/@homecache" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  # TODO: this should be state?
-  fileSystems."/var/lib/pcrlock.d" = {
+  # Regenerable, so cache rather than state: a restored snapshot could predict
+  # boot files no longer on the ESP. If lost, recover before rebooting:
+  #   systemctl start systemd-pcrlock-firmware-code \
+  #     systemd-pcrlock-secureboot-policy systemd-pcrlock-secureboot-authority
+  #   nixos-rebuild boot  # lzbt re-locks stubs/bootloader, then make-policy
+  fileSystems."/persist/caches/var/lib/pcrlock.d" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=caches/@pcrlock" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
-  fileSystems."/var/lib/flatpak" = {
+  fileSystems."/persist/caches/var/lib/flatpak" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
     options = [ "subvol=caches/@flatpak" ] ++ defaultMountOptions;
+    neededForBoot = true;
   };
 
   # Swap: same size as RAM (64 GiB), disables CoW
