@@ -11,10 +11,10 @@ let
   root-partition-uuid = "5f6d2a11-566c-42ed-ba66-4a5284b1636b";
 in
 {
-  # Add kernel module in initrd for decrypting AEAD
   boot.initrd.availableKernelModules = [
     "dm-integrity"
-    "aegis128"
+    "aegis128-aesni"
+    "aegis128" # software-backed alg as backup
   ];
   boot.initrd.systemd.tpm2.enable = true;
 
@@ -22,13 +22,20 @@ in
   fileSystems."/boot" = {
     device = "/dev/disk/by-uuid/${boot-partition-uuid}";
     fsType = "vfat";
+    # Owner-only access: bootctl refuses a world-readable random seed
+    options = [ "umask=0077" ];
   };
 
-  # Root partition: reset every boot
+  # Root partition: tmpfs, so nothing on it survives a reboot. Without size=,
+  # the kernel caps it at 50% of RAM. To set a cap, add e.g. "size=2G" to the
+  # options below.
   fileSystems."/" = {
-    device = "/dev/disk/by-uuid/${root-partition-uuid}";
-    fsType = "btrfs";
-    options = [ "subvol=@rw" ] ++ defaultMountOptions;
+    device = "none";
+    fsType = "tmpfs";
+    options = [
+      "defaults"
+      "mode=755" # tmpfs defaults to 1777
+    ];
   };
 
   boot.initrd.luks.devices."decrypted_root" = {
@@ -36,35 +43,9 @@ in
     bypassWorkqueues = true;
   };
 
-  # Reset root subvolume every boot (replaces postOpenCommands for systemd stage 1)
-  boot.initrd.systemd.services."reset-root" = {
-    description = "Reset btrfs root subvolume to clean snapshot";
-    wantedBy = [ "cryptsetup.target" ];
-    after = [ "cryptsetup.target" ];
-    before = [ "sysroot.mount" ];
-    unitConfig.DefaultDependencies = "no";
-    serviceConfig.Type = "oneshot";
-    script = ''
-      			mkdir -p /mnt
-      			mount /dev/mapper/decrypted_root /mnt
-      			btrfs subv show /mnt/@rw > /dev/null 2>&1 && btrfs subv delete -Rc /mnt/@rw || true
-      			btrfs subv snapshot /mnt/@snapshots/@ /mnt/@rw
-      			umount /mnt
-      		'';
-  };
-
-  # Prevents systemd from creating subvolumes: adds them to 00-nixos.conf
-  systemd.tmpfiles.rules = [
-    "d /srv                0755 root root -"
-    "d /tmp                1777 root root 10d"
-    "d /var/tmp            1777 root root 30d"
-    "d /var/lib/machines   0700 root root -"
-    "d /var/lib/portables  0700 root root -"
-  ];
-
   # Persistent storage: each subvolume is mounted under /persist in initrd, and
   # impermanence bind-mounts it into place (see host/paladin-iii.nix). The
-  # /persist parents live on the ephemeral root, so anything persisted must
+  # /persist parents live on the tmpfs root, so anything persisted must
   # have its own subvolume here: loose files under /persist are wiped.
 
   # States: persistent, snapshoted data
@@ -113,6 +94,8 @@ in
     neededForBoot = true;
   };
 
+  # Caches: persistent, non-snapshoted data. Ones that are "regenerable"
+
   # Mounted directly: the store must exist before any bind mount
   fileSystems."/nix" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
@@ -120,7 +103,6 @@ in
     options = [ "subvol=caches/@nix" ] ++ defaultMountOptions;
   };
 
-  # Caches: persistent, non-snapshoted data
   fileSystems."/persist/caches/var/log" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";
@@ -176,7 +158,7 @@ in
     {
       device = "/var/swap/swapfile";
       size = 64 * 1024; # Accepts MiB
-      # NOTE: Gnome system manager uses GB, not GiB
+      # NOTE: GNOME system manager uses GB, not GiB
     }
   ];
 }

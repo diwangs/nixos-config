@@ -75,7 +75,7 @@
     hideMounts = true;
     # The only non-critical warning is that /var/lib/nixos is not persisted.
     # Userborn keeps UIDs/GIDs stable by reading the existing /etc/passwd and
-    # /etc/group, which reset-root wipes, so accounts without a fixed uid/gid
+    # /etc/group, which live on the tmpfs root, so accounts without fixed uid/gid
     # are renumbered from scratch every boot. The numbers only shift when the
     # declared accounts change (e.g., a service added or removed); files those
     # accounts own on persistent storage would then have stale owners. diwangs
