@@ -121,11 +121,6 @@
         "claude-science-unwrapped"
         "chatgpt"
 
-        # VSCode and some unfree extensions
-        "vscode"
-        "vscode-extension-anthropic-claude-code"
-        "vscode-extension-ms-vscode-remote-remote-ssh"
-
         # AppImages
         "trezor-suite"
         "wootility"
