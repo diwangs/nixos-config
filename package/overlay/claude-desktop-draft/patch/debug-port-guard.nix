@@ -1,8 +1,10 @@
 # Debug-enablement overlay for the draft (buildFHSEnv) packaging. Opens BOTH
 # debugging surfaces, which are gated by two SEPARATE mechanisms:
 #   - Renderer / browser CDP (--remote-debugging-port): a JS guard in
-#     index.pre.js exits the app; we drop `&&process.exit(1)` (same substitution
-#     as ../../claude-desktop/patch/debug-port-guard.nix).
+#     index.pre.js exits the app when a debugging switch is on the command
+#     line. Since 4.x it is a statement (`if(...){try{'refusing to start'}
+#     catch{}process.exit(1)}`) rather than the old `&&process.exit(1)` tail; we drop the exit and keep the
+#     warning.
 #   - Main-process inspector (--inspect / SIGUSR1 → 9229): gated by the Electron
 #     `EnableNodeCliInspectArguments` build fuse, shipped OFF. With it off,
 #     SIGUSR1 has no handler and its default disposition TERMINATES the app. We
@@ -11,8 +13,9 @@
 # privileged main process, so do not import this in a shipping config.
 #
 # It has to be wired in differently from the base overlay: the draft's app.asar
-# lives in `passthru.unwrapped`, so the patch targets that and the FHS wrapper is
-# rebuilt around it. That plumbing lives in ./lib.nix's `mkPatch`.
+# lives in `passthru.unwrapped`, so the patch is injected into that inner build
+# and upstream's FHS wrapper picks it up. That plumbing lives in ./lib.nix's
+# `mkPatch`.
 #
 # For CDP work you usually don't even want the FHS chroot in the way: the
 # guard-free binary is exposed at `claude-desktop.unwrapped` (non-FHS), so
@@ -22,19 +25,18 @@
 # Import AFTER ../overlay.nix in ../../../../nixos.nix.
 final: prev:
 let
-  helpers = import ../../claude-desktop/patch/lib.nix { inherit (final) lib; };
   draft = import ./lib.nix { inherit final prev; };
 in
 draft.mkPatch {
   postFixup =
     # 1. Drop the renderer-CDP exit guard in app.asar.
-    helpers.mkAsarPatch {
+    draft.mkAsarPatch {
       label = "debug-port guard";
       body = ''
         substituteInPlace "$work/contents/.vite/build/index.pre.js" \
-          --replace-warn \
-            '&&process.exit(1)' \
-            '&&void 0'
+          --replace-fail \
+            '}catch{}process.exit(1)}' \
+            '}catch{}void 0}'
       '';
     }
     + "\n"

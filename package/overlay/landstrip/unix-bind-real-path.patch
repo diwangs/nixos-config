@@ -15,45 +15,47 @@ parent's `connect(2)` fails with ENOENT.
 
 Candidate for upstream as a bug fix. See package/overlay/landstrip/overlay.nix.
 
+Rebased for 0.20.26: the bind rewrite moved into UnixSocketOp::handle, the
+target root is now TargetFilesystem::root, and Anchor lives in procfs.rs.
+
 diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
-index 257717c..ac42b91 100644
+index 37e06e5..dc800a2 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
-@@ -2,17 +2,20 @@
- // Copyright (c) 2026 Jarkko Sakkinen
- 
- use super::error::{BrokerError, SysResult};
--use super::grant::{Grant, SocketGrant};
-+use super::grant::{Anchor, Grant, SocketGrant};
+@@ -5,16 +5,19 @@ use super::error::{BrokerError, SysResult};
+ use super::grant::{Grant, SocketAddrCall, SocketGrant};
  use super::notify::NotificationResult;
  use super::process::{MissingTarget, TargetProcess};
+-use super::procfs::ProcFd;
++use super::procfs::{Anchor, ProcFd};
  use super::supervise::{Denial, Denials};
  use crate::policy::{AccessPolicy, UnixPathAccess, UnixSocketAccess};
  use crate::trap::NetworkOperation;
 +use nix::sys::stat::fstat;
+ use socket2::SockRef;
  use std::ffi::OsStr;
 +use std::fs;
  use std::mem;
  use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
- use std::os::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+ use std::os::fd::{AsFd, BorrowedFd, OwnedFd, RawFd};
  use std::os::unix::ffi::OsStrExt;
 +use std::os::unix::fs::MetadataExt;
  use std::path::{Path, PathBuf};
- 
- pub(super) type SocketAddrCall =
-@@ -553,8 +556,8 @@ fn handle_unix_bind(
-             None,
-         );
+ #[derive(Debug)]
+ pub(super) struct TargetSocket {
+@@ -466,8 +469,8 @@ impl UnixSocketOp {
+                 socket.rewrite_unix_path(&ProcFd::new(object.as_fd()).proc_path())?;
+             }
+             Self::Bind => {
+-                let broker_path = anchor.path()?;
+-                socket.rewrite_unix_path(Path::new(OsStr::from_bytes(broker_path.as_bytes())))?;
++                let broker_path = unix_bind_path(&target.label, filesystem.root.as_fd(), &anchor)?;
++                socket.rewrite_unix_path(&broker_path)?;
+             }
+         }
+         let grant = SocketGrant::new(socket.sock, socket.addr, self.call(), Some(anchor));
+@@ -487,6 +490,39 @@ impl UnixSocketOp {
      }
--    let broker_path = anchor.path()?;
--    socket.rewrite_unix_path(Path::new(OsStr::from_bytes(broker_path.as_bytes())))?;
-+    let broker_path = unix_bind_path(&target.label, target.root.as_fd(), &anchor)?;
-+    socket.rewrite_unix_path(&broker_path)?;
-     let grant = SocketGrant {
-         sock: socket.sock,
-         addr: socket.addr,
-@@ -576,6 +579,39 @@ fn handle_unix_bind(
-     Ok(NotificationResult::grant(grant))
  }
  
 +/// Path the broker binds on behalf of the target.
@@ -89,6 +91,6 @@ index 257717c..ac42b91 100644
 +    stat.st_dev == right.dev() && stat.st_ino == right.ino()
 +}
 +
- impl IpEndpoint {
-     fn parse(addr: &[u8], domain: i32) -> SysResult<Self> {
-         match (domain, i32::from(SockAddrFamily::try_from(addr)?)) {
+ impl SockAddrFamily {
+     fn parse_ip(addr: &[u8], domain: i32) -> SysResult<SocketAddr> {
+         match (domain, i32::from(Self::try_from(addr)?)) {

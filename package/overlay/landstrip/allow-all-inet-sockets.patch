@@ -29,6 +29,12 @@ match how upstream now brokers unrestricted binds.
 Rebased for 0.20.17: `NetworkAccess::Restricted` is now built in
 policy/resolver.rs rather than policy.rs.
 
+Rebased for 0.20.26: the per-arch NotificationSyscalls table is gone (filters
+use libc::SYS_* directly), the notified-syscall set moved to
+SyscallClass::notified (supervise.rs), which now also skips the datagram send
+broker under allowAllInetSockets, and the bind short-circuit uses
+TargetSocket::into_grant.
+
 diff --git a/README.md b/README.md
 index 34c2dea..e670850 100644
 --- a/README.md
@@ -52,10 +58,10 @@ index 34c2dea..e670850 100644
  
  | Directory                                                    | Contents        | License           |
 diff --git a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
-index 167fd37..2f03d7f 100644
+index 4d7643b..3357ade 100644
 --- a/packages/landstrip/src/config.rs
 +++ b/packages/landstrip/src/config.rs
-@@ -147,6 +147,7 @@ pub(crate) struct SandboxFilesystem {
+@@ -148,6 +148,7 @@ pub(crate) struct SandboxFilesystem {
  #[serde(default, deny_unknown_fields, rename_all = "camelCase")]
  pub(crate) struct SandboxNetwork {
      pub(crate) allow_network: bool,
@@ -64,11 +70,11 @@ index 167fd37..2f03d7f 100644
      pub(crate) allow_all_unix_sockets: bool,
      pub(crate) allow_unix_sockets: Vec<PathSelector>,
 diff --git a/packages/landstrip/src/platform/linux/filter.rs b/packages/landstrip/src/platform/linux/filter.rs
-index f8cbc2d..98c769f 100644
+index e3b80f1..5d534e6 100644
 --- a/packages/landstrip/src/platform/linux/filter.rs
 +++ b/packages/landstrip/src/platform/linux/filter.rs
-@@ -142,9 +142,18 @@ impl FilterSet {
-         notify_syscalls: &[i64],
+@@ -140,9 +140,17 @@ impl FilterSet {
+         notify_syscalls: impl IntoIterator<Item = i64>,
      ) -> Result<Self> {
          let restricted = !policy.network_access.is_unrestricted();
 -        let allow_local_binding = policy.network_access.allows_local_binding();
@@ -77,21 +83,20 @@ index f8cbc2d..98c769f 100644
 +        // datagram send filters, even when allowLocalBinding is also enabled.
 +        let allow_local_binding = policy.network_access.allows_local_binding() && !allow_all_inet;
          let unix_sockets = policy.network_access.unix_socket_access().into();
--        let errno = build_errno_filter(syscalls, restricted, allow_local_binding, unix_sockets)?;
+-        let errno = build_errno_filter(restricted, allow_local_binding, unix_sockets)?;
 +        let errno = build_errno_filter(
-+            syscalls,
 +            restricted && !allow_all_inet,
 +            restricted,
 +            allow_local_binding,
 +            unix_sockets,
 +        )?;
-         let eperm = build_io_uring_deny(syscalls)?;
+         let eperm = build_io_uring_deny()?;
          let mut clone3_builder = FilterBuilder::new();
          clone3_builder.add_unconditional(libc::SYS_clone3);
-@@ -175,15 +184,19 @@ impl FilterSet {
+@@ -172,15 +180,19 @@ impl FilterSet {
+ }
  
  fn build_errno_filter(
-     syscalls: &NotificationSyscalls,
 -    needs_network: bool,
 +    restrict_inet_socket_types: bool,
 +    restrict_packet_netlink: bool,
@@ -100,18 +105,18 @@ index f8cbc2d..98c769f 100644
  ) -> Result<Option<BpfProgram>> {
      let mut builder = FilterBuilder::new();
 -    if needs_network {
--        builder.add_socket_family_filter(syscalls.socket, allow_local_binding)?;
+-        builder.add_socket_family_filter(libc::SYS_socket, allow_local_binding)?;
 +    if restrict_inet_socket_types {
-+        builder.add_inet_socket_filter(syscalls.socket, allow_local_binding)?;
-         builder.add_network_bypass_filters(syscalls)?;
++        builder.add_inet_socket_filter(libc::SYS_socket, allow_local_binding)?;
+         builder.add_network_bypass_filters()?;
      }
 +    if restrict_packet_netlink {
-+        builder.add_packet_netlink_filters(syscalls.socket)?;
++        builder.add_packet_netlink_filters(libc::SYS_socket)?;
 +    }
-     builder.add_unix_socket_filters(syscalls.socket, unix_sockets)?;
+     builder.add_unix_socket_filters(libc::SYS_socket, unix_sockets)?;
      if builder.is_empty() {
          return Ok(None);
-@@ -493,13 +506,7 @@ impl FilterBuilder {
+@@ -492,13 +504,7 @@ impl FilterBuilder {
          Ok(())
      }
  
@@ -127,40 +132,39 @@ index f8cbc2d..98c769f 100644
              let domain = u64::try_from(domain).map_err(|_| LandstripError::IntegerTooLarge)?;
              self.add_conditional_rule(
 diff --git a/packages/landstrip/src/platform/linux/seccomp/mod.rs b/packages/landstrip/src/platform/linux/seccomp/mod.rs
-index 1244acd..90f1f6a 100644
+index e764787..71a8151 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/mod.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/mod.rs
-@@ -247,7 +247,9 @@ pub(super) fn run_broker(
+@@ -245,8 +245,10 @@ pub(super) fn run_broker(
+ ) -> Result<i32> {
+     ensure_notification_supported()?;
  
-     let syscalls = NotificationSyscalls::new();
-     let restricted = !policy.network_access.is_unrestricted();
--    let allow_local_binding = policy.network_access.allows_local_binding();
+-    let handoff_by_pidfd =
+-        !policy.network_access.is_unrestricted() && policy.network_access.allows_local_binding();
 +    // Mirrors FilterSet::new: allowAllInetSockets skips the localhost broker.
-+    let allow_local_binding = policy.network_access.allows_local_binding()
++    let handoff_by_pidfd = !policy.network_access.is_unrestricted()
++        && policy.network_access.allows_local_binding()
 +        && !policy.network_access.allows_all_inet_sockets();
-     let handoff_by_pidfd = restricted && allow_local_binding;
- 
-     let mut notify_syscalls = Vec::new();
+     let filters = FilterSet::new(policy, SyscallClass::notified(policy, needs_filesystem))?;
+     let (mut parent, mut child_sock) = NotifySocket::pair(handoff_by_pidfd)?;
+     let launch = Launch::new().map_err(|error| {
 diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
-index 509d3d6..257717c 100644
+index f22fdfa..37e06e5 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
-@@ -199,6 +199,14 @@ pub(super) fn handle_bind(
+@@ -169,6 +169,11 @@ pub(super) fn handle_bind(
      denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
      let socket = TargetSocket::try_from(request)?;
 +    if policy.network_access.allows_all_inet_sockets()
 +        && matches!(socket.info.domain, libc::AF_INET | libc::AF_INET6)
 +    {
-+        return Ok(NotificationResult::grant(SocketGrant::new(
-+            socket,
-+            libc::bind,
-+        )));
++        return Ok(NotificationResult::grant(socket.into_grant(libc::bind)));
 +    }
  
      match socket.info.kind() {
          SocketKind::Tcp | SocketKind::Udp => {
-@@ -254,6 +262,11 @@ pub(super) fn handle_connect(
+@@ -215,6 +220,11 @@ pub(super) fn handle_connect(
      denials: &mut Denials<'_>,
  ) -> SysResult<NotificationResult> {
      let socket = TargetSocket::try_from(request)?;
@@ -172,11 +176,28 @@ index 509d3d6..257717c 100644
  
      match socket.info.kind() {
          SocketKind::Tcp => {
+diff --git a/packages/landstrip/src/platform/linux/seccomp/supervise.rs b/packages/landstrip/src/platform/linux/seccomp/supervise.rs
+index 9570aaa..0c5def2 100644
+--- a/packages/landstrip/src/platform/linux/seccomp/supervise.rs
++++ b/packages/landstrip/src/platform/linux/seccomp/supervise.rs
+@@ -211,7 +211,11 @@ impl SyscallClass {
+         needs_filesystem: bool,
+     ) -> impl Iterator<Item = i64> {
+         let restricted = !policy.network_access.is_unrestricted();
+-        let datagram = if restricted && policy.network_access.allows_local_binding() {
++        // Mirrors FilterSet::new: allowAllInetSockets skips the localhost broker.
++        let datagram = if restricted
++            && policy.network_access.allows_local_binding()
++            && !policy.network_access.allows_all_inet_sockets()
++        {
+             Self::DATAGRAM_SEND
+         } else {
+             &[]
 diff --git a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
-index 5c31098..cbc149b 100644
+index 1e21e86..bdcf8ee 100644
 --- a/packages/landstrip/src/policy.rs
 +++ b/packages/landstrip/src/policy.rs
-@@ -375,6 +375,7 @@ pub(crate) enum NetworkAccess {
+@@ -293,6 +293,7 @@ pub(crate) enum NetworkAccess {
          unix_socket_access: UnixSocketAccess,
      },
      Restricted {
@@ -184,7 +205,7 @@ index 5c31098..cbc149b 100644
          connect_tcp_ports: Vec<u16>,
          bind: IpBindAccess,
          unix_socket_access: UnixSocketAccess,
-@@ -426,6 +427,7 @@ impl NetworkAccess {
+@@ -344,6 +345,7 @@ impl NetworkAccess {
          matches!(
              self,
              Self::Restricted {
@@ -192,7 +213,7 @@ index 5c31098..cbc149b 100644
                  bind: IpBindAccess::Deny,
                  ..
              }
-@@ -434,7 +436,24 @@ impl NetworkAccess {
+@@ -352,7 +354,24 @@ impl NetworkAccess {
  
      #[cfg(target_os = "linux")]
      pub(crate) fn restricts_connect_tcp(&self) -> bool {
@@ -219,10 +240,10 @@ index 5c31098..cbc149b 100644
  
      #[cfg(target_os = "linux")]
 diff --git a/packages/landstrip/src/policy/resolver.rs b/packages/landstrip/src/policy/resolver.rs
-index 1ecf75a..2e9d0a3 100644
+index 94c4a6f..c365821 100644
 --- a/packages/landstrip/src/policy/resolver.rs
 +++ b/packages/landstrip/src/policy/resolver.rs
-@@ -670,6 +670,7 @@ impl PolicyResolver {
+@@ -689,6 +689,7 @@ impl PolicyResolver {
              IpBindAccess::Deny
          };
          Ok(NetworkAccess::Restricted {

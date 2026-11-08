@@ -62,7 +62,7 @@
 
     # Official Hermes Desktop package.
     hermes-agent = {
-      url = "github:NousResearch/hermes-agent/v0.22.5";
+      url = "github:NousResearch/hermes-agent/v0.23.0";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };

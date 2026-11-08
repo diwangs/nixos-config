@@ -7,7 +7,14 @@
    3. systemd strips and prepare salt to `/run/measured-boot/fido2-fde-salt`
 */
 
-{ lib, ... }: {
+{ config, lib, ... }:
+let
+  pcrlockMounts = [
+    "/var/lib/pcrlock.d"
+    "/var/lib/systemd"
+  ];
+in
+{
   # Managed systemd-pcrlock policy to unlock `/dev/mapper/fido2-fde-salt`
   boot.lanzaboote.measuredBoot = {
     enable = true;
@@ -16,9 +23,6 @@
       4 # boot-loader-code (lanzaboote stub)
       7 # secure-boot-policy (PK, KEK, db, status)
     ];
-    # Define explicitly because of impermanence
-    pcrlockDirectory = "/var/lib/pcrlock.d";
-    pcrlockPolicy = "/var/lib/pcrlock.d/policy.json";
   };
 
   boot.initrd = {
@@ -77,7 +81,10 @@
   # on the real root. Remove the runtime copies once that handoff is complete.
   #
   # The upstream pcrlock units only order themselves after var.mount. Ensure
-  # every writer sees the nested persistent mount instead of the ephemeral root.
+  # every writer sees the nested persistent mounts instead of the ephemeral root.
+  #
+  # The Varlink service (used by fwupd) otherwise builds a policy over
+  # systemd's default PCR set, which differs from lanzaboote's make-policy.
   systemd.services = {
     cleanup-fido2-fde-salt = {
       description = "Remove the initrd FIDO2 salt runtime files";
@@ -103,6 +110,21 @@
         "systemd-pcrlock-make-policy"
       ]
       (_: {
-        unitConfig.RequiresMountsFor = "/var/lib/pcrlock.d";
-      });
+        unitConfig.RequiresMountsFor = pcrlockMounts;
+      })
+  // {
+    "systemd-pcrlock@" = {
+      unitConfig.RequiresMountsFor = pcrlockMounts;
+      serviceConfig.ExecStart = [
+        "" # unset previous value
+        (lib.escapeShellArgs (
+          [
+            "${config.systemd.package}/lib/systemd/systemd-pcrlock"
+            "--location=770"
+          ]
+          ++ map (pcr: "--pcr=${toString pcr}") config.boot.lanzaboote.measuredBoot.pcrs
+        ))
+      ];
+    };
+  };
 }

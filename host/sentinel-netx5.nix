@@ -59,8 +59,6 @@ in
           4
           7
         ];
-        pcrlockDirectory = "/persist/caches/var/lib/pcrlock.d";
-        pcrlockPolicy = "/persist/caches/var/lib/pcrlock.d/policy.json";
       };
     };
     initrd.luks.devices."sentinel-root" = {
@@ -104,7 +102,10 @@ in
         "systemd-pcrlock-make-policy"
       ]
       (_: {
-        unitConfig.RequiresMountsFor = "/persist/caches/var/lib/pcrlock.d";
+        unitConfig.RequiresMountsFor = [
+          "/var/lib/pcrlock.d"
+          "/var/lib/systemd"
+        ];
       })
     )
     // {

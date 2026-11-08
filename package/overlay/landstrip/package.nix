@@ -28,7 +28,7 @@
 }:
 
 let
-  version = "0.20.17";
+  version = "0.20.26";
 in
 rustPlatform.buildRustPackage {
   pname = "landstrip";
@@ -38,12 +38,12 @@ rustPlatform.buildRustPackage {
     owner = "landstrip";
     repo = "landstrip";
     tag = version;
-    hash = "sha256-ffnctREHAmZ4drJexQyiFWG5pm3xdbddCEpzqCKGjU0=";
+    hash = "sha256-pEWjLWb5fS3/S0QOh/lEWFRAjyOx+gV8VnFVWm/dG7g=";
   };
 
   cargoRoot = "packages/landstrip";
   buildAndTestSubdir = "packages/landstrip";
-  cargoHash = "sha256-scUYS6lAYqlnQdNlPcX1r7YxX/buZrEb/HRn/qs6ljU=";
+  cargoHash = "sha256-U9pgLxkY3FmUzXXL9IK2yO7CvX6cUvJpvT0TptkLFk4=";
 
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [ openssl ];

@@ -1,27 +1,28 @@
 # Make Claude Desktop's existing CLAUDE_CODE_LOCAL_BINARY override functional.
-# The official Linux bundle reads the variable in ClaudeCodeManager's
-# constructor but discards it, leaving initLocalBinary() unreachable.
+# The official Linux bundle keeps initLocalBinary() and getLocalBinaryPath(),
+# but since 4.x ClaudeCodeManager's constructor no longer reads the variable at
+# all (it used to read and discard it), so the override is unreachable. Append
+# the read to the end of the constructor, which directly precedes
+# initLocalBinary() in the bundle.
 #
-# Draft-packaging port of ../../claude-desktop/patch/cli-path.nix: same
-# substitution, but applied to `passthru.unwrapped` (which owns app.asar) with
-# the FHS wrapper rebuilt around it — see ./lib.nix for that plumbing.
+# The substitution is injected into `passthru.unwrapped` (which owns app.asar)
+# so upstream's FHS wrapper picks it up — see ./lib.nix for that plumbing.
 #
 # Import AFTER ../overlay.nix in ../../../../nixos.nix.
 final: prev:
 let
-  helpers = import ../../claude-desktop/patch/lib.nix { inherit (final) lib; };
   draft = import ./lib.nix { inherit final prev; };
 in
 draft.mkPatch {
-  postFixup = helpers.mkAsarPatch {
+  postFixup = draft.mkAsarPatch {
     label = "Claude Code local binary";
     body = ''
-      target=${helpers.findChunk ",process.env.CLAUDE_CODE_LOCAL_BINARY}async initLocalBinary"}
+      target=${draft.findChunk "}async initLocalBinary("}
       test -n "$target" || { echo "cli-path: initLocalBinary anchor not found in any bundle chunk"; exit 1; }
       substituteInPlace "$target" \
         --replace-fail \
-          ',process.env.CLAUDE_CODE_LOCAL_BINARY}async initLocalBinary' \
-          ',process.env.CLAUDE_CODE_LOCAL_BINARY&&(this.localBinaryInitPromise=this.initLocalBinary(process.env.CLAUDE_CODE_LOCAL_BINARY))}async initLocalBinary'
+          '}async initLocalBinary(' \
+          ';process.env.CLAUDE_CODE_LOCAL_BINARY&&(this.localBinaryInitPromise=this.initLocalBinary(process.env.CLAUDE_CODE_LOCAL_BINARY))}async initLocalBinary('
     '';
   };
 }

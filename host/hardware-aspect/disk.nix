@@ -93,6 +93,14 @@ in
     options = [ "subvol=states/@home" ] ++ defaultMountOptions;
   };
 
+  # Mounted in initrd so random-seed, credentials, and pcrlock see it
+  fileSystems."/var/lib/systemd" = {
+    device = "/dev/disk/by-uuid/${root-partition-uuid}";
+    fsType = "btrfs";
+    options = [ "subvol=states/@systemd" ] ++ defaultMountOptions;
+    neededForBoot = true;
+  };
+
   # Caches: persistent, non-snapshoted data
   fileSystems."/nix" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
@@ -112,6 +120,7 @@ in
     options = [ "subvol=caches/@homecache" ] ++ defaultMountOptions;
   };
 
+  # TODO: this should be state?
   fileSystems."/var/lib/pcrlock.d" = {
     device = "/dev/disk/by-uuid/${root-partition-uuid}";
     fsType = "btrfs";

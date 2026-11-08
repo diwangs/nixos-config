@@ -1,114 +1,89 @@
 # Draft-specific plumbing shared by the patch fragments in THIS directory.
 #
-# WHY IT EXISTS: the draft packaging wraps the app in buildFHSEnv, so the
-# derivation bound to `claude-desktop` is a thin symlink to the FHS launcher and
-# has NO lib/claude-desktop/resources/app.asar to patch. The app.asar lives in
-# the inner `passthru.unwrapped`. So every fragment has to:
-#   1. patch `unwrapped` (asarRoot is $out/lib/claude-desktop/resources, same as
-#      the base build — ../../claude-desktop/patch/lib.nix's `mkAsarPatch` works
-#      unchanged), then
-#   2. rebuild the FHS wrapper + top-level symlinks around the patched
-#      `unwrapped`, because `fhsEnv` captured the original by store path and has
-#      no `.override` to swap it.
+# WHY IT EXISTS: the draft packaging wraps the app in buildFHSEnv, and its
+# `unwrapped` (which owns app.asar) is a `let` binding captured by store path in
+# both `fhsEnv` and the top-level derivation. Overriding `passthru.unwrapped`
+# would therefore never reach the launcher.
 #
-# `mkPatch` does both, so the step-2 boilerplate is written exactly once instead
-# of copy-pasted into each fragment.
+# Instead, `mkPatch` reaches INTO ../package.nix through callPackage's
+# `.override`: it swaps the `stdenvNoCC` argument for one whose `mkDerivation`
+# appends the fragment's `postFixup` to `unwrapped`. Upstream's own code then
+# builds `fhsEnv`, the `.desktop` rewrite, the launcher, and passthru around
+# the patched `unwrapped`, so nothing here mirrors (or drifts from) the PR.
 #
-# The `fhsEnv` block below MIRRORS ../package.nix's `fhsEnv`. It is the concrete
-# cost of the FHS restructuring for the patch-overlay architecture: if pull.sh
-# brings in upstream changes to that block, RE-SYNC it here. (x86_64 only — the
-# upstream aarch64 AAVMF branch is dropped; this host is x86_64-linux.)
+# The ONE upstream detail this relies on: `unwrapped` is the only
+# `stdenvNoCC.mkDerivation` call in ../package.nix that takes the
+# `finalAttrs: { ... }` form (the top-level wrapper passes a plain attrset). The
+# assert below fails evaluation if the snippet does not end up in
+# `unwrapped`'s postFixup, instead of the patch silently landing nowhere.
 #
-# COMPOSITION: fragments stay order-independent the same way the base ones do.
-# Each `mkPatch` appends to `prev.claude-desktop.unwrapped`'s postFixup — which,
-# for the second and later fragments, is already the previous fragment's patched
-# `unwrapped` — and then re-wraps. The last fragment in the import list wins the
-# wrapper rebuild, and by then `unwrapped` carries every fragment's patch.
+# COMPOSITION: each fragment wraps whatever `stdenvNoCC` the previous one left
+# in the override args, so fragments stack in any import order.
 { final, prev }:
 {
+  # mkAsarPatch: wrap a fragment's substituteInPlace body in its own
+  # extract → patch → repack cycle, so fragments stay order-independent. `body`
+  # mutates files under "$work/contents"; `label` is echoed into the build log so
+  # a drifted anchor is traceable to its fragment. The repack is a plain
+  # `asar pack`, exactly as ../package.nix's install does, and leaves the shipped
+  # app.asar.unpacked dir untouched.
+  mkAsarPatch =
+    { label, body }:
+    ''
+      echo "[claude-desktop patch] ${label}"
+      asarRoot=$out/lib/claude-desktop/resources
+      work=$(mktemp -d)
+      asar extract "$asarRoot/app.asar" "$work/contents"
+
+      ${body}
+
+      asar pack "$work/contents" "$work/app.asar"
+      cp -f "$work/app.asar" "$asarRoot/app.asar"
+      rm -rf "$work"
+    '';
+
+  # findChunk: main-process code is split into content-hashed
+  # .vite/build/index.chunk-<hash>.js files whose names change every release, so
+  # resolve at build time the file carrying a fixed-string anchor. Emits a bash
+  # command substitution for the caller to assign.
+  findChunk =
+    locator:
+    ''$(grep -rlF ${final.lib.escapeShellArg locator} "$work/contents/.vite/build")'';
+
   # mkPatch: turn a bash snippet that mutates the UNWRAPPED output tree into a
-  # complete overlay attrset. `postFixup` runs after ../package.nix's own
-  # postFixup (Cowork VM asar rewrite + wrapProgram), typically wrapping a
-  # ../../claude-desktop/patch/lib.nix `mkAsarPatch` / `mkLoosePatch` body.
+  # complete overlay attrset. `postFixup` runs after ../package.nix's install
+  # (which already patches app.asar and writes the wrapper), typically wrapping a
+  # `mkAsarPatch` body.
   mkPatch =
     { postFixup }:
     let
-      patchedUnwrapped = prev.claude-desktop.unwrapped.overrideAttrs (old: {
-        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.asar ];
-        postFixup = (old.postFixup or "") + "\n" + postFixup;
-      });
-
-      fhsEnv = final.buildFHSEnv {
-        pname = "claude-desktop-fhsenv";
-        inherit (patchedUnwrapped) version;
-
-        targetPkgs =
-          pkgs: with pkgs; [
-            patchedUnwrapped
-            glibc
-            qemu_kvm
-            python3
-            nodejs
-            libsecret
-            libglvnd
-            mesa
-            virtiofsd
-            git
-            openssh
-            procps
-          ];
-
-        extraBuildCommands = ''
-          ### OVMF firmware
-          mkdir -p "$out/usr/share/OVMF"
-          ln -s ${final.OVMF.fd}/FV/OVMF_CODE.fd  "$out/usr/share/OVMF/OVMF_CODE.fd"
-          ln -s ${final.OVMF.fd}/FV/OVMF_CODE.fd  "$out/usr/share/OVMF/OVMF_CODE_4M.fd"
-          ln -s ${final.OVMF.fd}/FV/OVMF_VARS.fd  "$out/usr/share/OVMF/OVMF_VARS.fd"
-          ln -s ${final.OVMF.fd}/FV/OVMF_VARS.fd  "$out/usr/share/OVMF/OVMF_VARS_4M.fd"
-
-          ### virtiofsd fallback paths
-          mkdir -p "$out/usr/libexec" "$out/usr/bin"
-          ln -sf ${final.virtiofsd}/bin/virtiofsd "$out/usr/libexec/virtiofsd"
-          ln -sf ${final.virtiofsd}/bin/virtiofsd "$out/usr/bin/virtiofsd"
-
-          ### Absolute-path helpers some app code still probes under /usr/bin
-          mkdir -p "$out/usr/bin"
-          ln -sf ${final.lib.getExe final.git} "$out/usr/bin/git"
-          ln -sf ${final.openssh}/bin/ssh "$out/usr/bin/ssh"
-          ln -sf ${final.procps}/bin/pgrep "$out/usr/bin/pgrep"
-        '';
-
-        extraBwrapArgs = [
-          "--dev-bind-try /dev/kvm /dev/kvm"
-          "--dev-bind-try /dev/vhost-vsock /dev/vhost-vsock"
-          "--dev-bind-try /dev/vhost-net /dev/vhost-net"
-          "--dev-bind-try /dev/net/tun /dev/net/tun"
-        ];
-
-        extraInstallCommands = ''
-          mkdir -p "$out/share"
-          ln -s ${patchedUnwrapped}/share/* "$out/share/"
-        '';
-
-        runScript = "${patchedUnwrapped}/bin/claude-desktop";
-
-        ### Avoid orphaned Electron after the launcher / nix run exits
-        dieWithParent = true;
-      };
-    in
-    {
-      # Re-point the top-level symlinks at the rebuilt wrapper, and expose the
-      # patched `unwrapped`/`fhsEnv` through passthru.
-      claude-desktop = prev.claude-desktop.overrideAttrs (old: {
-        installPhase = ''
-          mkdir -p "$out/bin" "$out/share"
-          ln -s ${fhsEnv}/bin/claude-desktop-fhsenv "$out/bin/claude-desktop"
-          ln -s ${fhsEnv}/share/* "$out/share/"
-        '';
-        passthru = (old.passthru or { }) // {
-          unwrapped = patchedUnwrapped;
-          inherit fhsEnv;
+      claude-desktop = prev.claude-desktop.override (old: {
+        stdenvNoCC = old.stdenvNoCC // {
+          mkDerivation =
+            args:
+            old.stdenvNoCC.mkDerivation (
+              if builtins.isFunction args then
+                finalAttrs:
+                let
+                  attrs = args finalAttrs;
+                in
+                attrs
+                // {
+                  postFixup = (attrs.postFixup or "") + "\n" + postFixup;
+                }
+              else
+                args
+            );
         };
       });
+    in
+    {
+      # Inside the attribute (not around the attrset) so the overlay's names
+      # stay evaluable without forcing `final`.
+      claude-desktop =
+        assert final.lib.assertMsg
+          (final.lib.hasInfix postFixup (claude-desktop.unwrapped.postFixup or ""))
+          "claude-desktop-draft: mkPatch's postFixup did not reach `unwrapped`; re-check ../package.nix";
+        claude-desktop;
     };
 }
