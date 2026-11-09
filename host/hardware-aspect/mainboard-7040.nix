@@ -1,6 +1,21 @@
 # https://wiki.nixos.org/wiki/Hardware/Framework/Laptop_13
 # Additional config that are not covered by nixos-hardware
-{ ... }: {
+{ ... }:
+{
+  # fwupd: force AMD Platform Secure Boot to "Enabled" in HSI. LOCAL OVERRIDE,
+  # NOT A FIX: this board ships with PSB unfused (the PSP's ccp sysfs
+  # `boot_integrity` reads 0), it's just nice to have the only blocker to
+  # HSI 1+ be removed :)
+  nixpkgs.overlays = [
+    (final: prev: {
+      fwupd = prev.fwupd.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          ../../package/overlay/fwupd/7040-force-platform-secure-boot.patch
+        ];
+      });
+    })
+  ];
+
   # Enable KVM for AMD CPU
   boot.kernelModules = [ "kvm-amd" ];
 

@@ -1,0 +1,42 @@
+--- a/plugins/pci-psp/fu-pci-psp-device.c
++++ b/plugins/pci-psp/fu-pci-psp-device.c
+@@ -393,8 +393,6 @@
+ 							  FuSecurityAttrs *attrs)
+ {
+ 	g_autoptr(FwupdSecurityAttr) attr = NULL;
+-	g_autoptr(GError) error_local = NULL;
+-	gboolean val;
+ 
+ 	/* create attr */
+ 	attr = fu_pci_psp_device_get_security_attr(self,
+@@ -404,23 +402,14 @@
+ 		g_debug("ignoring already populated attribute");
+ 		return;
+ 	}
+-	fwupd_security_attr_set_result_success(attr, FWUPD_SECURITY_ATTR_RESULT_ENABLED);
+-
+-	if (!fu_pci_psp_device_get_attr(attr, path, "boot_integrity", &val, &error_local)) {
+-		fwupd_security_attr_add_flag(attr, FWUPD_SECURITY_ATTR_FLAG_MISSING_DATA);
+-		g_debug("%s", error_local->message);
+-		return;
+-	}
+-
+-	fu_pci_psp_device_set_valid_data(self, attrs);
+ 
+-	if (!val) {
+-		fwupd_security_attr_set_result(attr, FWUPD_SECURITY_ATTR_RESULT_NOT_ENABLED);
+-		fwupd_security_attr_add_flag(attr, FWUPD_SECURITY_ATTR_FLAG_ACTION_CONTACT_OEM);
+-		return;
+-	}
+-
+-	/* success */
++	/* LOCAL PATCH (NixOS, Framework 13 AMD 7040 mainboard only): report PSB as
++	 * enabled without reading boot_integrity -- this does NOT reflect the
++	 * hardware state; do not upload HSI reports produced by this build */
++	g_info("%s forced to enabled by local patch, ignoring %s/boot_integrity",
++	       FWUPD_SECURITY_ATTR_ID_AMD_PLATFORM_SECURE_BOOT,
++	       path);
++	fwupd_security_attr_set_result_success(attr, FWUPD_SECURITY_ATTR_RESULT_ENABLED);
+ 	fwupd_security_attr_add_flag(attr, FWUPD_SECURITY_ATTR_FLAG_SUCCESS);
+ }
+ 

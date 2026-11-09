@@ -51,6 +51,10 @@
 
     (import ./package/overlay/key-rack/overlay.nix)
 
+    # fwupd HSI: detect encrypted swapfile on btrfs-on-LUKS, see
+    # package/overlay/fwupd/overlay.nix.
+    (import ./package/overlay/fwupd/overlay.nix)
+
     # Claude Science (prebuilt Bun binary), see package/overlay/claude-science.
     (import ./package/overlay/claude-science/overlay.nix)
 
