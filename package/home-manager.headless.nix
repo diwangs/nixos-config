@@ -293,6 +293,32 @@ in
     };
   };
 
+  # Same merge as upstream's codexMutableSettings, applied to each profile file:
+  # declared values win, keys Codex writes (e.g., `[desktop]`) are preserved.
+  home.activation.codexMutableProfiles =
+    lib.mkIf
+      (config.programs.codex.mutableSettings && config.programs.codex.profiles != { })
+      (
+        lib.hm.dag.entryAfter [ "linkGeneration" ] (
+          lib.concatStringsSep "\n" (
+            lib.mapAttrsToList (
+              name: settings:
+              lib.hm.generators.mkImpureConfigMerger {
+                inherit pkgs;
+                format = "toml";
+                empty = "{}";
+                jqOperation = "$dynamic * $static";
+                path = "${config.home.homeDirectory}/.codex/${name}.config.toml";
+                staticSettings =
+                  (pkgs.formats.toml { }).generate "codex-${name}-config"
+                    settings;
+                mode = "600";
+              }
+            ) config.programs.codex.profiles
+          )
+        )
+      );
+
   # CLI agent: Claude Code
   programs.claude-code = {
     enable = true;
@@ -372,10 +398,19 @@ in
   };
 
   # Select a profile at launch: claude --settings ~/.claude/profiles/docker.json
-  home.file = lib.mapAttrs' (
-    name: source:
-    lib.nameValuePair ".claude/profiles/${name}.json" {
-      inherit source;
-    }
-  ) claudeProfileFiles;
+  home.file =
+    lib.mapAttrs' (
+      name: source:
+      lib.nameValuePair ".claude/profiles/${name}.json" {
+        inherit source;
+      }
+    ) claudeProfileFiles
+    # Upstream links Codex profiles read-only from the store even with
+    # mutableSettings, so `codex --profile <name>` cannot persist its writes.
+    # Unlink them here; codexMutableProfiles merges them into writable files.
+    // lib.optionalAttrs config.programs.codex.mutableSettings (
+      lib.mapAttrs' (
+        name: _: lib.nameValuePair ".codex/${name}.config.toml" { enable = false; }
+      ) config.programs.codex.profiles
+    );
 }
