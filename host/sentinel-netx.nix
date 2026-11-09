@@ -143,5 +143,13 @@
   users.users.diwangs.openssh.authorizedKeys.keys = [
     (import ./identity/ssh.nix).diwangsPiv
   ];
-  security.sudo.wheelNeedsPassword = false;
+  # Keep real sudo alongside run0 (aspect/secret.nix disables it globally)
+  security.sudo = {
+    enable = lib.mkForce true;
+    wheelNeedsPassword = false;
+  };
+  security.run0 = {
+    wheelNeedsPassword = false;
+    sudo-shim.enable = lib.mkForce false; # Conflicts with real sudo
+  };
 }

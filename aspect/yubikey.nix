@@ -38,6 +38,20 @@
     };
   };
 
+  # polkit >= 127 runs its PAM helper as a sandboxed, socket-activated unit
+  # (`PrivateDevices=yes`, `DevicePolicy=strict`), which hides /dev/hidraw*
+  # from pam_u2f. With `unixAuth = false` every polkit auth (incl. `run0`)
+  # then fails instantly. Expose hidraw (plus RNG) devices to the helper.
+  systemd.services."polkit-agent-helper@".serviceConfig = {
+    PrivateDevices = false;
+    # Turning off PrivateDevices also drops its implicit allowlist, and
+    # pam_u2f reads /dev/urandom to build the challenge.
+    DeviceAllow = [
+      "char-hidraw rw"
+      "/dev/urandom r"
+    ];
+  };
+
   # Cosmetics
   services.displayManager.gdm.banner = "Password entry is disabled. Please use your FIDO2 authenticator.";
   security.sudo.extraConfig = ''

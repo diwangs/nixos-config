@@ -1,4 +1,13 @@
 { pkgs, agenix, ... }: {
+  # Superuser: run0
+  security = {
+    sudo.enable = false;
+    run0 = {
+      enable = true;
+      sudo-shim.enable = true;
+    };
+  };
+
   # SSH: we use yubikey-agent
   programs.ssh.enableAskPassword = true; # export SSH_ASKPASS
   services.gnome.gcr-ssh-agent.enable = false; # disable GCR SSH agent (25.11)
