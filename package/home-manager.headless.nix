@@ -350,7 +350,10 @@ in
       # effects outside the sandbox), TaskStop (only stops background tasks),
       # ToolSearch (only loads tool schemas; loaded tools still hit this hook) and
       # Agent (subagent tool calls pass through this same hook), including MCP
-      # and newly introduced tools.
+      # and newly introduced tools. ArtifactComments only exchanges text.
+      # Artifact and ArtifactData are allowed unless they read local files
+      # (`file_path`) into a shared database or write downloads to an arbitrary
+      # local path (`out_dir`); both would bypass the Landstrip policy.
       # PreToolUse decisions also apply in bypassPermissions mode.
       hooks.PreToolUse = [
         {
@@ -359,10 +362,14 @@ in
             {
               type = "command";
               command = "${pkgs.writeShellScript "claude-non-bash-block" ''
-                if ${lib.getExe pkgs.jq} -e '.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode")' >/dev/null 2>&1; then
+                if ${lib.getExe pkgs.jq} -e '
+                  (.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode", "ArtifactComments"))
+                  or (.tool_name == "Artifact" and (.tool_input | has("out_dir") | not))
+                  or (.tool_name == "ArtifactData" and (.tool_input | (has("out_dir") or has("file_path") or any(.writes[]?; has("file_path"))) | not))
+                ' >/dev/null 2>&1; then
                   exit 0
                 fi
-                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool disabled, bypasses sandbox. Retry through Bash, has sandbox hook."}}'
+                printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool disabled, bypasses sandbox or includes `out_dir` or `file_path. Strip them or retry through Bash, has sandbox hook."}}'
               ''}";
               timeout = 10;
             }
