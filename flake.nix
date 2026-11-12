@@ -132,44 +132,7 @@
         nixfmt = treefmtEval.config.build.check self;
       };
 
-      # One instance output: first installs unsigned and generates keys into
-      # /run, then uses the os-secret bundle for all later signed generations.
-      nixosConfigurations.sentinel-netx5 = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = {
-          inherit
-            disko
-            impermanence
-            allowedUnfree
-            os-secret
-            agenix
-            lanzaboote
-            ;
-        };
-        modules = [
-          ./host/sentinel-netx5.nix
-          ./nixos.headless.nix
-          home-manager.nixosModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.backupFileExtension = "bak";
-            home-manager.extraSpecialArgs = {
-              inherit
-                agenix
-                os-secret
-                allowedUnfree
-                self
-                ;
-            };
-            home-manager.users.diwangs.imports = [
-              ./host/sentinel-netx5-diwangs.hm.nix
-            ];
-          }
-        ];
-      };
-
-      # nixos-rebuild switch --flake path#hostname
+      # `paladin-iii`: bare-metal laptop
       nixosConfigurations.paladin-iii = nixpkgs.lib.nixosSystem rec {
         inherit system;
         # For nixos, but also passed to HM
@@ -202,8 +165,8 @@
           # even if it is used on home-manager, for consistency.
         };
         modules = [
-          ./host/paladin-iii.nix # Host-specific config (not portable)
           ./nixos.nix # Portable configs
+          ./host/paladin-iii.nix # Host-specific config (not portable)
 
           # Home Manager
           home-manager.nixosModules.home-manager
@@ -218,15 +181,53 @@
             # inside `home-manager.nix`.
             home-manager.users.diwangs = {
               imports = [
-                ./host/paladin-iii-diwangs.hm.nix # User-specific
                 ./home-manager.nix # Portable (desktop)
+                ./host/paladin-iii-diwangs.hm.nix # User-specific
               ];
             };
           }
         ];
       };
 
-      # Rootless hosts, keyed by username only: hostnames (AWS private-IP
+      # `sentinel-netx5`: lab's Proxmox VM
+      # One instance output: first installs unsigned and generates keys into
+      # /run, then uses the os-secret bundle for all later signed generations.
+      nixosConfigurations.sentinel-netx5 = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit
+            disko
+            impermanence
+            allowedUnfree
+            os-secret
+            agenix
+            lanzaboote
+            ;
+        };
+        modules = [
+          ./nixos.headless.nix
+          ./host/sentinel-netx5.nix
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.backupFileExtension = "bak";
+            home-manager.extraSpecialArgs = {
+              inherit
+                agenix
+                os-secret
+                allowedUnfree
+                self
+                ;
+            };
+            home-manager.users.diwangs.imports = [
+              ./host/sentinel-netx5-diwangs.hm.nix
+            ];
+          }
+        ];
+      };
+
+      # Managed hosts, keyed by username only: hostnames (AWS private-IP
       # derived, or Skipjack's login/compute nodes) aren't committed, so
       # home-manager's default `$USER@$HOST` lookup falls through to
       # `homeConfigurations.$USER`. Workflow on a host:
@@ -235,43 +236,44 @@
       # Adding a host = one entry below plus its host module.
       homeConfigurations =
         let
-          mkHeadlessHome =
-            { uid, module }:
-            home-manager.lib.homeManagerConfiguration {
-              pkgs = import nixpkgs {
-                inherit system;
-                overlays = [
-                  (import ./package/overlay/landstrip/overlay.nix)
-                ];
-                config.allowUnfreePredicate =
-                  pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
-              };
-              # No laptop-only args here (`secrets`, `pkgs-stable`): headless
-              # modules must not reference them.
-              extraSpecialArgs = {
-                inherit
-                  self
-                  allowedUnfree
-                  agenix
-                  os-secret
-                  ;
-              };
-              modules = [
-                { home.uid = uid; }
-                module # User-specific
-                ./home-manager.headless.nix # Portable (headless)
-              ];
-            };
+          # Standalone HM has no NixOS `pkgs` to share, so mirror the overlay
+          # and unfree list that nixos.headless.nix sets on NixOS hosts.
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [
+              (import ./package/overlay/landstrip/overlay.nix)
+            ];
+            config.allowUnfreePredicate =
+              pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
+          };
+          # No laptop-only args here (`pkgs-stable`, `nix-zed-extensions`, ...):
+          # headless modules must not reference them.
+          extraSpecialArgs = {
+            inherit
+              self
+              allowedUnfree
+              agenix
+              os-secret
+              ;
+          };
         in
         {
-          admin = mkHeadlessHome {
-            uid = 1000;
-            module = ./host/nova-devbox-admin.hm.nix;
+          # `sentinel-skipjack`: JHU-managed linux cluster
+          ssangdi1 = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs extraSpecialArgs;
+            modules = [
+              ./home-manager.headless.nix # Shared
+              ./host/sentinel-skipjack-ssangdi1.hm.nix # Host-specific
+            ];
           };
-          # JHU ARCH Skipjack; see host/skipjack/README.md
-          ssangdi1 = mkHeadlessHome {
-            uid = 11498;
-            module = ./host/sentinel-skipjack-ssangdi1.hm.nix;
+
+          # `nova-devbox`: AWS devbox
+          admin = home-manager.lib.homeManagerConfiguration {
+            inherit pkgs extraSpecialArgs;
+            modules = [
+              ./home-manager.headless.nix # Shared
+              ./host/nova-devbox-admin.hm.nix # Host-specific
+            ];
           };
         };
     };

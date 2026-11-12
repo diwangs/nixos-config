@@ -72,7 +72,16 @@ in
     nixd # Nix LSP for Zed and ACP agents
     tmux
 
-    # Little tools
+    # Little tools (NixOS hosts also ship some system-wide; rootless hosts don't)
+    nano
+    ripgrep
+    tree
+    htop
+    wget
+    curl
+    unzip
+    zip
+    rsync
     jq # JSON parser
     aws-vault # STS credential broker through ECS servers
     yubikey-manager # Supplies aws-vault's built-in non-terminal ykman driver

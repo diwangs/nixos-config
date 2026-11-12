@@ -1,12 +1,12 @@
 {
   config,
-  pkgs,
   os-secret,
   ...
 }:
 {
   home.stateVersion = "25.05";
   home.username = "admin";
+  home.uid = 1000;
   home.homeDirectory = "/home/admin";
 
   # Non-NixOS Linux hosts need profile/session glue that NixOS
@@ -40,17 +40,5 @@
   # No Secret Service on this rootless host; keyring elsewhere (oo7)
   programs.codex.settings.cli_auth_credentials_store = "file";
 
-  # Headless tools that NixOS provides system-wide on the laptop
   home.sessionPath = [ "$HOME/.local/bin" ];
-  home.packages = with pkgs; [
-    nano
-    ripgrep
-    tree
-    htop
-    wget
-    curl
-    unzip
-    zip
-    rsync
-  ];
 }

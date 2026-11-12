@@ -16,13 +16,9 @@ let
   # Canonical path behind ~/scratch_ycao43 (WekaFS, shared with the group).
   nixRoot = "/scratch/jhu/ycao43/ssangdi1/.nix";
 
-  # Must run outside /nix, so it has to be static; nixpkgs' pkgsStatic build
-  # isn't in the binary cache, so pin upstream's musl release (also used to
-  # bootstrap).
-  nixUserChroot = pkgs.fetchurl {
-    url = "https://github.com/nix-community/nix-user-chroot/releases/download/2.1.1/nix-user-chroot-bin-2.1.1-x86_64-unknown-linux-musl";
-    hash = "sha256-5tqmoDbgC5OVMeXBHm3NiRFAgToJlk/RKmQRLeUA/BU=";
-  };
+  # Runs outside /nix, so it must be static. Only this crate builds locally
+  # (seconds); the musl Rust toolchain comes from the binary cache.
+  nixUserChroot = "${pkgs.pkgsStatic.nix-user-chroot}/bin/nix-user-chroot";
 
   nixEnter = pkgs.replaceVars ./skipjack/nix-enter.sh {
     inherit nixRoot;
@@ -38,20 +34,14 @@ in
 {
   home.stateVersion = "25.05";
   home.username = "ssangdi1";
-  home.homeDirectory = "/home/jhu/ssangdi1";
+  home.uid = 11498;
+  home.homeDirectory = "/home/jhu/ssangdi1"; # explicit, since it's under `jhu`
 
   # Non-NixOS Linux hosts need profile/session glue that NixOS
   # normally provides.
   targets.genericLinux.enable = true;
   xdg.enable = true;
   manual.manpages.enable = true;
-
-  # No secrets on this shared cluster: agenix stays off, so the private
-  # os-secret input is never fetched here (no agent needed to switch).
-  age.enable = false;
-
-  # No Secret Service on this rootless host
-  programs.codex.settings.cli_auth_credentials_store = "file";
 
   # nix.conf for the single-user store. GC keeps it from crowding the
   # group's scratch quota.
@@ -84,17 +74,12 @@ in
     run skipjackPut 600 ${authorizedKeys} ${home}/.ssh/authorized_keys
   '';
 
-  # Headless tools that NixOS provides system-wide on the laptop
   home.sessionPath = [ "$HOME/.local/bin" ];
-  home.packages = with pkgs; [
-    nano
-    ripgrep
-    tree
-    htop
-    wget
-    curl
-    unzip
-    zip
-    rsync
-  ];
+
+  # No secrets on this shared cluster: agenix stays off, so the private
+  # os-secret input is never fetched here (no agent needed to switch).
+  age.enable = false;
+
+  # No Secret Service on this rootless host
+  programs.codex.settings.cli_auth_credentials_store = "file";
 }
