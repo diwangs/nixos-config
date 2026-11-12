@@ -14,6 +14,9 @@ in
       # Bug fix: brokered unix bind leaked `/proc/self/fd/N/...` into
       # getsockname(2), breaking go-plugin (Terraform providers).
       ./unix-bind-real-path.patch
+      # Bug fix: filesystems without user xattrs (WekaFS on Skipjack) made the
+      # optional per-executable policy lookup fail closed on every command.
+      ./xattr-unsupported-no-policy.patch
     ];
 
     # `-F0` forbids fuzzy context matching, so a landstrip release that reworks

@@ -1,0 +1,32 @@
+Treat "xattrs unsupported" as "no executable policy".
+
+Before launching a tool, `read_policy_bytes` reads the optional
+`user.landstrip.policy` xattr from the executable and fails closed on any
+error other than ENOENT/ENODATA. Filesystems without user xattrs (WekaFS on
+JHU Skipjack, where the Nix store and $HOME live, and some NFS setups) answer
+EOPNOTSUPP/ENOTSUP, so every sandboxed command dies with POLICY_IO_ERROR.
+
+Such a filesystem cannot carry the attribute at all, so there is no policy to
+miss: return `Ok(None)` for those errnos. Every other error still fails closed.
+
+Candidate for upstream as a bug fix. See package/overlay/landstrip/overlay.nix.
+
+diff --git a/packages/landstrip/src/config.rs b/packages/landstrip/src/config.rs
+index 4d7643b..e9af815 100644
+--- a/packages/landstrip/src/config.rs
++++ b/packages/landstrip/src/config.rs
+@@ -288,6 +288,14 @@ fn read_policy_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
+     match xattr::get_deref(path, EXECUTABLE_POLICY_XATTR) {
+         Ok(bytes) => Ok(bytes),
+         Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
++        // A filesystem without user xattrs (e.g. WekaFS, some NFS) cannot hold
++        // the attribute, so there is no policy to miss.
++        Err(source)
++            if source.raw_os_error() == Some(nix::libc::ENOTSUP)
++                || source.raw_os_error() == Some(nix::libc::EOPNOTSUPP) =>
++        {
++            Ok(None)
++        }
+         Err(source) => Err(Error::policy_io(source)),
+     }
+ }
