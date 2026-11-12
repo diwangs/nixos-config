@@ -226,40 +226,53 @@
         ];
       };
 
-      # Rootless devbox servers, keyed by username only: hostnames are AWS
-      # private-IP-derived and not committed, so home-manager's default
-      # `$USER@$HOST` lookup falls through to `homeConfigurations.$USER`.
-      # Workflow on a devbox:
+      # Rootless hosts, keyed by username only: hostnames (AWS private-IP
+      # derived, or Skipjack's login/compute nodes) aren't committed, so
+      # home-manager's default `$USER@$HOST` lookup falls through to
+      # `homeConfigurations.$USER`. Workflow on a host:
       #   git clone git@github.com:diwangs/nixos-config.git ~/.config/home-manager
       #   home-manager switch
-      # Adding a devbox user = adding one string to the list below.
-      homeConfigurations = nixpkgs.lib.genAttrs [ "admin" ] (
-        username:
-        home-manager.lib.homeManagerConfiguration {
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [
-              (import ./package/overlay/landstrip/overlay.nix)
-            ];
-            config.allowUnfreePredicate =
-              pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
+      # Adding a host = one entry below plus its host module.
+      homeConfigurations =
+        let
+          mkHeadlessHome =
+            { uid, module }:
+            home-manager.lib.homeManagerConfiguration {
+              pkgs = import nixpkgs {
+                inherit system;
+                overlays = [
+                  (import ./package/overlay/landstrip/overlay.nix)
+                ];
+                config.allowUnfreePredicate =
+                  pkg: builtins.elem (nixpkgs.lib.getName pkg) allowedUnfree;
+              };
+              # No laptop-only args here (`secrets`, `pkgs-stable`): headless
+              # modules must not reference them.
+              extraSpecialArgs = {
+                inherit
+                  self
+                  allowedUnfree
+                  agenix
+                  os-secret
+                  ;
+              };
+              modules = [
+                { home.uid = uid; }
+                module # User-specific
+                ./home-manager.headless.nix # Portable (headless)
+              ];
+            };
+        in
+        {
+          admin = mkHeadlessHome {
+            uid = 1000;
+            module = ./host/nova-devbox-admin.hm.nix;
           };
-          # No laptop-only args here (`secrets`, `pkgs-stable`): devbox-reachable
-          # modules must not reference them.
-          extraSpecialArgs = {
-            inherit
-              self
-              allowedUnfree
-              agenix
-              os-secret
-              ;
+          # JHU ARCH Skipjack; see host/skipjack/README.md
+          ssangdi1 = mkHeadlessHome {
+            uid = 11498;
+            module = ./host/sentinel-skipjack-ssangdi1.hm.nix;
           };
-          modules = [
-            { home.uid = 1000; }
-            ./host/nova-devbox-admin.hm.nix # User-specific
-            ./home-manager.headless.nix # Portable (devbox)
-          ];
-        }
-      );
+        };
     };
 }
