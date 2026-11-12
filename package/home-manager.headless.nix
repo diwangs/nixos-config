@@ -352,6 +352,7 @@ in
       # Agent (subagent tool calls pass through this same hook), including MCP
       # and newly introduced tools. ArtifactComments only exchanges text. Skill
       # only loads instructions (forked skills run as subagents, hooked as above).
+      # WebSearch runs server-side and only returns results as text.
       # Artifact and ArtifactData are allowed unless they read local files
       # (`file_path`) into a shared database or write downloads to an arbitrary
       # local path (`out_dir`); both would bypass the Landstrip policy.
@@ -364,7 +365,7 @@ in
               type = "command";
               command = "${pkgs.writeShellScript "claude-non-bash-block" ''
                 if ${lib.getExe pkgs.jq} -e '
-                  (.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode", "ArtifactComments", "Skill"))
+                  (.tool_name | IN("Bash", "Agent", "TaskStop", "ToolSearch", "AskUserQuestion", "ExitPlanMode", "ArtifactComments", "Skill", "WebSearch"))
                   or (.tool_name == "Artifact" and (.tool_input | has("out_dir") | not))
                   or (.tool_name == "ArtifactData" and (.tool_input | (has("out_dir") or has("file_path") or any(.writes[]?; has("file_path"))) | not))
                 ' >/dev/null 2>&1; then
