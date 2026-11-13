@@ -6,12 +6,12 @@ the Skipjack cluster, used from Zed on the laptop.
 - **Nix:** the store lives at `/scratch/jhu/ycao43/ssangdi1/.nix` and is
   bind-mounted at `/nix` by `nix-user-chroot` (unprivileged user namespace).
 - **Entry:** compute-node key logins hit a forced command in
-  `~/.ssh/authorized_keys` (`~/.local/bin/nix-enter`, from `nix-enter.sh`),
+  `~/.ssh/authorized_keys` (`~/.local/bin/skipjack-enter.sh`),
   which enters `/nix` and runs the requested command or a login zsh.
-- **Job:** `ssh sentinel-skipjack` runs `skipjack-jump` (`jump.sh`) on the login
-  node. It reuses or submits one `zed-dev` job (`interactive_cpu`, 4 hours,
+- **Job:** `ssh sentinel-skipjack` runs `skipjack-jump.sh` on the login
+  node. It reuses or submits one `sentinel-skipjack` job (`interactive_cpu`, 4 hours,
   4 CPUs, 8G) and pipes ssh to that node. The job survives disconnects;
-  `skipjack-stop` cancels it.
+  `scancel -u "$USER" -n sentinel-skipjack` on the login node cancels it.
 - `interactive_cpu` and `agentic` allow 4 CPUs and one job per user, at
   2000 MB per CPU, so larger `--mem` requests never start
   (`QOSMaxCpuPerUserLimit`).
@@ -19,7 +19,7 @@ the Skipjack cluster, used from Zed on the laptop.
   and the login node read them outside `/nix`.
 
 The laptop-side aliases `citadel-skipjack` (login node, shared MFA master) and
-`sentinel-skipjack` (ProxyCommand through `skipjack-jump`) live in the
+`sentinel-skipjack` (ProxyCommand through `skipjack-jump.sh`) live in the
 os-secret `ssh-hosts` include, not in this repo.
 
 `vscode_job.sh` is ARCH's original VS Code launcher, kept for reference.
@@ -37,13 +37,13 @@ the managed one.
 
    ```bash
    mkdir -p ~/.local/bin ~/.ssh && chmod 700 ~/.ssh
-   # copy host/skipjack/jump.sh here, e.g. with scp from the laptop
-   chmod 755 ~/.local/bin/skipjack-jump
+   # copy host/hardware-aspect/skipjack/skipjack-jump.sh here, e.g. with scp from the laptop
+   chmod 755 ~/.local/bin/skipjack-jump.sh
    echo "<diwangsPiv from host/identity/ssh.nix>" >~/.ssh/authorized_keys
    chmod 600 ~/.ssh/authorized_keys
    ```
 
-2. From the laptop, run `ssh sentinel-skipjack`. This submits `zed-dev` and gives
+2. From the laptop, run `ssh sentinel-skipjack`. This submits `sentinel-skipjack` and gives
    you a plain shell on the node. Then:
 
    ```bash
@@ -71,9 +71,9 @@ the managed one.
 After this, everything goes through `sentinel-skipjack`:
 
 ```bash
-ssh sentinel-skipjack                     # login zsh inside /nix on the zed-dev node
+ssh sentinel-skipjack                     # login zsh inside /nix on the job's node
 ssh sentinel-skipjack home-manager switch # update after pulling
-ssh citadel-skipjack ~/.local/bin/skipjack-stop
+ssh citadel-skipjack '/opt/mprov/cloack/slurm/current/bin/scancel -u "$USER" -n sentinel-skipjack'
 ```
 
 In Zed, open `ssh://sentinel-skipjack/~/<project>`. The remote server comes from
@@ -81,13 +81,13 @@ the same `flake.lock` as the laptop's Zed, so the versions match.
 
 To use different resources, pass sbatch flags to the jump script. They only
 apply when a new job is submitted:
-`ProxyCommand ssh citadel-skipjack '~/.local/bin/skipjack-jump -p agentic -t 1-00:00:00'`.
+`ProxyCommand ssh citadel-skipjack '~/.local/bin/skipjack-jump.sh -p agentic -t 1-00:00:00'`.
 
 ## Caveats
 
 - `/scratch` may be purged. If store paths vanish, run
   `nix-store --verify --check-contents --repair` and switch again.
 - Keep to one job at a time: the Nix SQLite database is on WekaFS.
-  `zed-dev` reuse guarantees this.
+  Job reuse guarantees this.
 - `authorized_keys` is fully managed, so add any other keys in the host
   module.

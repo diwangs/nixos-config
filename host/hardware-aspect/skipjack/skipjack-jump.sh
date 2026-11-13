@@ -1,16 +1,17 @@
 #!/bin/bash
 # ProxyCommand target on the Skipjack login node, installed as a real file by
 # host/sentinel-skipjack-ssangdi1.hm.nix. Reuses (or submits) one long-lived
-# job named `zed-dev`, then pipes stdio to that node's sshd. Disconnecting
-# leaves the job running; `skipjack-stop` cancels it.
+# job named `sentinel-skipjack`, then pipes stdio to that node's sshd.
+# Disconnecting leaves the job running; cancel it with
+# `scancel -u "$USER" -n sentinel-skipjack`.
 #
 # Extra arguments go to sbatch when a new job is submitted, e.g.
-#   ProxyCommand ssh citadel-skipjack '~/.local/bin/skipjack-jump -p agentic -t 1-00:00:00'
+#   ProxyCommand ssh citadel-skipjack '~/.local/bin/skipjack-jump.sh -p agentic -t 1-00:00:00'
 # Only Slurm queries run here: nothing heavy on the login node.
 set -euo pipefail
 
 export PATH="/opt/mprov/cloack/slurm/current/bin:$PATH"
-name=zed-dev
+name=sentinel-skipjack
 
 find_job() {
   squeue -h -u "$(id -un)" -n "$name" -t PENDING,CONFIGURING,RUNNING -o %i |
@@ -36,7 +37,7 @@ if [ -z "$jobid" ]; then
     "$@" \
     --wrap='exec sleep infinity')"
   jobid="${jobid%%;*}"
-  echo "skipjack-jump: submitted job $jobid" >&2
+  echo "skipjack-jump.sh: submitted job $jobid" >&2
 fi
 flock -u 9
 exec 9>&-
@@ -47,19 +48,19 @@ for _ in $(seq 1 900); do
   case "$state" in
     RUNNING) break ;;
     "")
-      echo "skipjack-jump: job $jobid is gone" >&2
+      echo "skipjack-jump.sh: job $jobid is gone" >&2
       exit 1
       ;;
   esac
   sleep 2
 done
 if [ "$state" != RUNNING ]; then
-  echo "skipjack-jump: job $jobid still $state, giving up" >&2
+  echo "skipjack-jump.sh: job $jobid still $state, giving up" >&2
   exit 1
 fi
 
 node="$(scontrol show hostnames "$(squeue -h -j "$jobid" -o %N)" | head -1)"
-echo "skipjack-jump: job $jobid on $node" >&2
+echo "skipjack-jump.sh: job $jobid on $node" >&2
 
 # Skipjack has no netcat; use bash's /dev/tcp. sshd may lag the job start.
 for _ in $(seq 1 30); do

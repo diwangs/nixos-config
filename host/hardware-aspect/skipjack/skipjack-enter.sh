@@ -4,7 +4,7 @@
 # /nix, so it re-executes itself inside nix-user-chroot, then runs the
 # requested command (Zed, scp, ssh-ng, ...) or a login shell.
 #
-# Also usable by hand, e.g. `nix-enter` in an `srun --pty` shell.
+# Also usable by hand, e.g. `skipjack-enter.sh` in an `srun --pty` shell.
 set -euo pipefail
 
 nix_root=@nixRoot@
@@ -17,7 +17,7 @@ if [ ! -d /nix ]; then
     exec "$chroot_bin" "$nix_root" "$0" "$@"
   fi
   # Never lock the key out of the node: degrade to the host environment.
-  echo "nix-enter: $nix_root not usable, continuing without Nix" >&2
+  echo "skipjack-enter.sh: $nix_root not usable, continuing without Nix" >&2
   cmd="${SSH_ORIGINAL_COMMAND:-}"
   if [ -n "$cmd" ]; then exec /bin/bash -c "$cmd"; fi
   if [ $# -gt 0 ]; then exec "$@"; fi

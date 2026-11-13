@@ -1,8 +1,8 @@
 # JHU ARCH Skipjack (rootless HPC). No /nix on the cluster: the store lives on
 # group scratch and is bind-mounted at /nix by nix-user-chroot. Compute-node
-# SSH logins enter it automatically through a forced command (nix-enter), so
+# SSH logins enter it automatically through a forced command (skipjack-enter.sh), so
 # Zed's remote server, terminals and agents all run inside /nix.
-# Bootstrap and laptop-side SSH: see host/skipjack/README.md.
+# Bootstrap and laptop-side SSH: see host/hardware-aspect/skipjack/README.md.
 {
   config,
   lib,
@@ -20,7 +20,7 @@ let
   # (seconds); the musl Rust toolchain comes from the binary cache.
   nixUserChroot = "${pkgs.pkgsStatic.nix-user-chroot}/bin/nix-user-chroot";
 
-  nixEnter = pkgs.replaceVars ./skipjack/nix-enter.sh {
+  skipjackEnter = pkgs.replaceVars ./hardware-aspect/skipjack/skipjack-enter.sh {
     inherit nixRoot;
     chrootBin = "${bin}/nix-user-chroot";
   };
@@ -28,7 +28,7 @@ let
   # Key logins to compute nodes always land in /nix. (The login node only
   # accepts MFA, so this never applies there.)
   authorizedKeys = pkgs.writeText "skipjack-authorized-keys" ''
-    command="${bin}/nix-enter" ${(import ./identity/ssh.nix).diwangsPiv} diwangs-piv
+    command="${bin}/skipjack-enter.sh" ${(import ./identity/ssh.nix).diwangsPiv} diwangs-piv
   '';
 in
 {
@@ -67,9 +67,8 @@ in
       mv -f "$3.tmp" "$3"
     }
     run skipjackPut 755 ${nixUserChroot} ${bin}/nix-user-chroot
-    run skipjackPut 755 ${nixEnter} ${bin}/nix-enter
-    run skipjackPut 755 ${./skipjack/jump.sh} ${bin}/skipjack-jump
-    run skipjackPut 755 ${./skipjack/stop.sh} ${bin}/skipjack-stop
+    run skipjackPut 755 ${skipjackEnter} ${bin}/skipjack-enter.sh
+    run skipjackPut 755 ${./hardware-aspect/skipjack/skipjack-jump.sh} ${bin}/skipjack-jump.sh
     run install -dm700 ${home}/.ssh
     run skipjackPut 600 ${authorizedKeys} ${home}/.ssh/authorized_keys
   '';
