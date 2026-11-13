@@ -60,6 +60,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Delta (Zed's AI coding assistant): official prebuilt binary, unfree.
+    delta-nix = {
+      url = "github:zed-industries/delta-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Official Hermes Desktop package.
     hermes-agent = {
       url = "github:NousResearch/hermes-agent/v0.23.0";
@@ -96,6 +102,7 @@
       impermanence,
       nix-flatpak,
       nix-zed-extensions,
+      delta-nix,
       hermes-agent,
       cua,
       treefmt-nix,
@@ -140,6 +147,7 @@
           inherit self;
           inherit cua;
           inherit nix-zed-extensions;
+          inherit delta-nix;
           inherit agenix; # for the CLI package in aspect/secret.nix
           inherit os-secret; # .age file paths in aspect/secret.nix
           inherit lanzaboote;

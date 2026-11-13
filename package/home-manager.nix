@@ -19,6 +19,7 @@
   lib,
   pkgs,
   pkgs-stable,
+  delta-nix,
   ...
 }:
 {
@@ -58,6 +59,8 @@
     ]
     ++ [
       pkgs-stable.codeql # Pin CodeQL.
+      # Delta (Zed's AI coding assistant). Not `pkgs.delta`, which is git-delta.
+      delta-nix.packages.${pkgs.stdenv.hostPlatform.system}.delta
     ];
 
   # Dev (OpenCode, direnv, and gh live in home-manager.headless.nix)
