@@ -43,6 +43,13 @@ in
   xdg.enable = true;
   manual.manpages.enable = true;
 
+  # nix-user-chroot maps only our uid, so root-owned host dirs appear as
+  # `nobody` inside /nix and compinit flags the /usr/share/zsh paths that
+  # targets.genericLinux adds. Drop them before compinit (order 570).
+  programs.zsh.initContent = lib.mkOrder 550 ''
+    fpath=(''${fpath:#/usr/share/zsh/*})
+  '';
+
   # nix.conf for the single-user store. GC keeps it from crowding the
   # group's scratch quota.
   nix = {
