@@ -150,4 +150,14 @@
     };
     Install.WantedBy = [ "default.target" ];
   };
+
+  # Terminal emulator: kitty
+  programs.kitty = {
+    enable = true;
+    settings = {
+      remember_window_size = "no";
+      initial_window_width = 1080;
+      initial_window_height = "25c"; # 24 + 1 for tmux bar
+    };
+  };
 }
