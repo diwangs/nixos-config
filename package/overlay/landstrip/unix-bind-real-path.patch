@@ -19,11 +19,11 @@ Rebased for 0.20.26: the bind rewrite moved into UnixSocketOp::handle, the
 target root is now TargetFilesystem::root, and Anchor lives in procfs.rs.
 
 diff --git a/packages/landstrip/src/platform/linux/seccomp/network.rs b/packages/landstrip/src/platform/linux/seccomp/network.rs
-index 37e06e5..dc800a2 100644
+index 2c030aa..bf30a92 100644
 --- a/packages/landstrip/src/platform/linux/seccomp/network.rs
 +++ b/packages/landstrip/src/platform/linux/seccomp/network.rs
 @@ -5,16 +5,19 @@ use super::error::{BrokerError, SysResult};
- use super::grant::{Grant, SocketAddrCall, SocketGrant};
+ use super::grant::{Grant, SessionBusGrant, SocketAddrCall, SocketGrant};
  use super::notify::NotificationResult;
  use super::process::{MissingTarget, TargetProcess};
 -use super::procfs::ProcFd;
@@ -43,7 +43,7 @@ index 37e06e5..dc800a2 100644
  use std::path::{Path, PathBuf};
  #[derive(Debug)]
  pub(super) struct TargetSocket {
-@@ -466,8 +469,8 @@ impl UnixSocketOp {
+@@ -493,8 +496,8 @@ impl UnixSocketOp {
                  socket.rewrite_unix_path(&ProcFd::new(object.as_fd()).proc_path())?;
              }
              Self::Bind => {
@@ -54,7 +54,7 @@ index 37e06e5..dc800a2 100644
              }
          }
          let grant = SocketGrant::new(socket.sock, socket.addr, self.call(), Some(anchor));
-@@ -487,6 +490,39 @@ impl UnixSocketOp {
+@@ -557,6 +560,39 @@ impl UnixSocketOp {
      }
  }
  

@@ -1,36 +1,13 @@
 {
   hermes-agent,
-  electron,
   lib,
-  nodejs_26,
+  patchelfUnstable,
   pkgs,
-  runCommandLocal,
   stdenv,
   writeShellScriptBin,
 }:
 let
   system = stdenv.hostPlatform.system;
-
-  # Hermes fetches an Electron headers archive with a hash pinned to the
-  # Electron version in its own nixpkgs lock. Repack nixpkgs' matching,
-  # already-fetched headers so the upstream build follows our Electron update
-  # without maintaining a second version/hash table here.
-  electronHeadersArchive =
-    runCommandLocal "electron-${electron.version}-headers.tar.gz" { }
-      ''
-        tar -C ${electron.headers} -czf "$out" .
-      '';
-
-  electronHeadersUrl = "https://artifacts.electronjs.org/headers/dist/v${electron.version}/node-v${electron.version}-headers.tar.gz";
-
-  hermesPkgs = pkgs // {
-    fetchurl =
-      args:
-      if args.url == electronHeadersUrl then
-        electronHeadersArchive
-      else
-        pkgs.fetchurl args;
-  };
 
   # Upstream's desktop derivation requires a Hermes Agent package and writes
   # its executable into the launcher as HERMES_DESKTOP_HERMES. Supply a tiny
@@ -42,19 +19,30 @@ let
     exit 1
   '';
 
-  # Hermes builds with an official Node release binary that autoPatchelfHook
-  # rewrites. That non-PIE executable gains an overlapping program header
-  # segment and segfaults before main, which breaks the renderer's npm steps.
-  # Rebuild Hermes' npm helpers on nixpkgs' source-built Node of the same
-  # major version; its pinned npm still comes from Hermes.
+  # Upstream autoPatchelfs its pm/lock.json tools (node, pnpm, ...) with
+  # nixpkgs' `patchelf` plus NixOS/patchelf#672, a fix for headers moved into
+  # an overlapping LOAD segment that makes node segfault before main. That
+  # patch targets 0.19.x, but our nixpkgs' `patchelf` is 0.15.2, where it does
+  # not apply. `patchelfUnstable` already contains the fix, so hand it over
+  # with its overrideAttrs neutralised to keep the patch from applying twice.
+  # Drop this once nixpkgs' `patchelf` is a release containing #672.
+  hermesPatchelf = patchelfUnstable // {
+    overrideAttrs = _: patchelfUnstable;
+  };
+
+  # Mirrors pmPackages and hermesNpmLib in upstream's nix/packages.nix and
+  # nix/hermes-agent.nix, differing only in the patchelf above.
+  hermesPmPackages = lib.filterAttrs (_: lib.isDerivation) (
+    pkgs.callPackage "${hermes-agent}/nix/pm-packages.nix" {
+      patchelf = hermesPatchelf;
+    }
+  );
   hermesNpmLib = pkgs.callPackage "${hermes-agent}/nix/lib.nix" {
-    pmPackages.node = nodejs_26;
+    pmPackages = hermesPmPackages;
   };
 
   upstream = hermes-agent.packages.${system}.desktop.override {
-    pkgs = hermesPkgs;
     inherit hermesNpmLib;
-    inherit electron;
     hermesAgent = hermes-placeholder;
     extraEnv.HERMES_DESKTOP_PASSWORD_STORE = "gnome-libsecret";
   };
