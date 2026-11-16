@@ -71,6 +71,7 @@ in
     # DevEx
     nixd # Nix LSP for Zed and ACP agents
     tmux
+    kitty.terminfo # TERM=xterm-kitty over SSH (else zle garbles input)
 
     # Little tools (NixOS hosts also ship some system-wide; rootless hosts don't)
     nano
