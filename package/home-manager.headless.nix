@@ -268,9 +268,10 @@ in
       - Landstrip restricts filesystem access and allowlists AF_UNIX socket paths
       - Landstrip leaves AF_INET and AF_INET6 sockets unrestricted
 
-      # Python and Node in Nix Environment
+      # Software in Nix Environment
       - Python is available via `uv` (e.g., `uv run`)
-      - Node is available via `fnm` (e.g., `fnm exec --using=24`)
+      - Node is available via `fnm` (e.g., `fnm exec --using=26`)
+      - Use `nix shell` to obtain other missing software
     '';
     profiles = rec {
       # Custom profile to use Bedrock.
@@ -334,18 +335,20 @@ in
     # Merge into a writable settings.json so changes Claude Code persists (e.g.,
     # via /config) survive activation. Declared values below take precedence.
     mutableSettings = true;
+    context = ''
+      @~/.codex/AGENTS.md
+
+      # Tools
+      Only Bash, Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode
+      are permitted. Use shell commands for reading, searching, editing, and
+      other operations; all other tools are blocked.
+    '';
     settings = {
       permissions.defaultMode = "bypassPermissions";
       skipDangerousModePermissionPrompt = true;
       tui = "fullscreen";
       sandbox.enabled = false;
       autoMemoryEnabled = false;
-      context = ''
-        @~/.codex/AGENTS.md
-        Only Bash, Agent, TaskStop, ToolSearch, AskUserQuestion, and ExitPlanMode
-        are permitted. Use shell commands for reading, searching, editing, and
-        other operations; all other tools are blocked.
-      '';
       env = {
         CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = "0"; # Enables bwrap if true
         CLAUDE_CODE_SHELL = "${pkgs.writeShellScriptBin "bash" ''
