@@ -37,6 +37,7 @@
         disable-user-extensions = false;
         enabled-extensions = [
           pkgs.gnomeExtensions.vitals.extensionUuid
+          pkgs.gnomeExtensions.appindicator.extensionUuid
           "winrects@cua"
         ];
       };

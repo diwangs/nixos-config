@@ -1,6 +1,8 @@
 {
   config,
+  lib,
   pkgs,
+  pkgs-stable,
   cua,
   ...
 }:
@@ -53,6 +55,7 @@ in
 
     # Gnome things
     gnomeExtensions.vitals # Gnome performance manager
+    gnomeExtensions.appindicator # Tray icons (e.g., SeaDrive's menu)
     winrects-cua # cua-driver Wayland window-rect/cursor helper
     ffmpegthumbnailer # For video thumbnails
     ffmpeg-headless
@@ -72,4 +75,13 @@ in
   ];
 
   programs.yubikey-manager.enable = true;
+
+  # fuse2 `fusermount` for SeaDrive (pkgs-stable). Unstable's programs.fuse
+  # only wraps fusermount3; stable libfuse2 looks in /run/wrappers/bin.
+  security.wrappers.fusermount = {
+    owner = "root";
+    group = "root";
+    setuid = true;
+    source = "${lib.getBin pkgs-stable.fuse2}/bin/fusermount";
+  };
 }

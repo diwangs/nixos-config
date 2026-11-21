@@ -30,6 +30,7 @@
       lm_sensors # Power and temperature monitoring
       crosspipe # Pipewire multimedia patchbay
       key-rack
+      seadrive-gui # Seafile virtual drive (FUSE), see overlay/seadrive-gui
 
       # Runtime environment (or environment manager)
       conda # Python environment manager	  		(conda-shell)

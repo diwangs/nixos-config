@@ -51,6 +51,12 @@
 
     (import ./package/overlay/key-rack/overlay.nix)
 
+    # SeaDrive GUI from pkgs-stable, with a single-instance guard fix. See
+    # package/overlay/seadrive-gui/overlay.nix.
+    (import ./package/overlay/seadrive-gui/overlay.nix {
+      inherit (args) pkgs-stable;
+    })
+
     # fwupd HSI: detect encrypted swapfile on btrfs-on-LUKS, see
     # package/overlay/fwupd/overlay.nix.
     (import ./package/overlay/fwupd/overlay.nix)
