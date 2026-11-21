@@ -1,0 +1,74 @@
+Allow O_PATH traversal handles on directories leading to read roots.
+
+When `denyRead` names paths below `/` (e.g. `$HOME`, `/run/user/<uid>/...`),
+`LoweredReadAccess::restricted` drops `/` from the read roots and splits it
+into the siblings of each denied path. The directories on the way to those
+denials (`/`, `/home`, `/run`, `/run/user/<uid>`, ...) end up under no read
+root, so the seccomp broker refuses every `openat` of them as `allow_miss`,
+including `O_PATH | O_DIRECTORY`, which reads nothing.
+
+Nix 2.35 resolves every path beneath a root descriptor opened on `/`
+(`makeFSSourceAccessor("/")`, then `openat2(..., RESOLVE_BENEATH)`). It
+already falls back to an `O_PATH | O_DIRECTORY` "traversable" handle when the
+`O_RDONLY` open fails with EACCES, but the broker refuses that too, so every
+evaluation that touches the filesystem dies with `opening file "/":
+Permission denied`.
+
+Let `O_PATH | O_DIRECTORY` opens through when the target is a strict ancestor
+of a read root and is not read-denied. Such a handle only anchors `*at` calls,
+which the broker mediates on their own. `O_DIRECTORY` keeps it off regular
+files, which could otherwise be hardlinked elsewhere and read. Listing those
+directories (`O_RDONLY`) and hard `denyReadAlways` matches stay denied.
+
+Candidate for upstream as a bug fix. See package/overlay/landstrip/overlay.nix.
+
+diff --git a/packages/landstrip/src/platform/linux/seccomp/fs.rs b/packages/landstrip/src/platform/linux/seccomp/fs.rs
+index 6c3af7d..eb6ed54 100644
+--- a/packages/landstrip/src/platform/linux/seccomp/fs.rs
++++ b/packages/landstrip/src/platform/linux/seccomp/fs.rs
+@@ -796,7 +796,15 @@ pub(super) fn handle_openat(
+         }
+         .deny(denials, allow_query);
+     }
+-    if wants_read && let Some(reason) = policy.read_access_reason(&resolved, &lexical) {
++    // Directories leading to a read root may be opened as traversal handles.
++    let traversal_flags = libc::O_PATH | libc::O_DIRECTORY;
++    let traversal = (flags & traversal_flags) == traversal_flags
++        && !hard_read_denied
++        && policy.read_traversal_allowed(&resolved, &lexical);
++    if wants_read
++        && !traversal
++        && let Some(reason) = policy.read_access_reason(&resolved, &lexical)
++    {
+         return OpenDenial {
+             operation: TrapOperation::Read,
+             path: resolved,
+diff --git a/packages/landstrip/src/policy.rs b/packages/landstrip/src/policy.rs
+index 20ea1b2..ee66ebf 100644
+--- a/packages/landstrip/src/policy.rs
++++ b/packages/landstrip/src/policy.rs
+@@ -268,6 +268,24 @@ impl AccessPolicy {
+         }
+     }
+ 
++    /// Whether `canonical` may be opened as an `O_PATH | O_DIRECTORY`
++    /// traversal handle even though it is not under a read root itself.
++    ///
++    /// Splitting `/` around read denials leaves the directories on the way to
++    /// those denials (`/`, `/home`, `/run/user/1000`, ...) outside every read
++    /// root. Such a handle exposes no data: it only anchors `*at` calls, which
++    /// are mediated on their own, and `O_DIRECTORY` keeps it off regular files
++    /// that could otherwise be hardlinked elsewhere and read.
++    pub(crate) fn read_traversal_allowed(&self, canonical: &Path, lexical: &Path) -> bool {
++        match &self.read_access {
++            ReadAccess::Unrestricted => true,
++            ReadAccess::AllowRoots(roots) => {
++                !self.read_denials.is_denied_pair(canonical, lexical)
++                    && roots.iter().any(|root| root.is_strictly_under(canonical))
++            }
++        }
++    }
++
+     pub(crate) fn read_access_reason(
+         &self,
+         canonical: &Path,

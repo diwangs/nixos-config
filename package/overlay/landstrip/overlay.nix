@@ -17,6 +17,9 @@ in
       # Bug fix: filesystems without user xattrs (WekaFS on Skipjack) made the
       # optional per-executable policy lookup fail closed on every command.
       ./xattr-unsupported-no-policy.patch
+      # Bug fix: directories on the way to a denyRead path (`/`, `/home`, ...)
+      # refused even O_PATH traversal handles, breaking Nix >= 2.35.
+      ./opath-traverse-read-ancestors.patch
     ];
 
     # `-F0` forbids fuzzy context matching, so a landstrip release that reworks
